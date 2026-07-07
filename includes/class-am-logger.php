@@ -35,20 +35,6 @@ class AM_Logger {
 		return $map[ $level ] ?? '';
 	}
 
-	/**
-	 * Write an event to the log.
-	 *
-	 * @param string $event_type  Dot-namespaced key, e.g. "post.update"
-	 * @param string $message     Human-readable description
-	 * @param array  $args {
-	 *   severity    (int)    default NOTICE
-	 *   object_type (string) 'post','user','option', etc.
-	 *   object_id   (int)
-	 *   object_name (string)
-	 *   meta        (array)  arbitrary extra data
-	 *   user_id     (int)    override; defaults to current user
-	 * }
-	 */
 	public static function log( string $event_type, string $message, array $args = array() ) {
 		$user = wp_get_current_user();
 
@@ -78,7 +64,6 @@ class AM_Logger {
 			'meta'        => $args['meta'],
 		) );
 
-		// Fire notifications if row was saved
 		if ( $row_id ) {
 			AM_Notifications::maybe_notify( $args['severity'], $event_type, $message, $args );
 		}

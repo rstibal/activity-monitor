@@ -1,6 +1,6 @@
 <?php
 /**
- * AM_Admin — registers menus, renders all tabbed UI, handles form actions.
+ * AM_Admin – registers menus, renders all tabbed UI, handles form actions.
  *
  * Single top-level menu page with three tabs:
  *   1. Activity Log
@@ -8,7 +8,7 @@
  *   3. Settings  (notifications + general settings + clear-log)
  *
  * @package ActivityMonitor
- * @version 1.1.4
+ * @version 1.4.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -17,25 +17,25 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class AM_Admin {
 
-	/** Query-string key that controls which tab is active. */
 	const TAB_PARAM = 'am_tab';
 
-	// ── Bootstrap ─────────────────────────────────────────────────────────────
+	// ── Bootstrap ──────────────────────────────────────────────────────
 
 	public static function init() {
 		$instance = new self();
 
-		add_action( 'admin_menu',                    array( $instance, 'register_menu' ) );
-		add_action( 'admin_enqueue_scripts',         array( $instance, 'enqueue_assets' ) );
-		add_action( 'admin_init',                    array( $instance, 'register_settings' ) );
-		add_action( 'admin_post_am_clear_log',       array( $instance, 'handle_clear_log' ) );
-		add_action( 'admin_post_am_revoke_session',  array( $instance, 'handle_revoke_session' ) );
-		add_action( 'admin_notices',                 array( $instance, 'show_notices' ) );
-		add_action( 'wp_ajax_am_get_event_detail',   array( $instance, 'ajax_event_detail' ) );
-		add_action( 'wp_ajax_am_get_session_detail', array( $instance, 'ajax_session_detail' ) );
+		add_action( 'admin_menu',                             array( $instance, 'register_menu' ) );
+		add_action( 'admin_enqueue_scripts',                  array( $instance, 'enqueue_assets' ) );
+		add_action( 'admin_init',                             array( $instance, 'register_settings' ) );
+		add_action( 'admin_post_am_clear_log',                array( $instance, 'handle_clear_log' ) );
+		add_action( 'admin_post_am_revoke_session',           array( $instance, 'handle_revoke_session' ) );
+		add_action( 'admin_post_am_revoke_expired',           array( $instance, 'handle_revoke_expired' ) );
+		add_action( 'admin_notices',                          array( $instance, 'show_notices' ) );
+		add_action( 'wp_ajax_am_get_event_detail',            array( $instance, 'ajax_event_detail' ) );
+		add_action( 'wp_ajax_am_get_session_detail',          array( $instance, 'ajax_session_detail' ) );
 	}
 
-	// ── Menu ──────────────────────────────────────────────────────────────────
+	// ── Menu ───────────────────────────────────────────────────────────
 
 	public function register_menu() {
 		add_menu_page(
@@ -47,8 +47,6 @@ class AM_Admin {
 			'dashicons-shield-alt',
 			2
 		);
-
-		// Single sub-entry so the menu label matches the parent.
 		add_submenu_page(
 			'activity-monitor',
 			__( 'Activity Monitor', 'activity-monitor' ),
@@ -59,13 +57,12 @@ class AM_Admin {
 		);
 	}
 
-	// ── Assets ────────────────────────────────────────────────────────────────
+	// ── Assets ─────────────────────────────────────────────────────────
 
 	public function enqueue_assets( $hook ) {
 		if ( 'toplevel_page_activity-monitor' !== $hook ) {
 			return;
 		}
-
 		wp_enqueue_style( 'am-admin', AM_URL . 'assets/css/admin.css', array(), AM_VERSION );
 		wp_enqueue_script( 'am-admin', AM_URL . 'assets/js/admin.js', array( 'jquery' ), AM_VERSION, true );
 		wp_localize_script( 'am-admin', 'amData', array(
@@ -74,90 +71,76 @@ class AM_Admin {
 		) );
 	}
 
-	// ── Settings registration ─────────────────────────────────────────────────
+	// ── Settings registration ────────────────────────────────────────────
 
 	public function register_settings() {
-		register_setting( 'am_settings_group', 'am_settings', array(
-			'sanitize_callback' => array( $this, 'sanitize_settings' ),
-			'default'           => array( 'retention_days' => 90 ),
-		) );
-
 		register_setting( 'am_notifications_group', 'am_notification_channels', array(
 			'sanitize_callback' => array( $this, 'sanitize_channels' ),
 			'default'           => array(),
 		) );
 	}
 
-	public function sanitize_settings( $input ) {
-		return array(
-			'retention_days' => min( 365, max( 7, absint( $input['retention_days'] ?? 90 ) ) ),
-		);
-	}
-
 	public function sanitize_channels( $input ) {
 		if ( ! is_array( $input ) ) {
 			return array();
 		}
-
 		$clean = array();
 		foreach ( $input as $ch ) {
 			$type = sanitize_key( $ch['type'] ?? '' );
 			if ( ! in_array( $type, array( 'email', 'slack' ), true ) ) {
 				continue;
 			}
-
 			$entry = array(
 				'type'     => $type,
 				'name'     => sanitize_text_field( $ch['name'] ?? '' ),
 				'severity' => absint( $ch['severity'] ?? AM_Logger::CRITICAL ),
 			);
-
 			if ( $type === 'email' ) {
 				$emails = array_filter( array_map( 'trim', explode( ',', $ch['recipients'] ?? '' ) ) );
 				$entry['recipients'] = implode( ', ', array_filter( $emails, 'is_email' ) );
 			} elseif ( $type === 'slack' ) {
 				$entry['webhook_url'] = esc_url_raw( $ch['webhook_url'] ?? '' );
 			}
-
 			$clean[] = $entry;
 		}
-
 		return $clean;
 	}
 
-	// ── Admin notices ─────────────────────────────────────────────────────────
+	// ── Admin notices ────────────────────────────────────────────────────
 
 	public function show_notices() {
 		$screen = get_current_screen();
 		if ( ! $screen || 'toplevel_page_activity-monitor' !== $screen->id ) {
 			return;
 		}
-
 		if ( isset( $_GET['am_cleared'] ) ) {
 			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Activity log cleared.', 'activity-monitor' ) . '</p></div>';
 		}
-
 		if ( isset( $_GET['am_revoked'] ) ) {
 			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Session revoked.', 'activity-monitor' ) . '</p></div>';
 		}
+		if ( isset( $_GET['am_expired_revoked'] ) ) {
+			$count = absint( $_GET['am_expired_revoked'] );
+			echo '<div class="notice notice-success is-dismissible"><p>' . sprintf(
+				esc_html( _n( '%d expired session revoked.', '%d expired sessions revoked.', $count, 'activity-monitor' ) ),
+				$count
+			) . '</p></div>';
+		}
 	}
 
-	// ── Action handlers ───────────────────────────────────────────────────────
+	// ── Action handlers ──────────────────────────────────────────────────
 
 	public function handle_clear_log() {
 		check_admin_referer( 'am_clear_log' );
-
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_die( esc_html__( 'Unauthorized.', 'activity-monitor' ) );
 		}
-
 		AM_DB::clear_all();
 		AM_Logger::log( 'log.clear', 'Activity log was cleared by an administrator.', array(
 			'severity'    => AM_Logger::WARNING,
 			'object_type' => 'log',
 			'object_name' => 'activity-log',
 		) );
-
 		wp_safe_redirect( add_query_arg(
 			array( 'page' => 'activity-monitor', self::TAB_PARAM => 'settings', 'am_cleared' => '1' ),
 			admin_url( 'admin.php' )
@@ -167,7 +150,6 @@ class AM_Admin {
 
 	public function handle_revoke_session() {
 		check_admin_referer( 'am_revoke_session' );
-
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_die( esc_html__( 'Unauthorized.', 'activity-monitor' ) );
 		}
@@ -207,11 +189,57 @@ class AM_Admin {
 		exit;
 	}
 
-	// ── AJAX ──────────────────────────────────────────────────────────────────
+	public function handle_revoke_expired() {
+		check_admin_referer( 'am_revoke_expired' );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Unauthorized.', 'activity-monitor' ) );
+		}
+
+		$now   = time();
+		$count = 0;
+		$users = get_users( array( 'fields' => array( 'ID', 'user_login' ) ) );
+
+		foreach ( $users as $user ) {
+			$sessions = get_user_meta( $user->ID, 'session_tokens', true );
+			if ( ! is_array( $sessions ) || empty( $sessions ) ) {
+				continue;
+			}
+			$updated = false;
+			foreach ( $sessions as $token_hash => $session ) {
+				$expiration = isset( $session['expiration'] ) ? (int) $session['expiration'] : 0;
+				if ( $expiration > 0 && $expiration < $now ) {
+					unset( $sessions[ $token_hash ] );
+					$count++;
+					$updated = true;
+				}
+			}
+			if ( $updated ) {
+				update_user_meta( $user->ID, 'session_tokens', $sessions );
+			}
+		}
+
+		if ( $count > 0 ) {
+			AM_Logger::log( 'user.expired_sessions_revoked', sprintf(
+				'%d expired session(s) revoked across all users.', $count
+			), array(
+				'severity'    => AM_Logger::WARNING,
+				'object_type' => 'user',
+				'object_name' => 'all-users',
+				'meta'        => array( 'count' => $count ),
+			) );
+		}
+
+		wp_safe_redirect( add_query_arg(
+			array( 'page' => 'activity-monitor', self::TAB_PARAM => 'settings', 'am_expired_revoked' => $count ),
+			admin_url( 'admin.php' )
+		) );
+		exit;
+	}
+
+	// ── AJAX ─────────────────────────────────────────────────────────────
 
 	public function ajax_event_detail() {
 		check_ajax_referer( 'am_ajax', 'nonce' );
-
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_die( '-1' );
 		}
@@ -232,84 +260,81 @@ class AM_Admin {
 		ob_start();
 		?>
 		<table class="am-detail-table">
-			<tr>
-				<th><?php esc_html_e( 'ID', 'activity-monitor' ); ?></th>
-				<td><?php echo esc_html( $row->id ); ?></td>
-			</tr>
-			<tr>
-				<th><?php esc_html_e( 'Date / Time', 'activity-monitor' ); ?></th>
-				<td><?php echo esc_html( $row->created_at ); ?> UTC</td>
-			</tr>
+			<tr><th><?php esc_html_e( 'ID', 'activity-monitor' ); ?></th><td><?php echo esc_html( $row->id ); ?></td></tr>
+			<tr><th><?php esc_html_e( 'Date / Time', 'activity-monitor' ); ?></th><td><?php echo esc_html( $row->created_at ); ?> UTC</td></tr>
 			<tr>
 				<th><?php esc_html_e( 'Severity', 'activity-monitor' ); ?></th>
-				<td>
-					<span class="am-badge <?php echo esc_attr( AM_Logger::severity_class( (int) $row->severity ) ); ?>">
-						<?php echo esc_html( AM_Logger::severity_label( (int) $row->severity ) ); ?>
-					</span>
-				</td>
+				<td><span class="am-badge <?php echo esc_attr( AM_Logger::severity_class( (int) $row->severity ) ); ?>"><?php echo esc_html( AM_Logger::severity_label( (int) $row->severity ) ); ?></span></td>
 			</tr>
-			<tr>
-				<th><?php esc_html_e( 'Event Type', 'activity-monitor' ); ?></th>
-				<td><?php echo esc_html( $row->event_type ); ?></td>
-			</tr>
+			<tr><th><?php esc_html_e( 'Event Type', 'activity-monitor' ); ?></th><td><?php echo esc_html( $row->event_type ); ?></td></tr>
 			<tr>
 				<th><?php esc_html_e( 'User', 'activity-monitor' ); ?></th>
-				<td>
-					<?php echo esc_html( $row->user_name ); ?>
-					<?php if ( $row->user_role ) echo ' (' . esc_html( $row->user_role ) . ')'; ?>
-				</td>
+				<td><?php echo esc_html( $row->user_name ); ?><?php if ( $row->user_role ) echo ' (' . esc_html( $row->user_role ) . ')'; ?></td>
 			</tr>
-			<tr>
-				<th><?php esc_html_e( 'IP Address', 'activity-monitor' ); ?></th>
-				<td><?php echo esc_html( $row->ip_address ); ?></td>
-			</tr>
+			<tr><th><?php esc_html_e( 'IP Address', 'activity-monitor' ); ?></th><td><?php echo esc_html( $row->ip_address ); ?></td></tr>
 			<tr>
 				<th><?php esc_html_e( 'Object', 'activity-monitor' ); ?></th>
 				<td>
 					<?php echo esc_html( $row->object_type ); ?>
-					<?php if ( $row->object_name ) echo ' — ' . esc_html( $row->object_name ); ?>
+					<?php if ( $row->object_name ) echo ' – ' . esc_html( $row->object_name ); ?>
 					<?php if ( $row->object_id )   echo ' (ID: ' . esc_html( $row->object_id ) . ')'; ?>
 				</td>
 			</tr>
-			<tr>
-				<th><?php esc_html_e( 'Message', 'activity-monitor' ); ?></th>
-				<td><?php echo esc_html( $row->message ); ?></td>
-			</tr>
+			<tr><th><?php esc_html_e( 'Message', 'activity-monitor' ); ?></th><td><?php echo esc_html( $row->message ); ?></td></tr>
 			<?php if ( ! empty( $meta ) ) : ?>
-			<tr>
-				<th><?php esc_html_e( 'Meta', 'activity-monitor' ); ?></th>
-				<td><pre><?php echo esc_html( wp_json_encode( $meta, JSON_PRETTY_PRINT ) ); ?></pre></td>
-			</tr>
+			<tr><th><?php esc_html_e( 'Meta', 'activity-monitor' ); ?></th><td><pre><?php echo esc_html( wp_json_encode( $meta, JSON_PRETTY_PRINT ) ); ?></pre></td></tr>
 			<?php endif; ?>
 		</table>
 		<?php
 		wp_send_json_success( array( 'html' => ob_get_clean() ) );
 	}
 
+	/**
+	 * FIX #2: Re-fetch session data from the database rather than trusting
+	 * POST-supplied display values. Only user_id and token_hash are accepted
+	 * from POST; everything else is re-derived server-side.
+	 */
 	public function ajax_session_detail() {
 		check_ajax_referer( 'am_ajax', 'nonce' );
-
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_die( '-1' );
 		}
 
-		// Session data is passed directly from the page via POST.
-		$user_id      = absint( $_POST['user_id']      ?? 0 );
-		$user_login   = sanitize_text_field( wp_unslash( $_POST['user_login']   ?? '' ) );
-		$display_name = sanitize_text_field( wp_unslash( $_POST['display_name'] ?? '' ) );
-		$token_hash   = sanitize_text_field( wp_unslash( $_POST['token_hash']   ?? '' ) );
-		$login_ts     = absint( $_POST['login_ts']     ?? 0 );
-		$expiry_ts    = absint( $_POST['expiry_ts']    ?? 0 );
-		$ip           = sanitize_text_field( wp_unslash( $_POST['ip']           ?? '' ) );
-		$ua           = sanitize_text_field( wp_unslash( $_POST['ua']           ?? '' ) );
-		$is_current   = (bool) ( $_POST['is_current']  ?? false );
+		$user_id    = absint( $_POST['user_id'] ?? 0 );
+		$token_hash = sanitize_text_field( wp_unslash( $_POST['token_hash'] ?? '' ) );
 
-		$date_format  = get_option( 'date_format' ) . ' ' . get_option( 'time_format' );
-		$login_text   = $login_ts  ? wp_date( $date_format, $login_ts )  : __( 'Unknown', 'activity-monitor' );
-		$expiry_text  = $expiry_ts ? wp_date( $date_format, $expiry_ts ) : __( 'Never',   'activity-monitor' );
-		$browser      = $this->parse_user_agent( $ua );
-		$now          = time();
-		$is_expired   = ( $expiry_ts > 0 && $expiry_ts < $now );
+		if ( ! $user_id || ! $token_hash ) {
+			wp_send_json_error( 'Invalid request' );
+		}
+
+		// Re-fetch authoritative data from the database.
+		$user = get_userdata( $user_id );
+		if ( ! $user ) {
+			wp_send_json_error( 'User not found' );
+		}
+
+		$sessions = get_user_meta( $user_id, 'session_tokens', true );
+		if ( ! is_array( $sessions ) || ! isset( $sessions[ $token_hash ] ) ) {
+			wp_send_json_error( 'Session not found' );
+		}
+
+		$session = $sessions[ $token_hash ];
+
+		// Derive values from authoritative session data – not from POST.
+		$login_ts   = isset( $session['login'] )      ? (int) $session['login']      : 0;
+		$expiry_ts  = isset( $session['expiration'] ) ? (int) $session['expiration'] : 0;
+		$ip         = isset( $session['ip'] )         ? sanitize_text_field( $session['ip'] ) : '';
+		$ua         = isset( $session['ua'] )         ? sanitize_text_field( $session['ua'] ) : '';
+
+		$date_format = get_option( 'date_format' ) . ' ' . get_option( 'time_format' );
+		$login_text  = $login_ts  ? wp_date( $date_format, $login_ts )  : __( 'Unknown', 'activity-monitor' );
+		$expiry_text = $expiry_ts ? wp_date( $date_format, $expiry_ts ) : __( 'Never',   'activity-monitor' );
+		$browser     = $this->parse_user_agent( $ua );
+		$now         = time();
+		$is_expired  = ( $expiry_ts > 0 && $expiry_ts < $now );
+
+		$current_token_hash = hash( 'sha256', wp_get_session_token() );
+		$is_current = ( $user_id === get_current_user_id() && hash_equals( $current_token_hash, $token_hash ) );
 
 		ob_start();
 		?>
@@ -317,17 +342,14 @@ class AM_Admin {
 			<tr>
 				<th><?php esc_html_e( 'User', 'activity-monitor' ); ?></th>
 				<td>
-					<strong><?php echo esc_html( $display_name ); ?></strong>
-					(<?php echo esc_html( $user_login ); ?>, ID: <?php echo esc_html( $user_id ); ?>)
+					<strong><?php echo esc_html( $user->display_name ); ?></strong>
+					(<?php echo esc_html( $user->user_login ); ?>, ID: <?php echo esc_html( $user_id ); ?>)
 					<?php if ( $is_current ) : ?>
 						<span class="am-badge am-info"><?php esc_html_e( 'You', 'activity-monitor' ); ?></span>
 					<?php endif; ?>
 				</td>
 			</tr>
-			<tr>
-				<th><?php esc_html_e( 'Logged In', 'activity-monitor' ); ?></th>
-				<td><?php echo esc_html( $login_text ); ?></td>
-			</tr>
+			<tr><th><?php esc_html_e( 'Logged In', 'activity-monitor' ); ?></th><td><?php echo esc_html( $login_text ); ?></td></tr>
 			<tr>
 				<th><?php esc_html_e( 'Expiry', 'activity-monitor' ); ?></th>
 				<td>
@@ -337,28 +359,16 @@ class AM_Admin {
 					<?php endif; ?>
 				</td>
 			</tr>
-			<tr>
-				<th><?php esc_html_e( 'IP Address', 'activity-monitor' ); ?></th>
-				<td><code><?php echo esc_html( $ip ); ?></code></td>
-			</tr>
-			<tr>
-				<th><?php esc_html_e( 'Browser / UA', 'activity-monitor' ); ?></th>
-				<td><?php echo esc_html( $browser ); ?></td>
-			</tr>
-			<tr>
-				<th><?php esc_html_e( 'User Agent', 'activity-monitor' ); ?></th>
-				<td><small><?php echo esc_html( $ua ); ?></small></td>
-			</tr>
-			<tr>
-				<th><?php esc_html_e( 'Session ID', 'activity-monitor' ); ?></th>
-				<td><code><?php echo esc_html( $token_hash ); ?></code></td>
-			</tr>
+			<tr><th><?php esc_html_e( 'IP Address', 'activity-monitor' ); ?></th><td><code><?php echo esc_html( $ip ); ?></code></td></tr>
+			<tr><th><?php esc_html_e( 'Browser / UA', 'activity-monitor' ); ?></th><td><?php echo esc_html( $browser ); ?></td></tr>
+			<tr><th><?php esc_html_e( 'User Agent', 'activity-monitor' ); ?></th><td><small><?php echo esc_html( $ua ); ?></small></td></tr>
+			<tr><th><?php esc_html_e( 'Session ID', 'activity-monitor' ); ?></th><td><code><?php echo esc_html( $token_hash ); ?></code></td></tr>
 		</table>
 		<?php
 		wp_send_json_success( array( 'html' => ob_get_clean() ) );
 	}
 
-	// ── Master page renderer ──────────────────────────────────────────────────
+	// ── Master page renderer ─────────────────────────────────────────────
 
 	public function render_page() {
 		if ( ! current_user_can( 'manage_options' ) ) {
@@ -432,7 +442,7 @@ class AM_Admin {
 		<?php
 	}
 
-	// ── Tab: Activity Log ─────────────────────────────────────────────────────
+	// ── Tab: Activity Log ────────────────────────────────────────────────
 
 	private function render_tab_log() {
 		$per_page   = 50;
@@ -539,11 +549,7 @@ class AM_Admin {
 						$sev_label = AM_Logger::severity_label( (int) $row->severity );
 					?>
 					<tr class="am-row am-row-<?php echo esc_attr( $sev_class ); ?>">
-						<td>
-							<span class="am-badge <?php echo esc_attr( $sev_class ); ?>">
-								<?php echo esc_html( $sev_label ); ?>
-							</span>
-						</td>
+						<td><span class="am-badge <?php echo esc_attr( $sev_class ); ?>"><?php echo esc_html( $sev_label ); ?></span></td>
 						<td>
 							<span title="<?php echo esc_attr( $row->created_at ); ?> UTC">
 								<?php echo esc_html( wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), strtotime( $row->created_at ) ) ); ?>
@@ -601,7 +607,7 @@ class AM_Admin {
 		<?php
 	}
 
-	// ── Tab: Active Sessions ──────────────────────────────────────────────────
+	// ── Tab: Active Sessions ──────────────────────────────────────────────
 
 	private function render_tab_sessions() {
 		$users = get_users( array( 'fields' => array( 'ID', 'user_login', 'display_name' ) ) );
@@ -643,12 +649,12 @@ class AM_Admin {
 			<table class="wp-list-table widefat striped am-log-table">
 				<thead>
 					<tr>
-						<th><?php esc_html_e( 'User',         'activity-monitor' ); ?></th>
-						<th><?php esc_html_e( 'Logged In',    'activity-monitor' ); ?></th>
-						<th><?php esc_html_e( 'Expiry',       'activity-monitor' ); ?></th>
-						<th><?php esc_html_e( 'IP Address',   'activity-monitor' ); ?></th>
-						<th><?php esc_html_e( 'Browser / UA', 'activity-monitor' ); ?></th>
-						<th><?php esc_html_e( 'Actions',      'activity-monitor' ); ?></th>
+						<th><?php esc_html_e( 'User',        'activity-monitor' ); ?></th>
+						<th><?php esc_html_e( 'Logged In',   'activity-monitor' ); ?></th>
+						<th><?php esc_html_e( 'Expiry',      'activity-monitor' ); ?></th>
+						<th><?php esc_html_e( 'IP Address',  'activity-monitor' ); ?></th>
+						<th><?php esc_html_e( 'Browser / UA','activity-monitor' ); ?></th>
+						<th><?php esc_html_e( 'Actions',     'activity-monitor' ); ?></th>
 					</tr>
 				</thead>
 				<tbody>
@@ -686,16 +692,10 @@ class AM_Admin {
 							</span>
 						</td>
 						<td>
+							<?php /* FIX #2: Only pass user_id + token_hash; the AJAX handler re-fetches everything else. */ ?>
 							<button class="button button-small am-view-session-detail"
 							        data-user-id="<?php echo esc_attr( $s['user_id'] ); ?>"
-							        data-user-login="<?php echo esc_attr( $s['user_login'] ); ?>"
-							        data-display-name="<?php echo esc_attr( $s['display_name'] ); ?>"
-							        data-token-hash="<?php echo esc_attr( $s['token_hash'] ); ?>"
-							        data-login-ts="<?php echo esc_attr( $s['login'] ); ?>"
-							        data-expiry-ts="<?php echo esc_attr( $s['expiration'] ); ?>"
-							        data-ip="<?php echo esc_attr( $s['ip'] ); ?>"
-							        data-ua="<?php echo esc_attr( $s['ua'] ); ?>"
-							        data-is-current="<?php echo $is_current ? '1' : '0'; ?>">
+							        data-token-hash="<?php echo esc_attr( $s['token_hash'] ); ?>">
 								<?php esc_html_e( 'Details', 'activity-monitor' ); ?>
 							</button>
 							<?php if ( $is_current ) : ?>
@@ -733,90 +733,38 @@ class AM_Admin {
 		<?php
 	}
 
-	/**
-	 * Lightweight UA parser — no external library required.
-	 */
+	// ── UA parser ─────────────────────────────────────────────────────────
+
 	private function parse_user_agent( $ua ) {
 		if ( empty( $ua ) ) {
 			return __( 'Unknown', 'activity-monitor' );
 		}
-
 		$browsers = array(
-			'Edg'     => 'Edge',
-			'OPR'     => 'Opera',
-			'Chrome'  => 'Chrome',
-			'Firefox' => 'Firefox',
-			'Safari'  => 'Safari',
-			'MSIE'    => 'Internet Explorer',
-			'Trident' => 'Internet Explorer',
+			'Edg' => 'Edge', 'OPR' => 'Opera', 'Chrome' => 'Chrome',
+			'Firefox' => 'Firefox', 'Safari' => 'Safari',
+			'MSIE' => 'Internet Explorer', 'Trident' => 'Internet Explorer',
 		);
-
 		$os_map = array(
-			'Windows NT 10' => 'Windows 10/11',
-			'Windows NT 6'  => 'Windows',
-			'Mac OS X'      => 'macOS',
-			'Linux'         => 'Linux',
-			'Android'       => 'Android',
-			'iPhone'        => 'iOS',
-			'iPad'          => 'iPadOS',
+			'Windows NT 10' => 'Windows 10/11', 'Windows NT 6' => 'Windows',
+			'Mac OS X' => 'macOS', 'Linux' => 'Linux',
+			'Android' => 'Android', 'iPhone' => 'iOS', 'iPad' => 'iPadOS',
 		);
-
 		$browser = __( 'Other', 'activity-monitor' );
 		foreach ( $browsers as $key => $name ) {
-			if ( strpos( $ua, $key ) !== false ) {
-				$browser = $name;
-				break;
-			}
+			if ( strpos( $ua, $key ) !== false ) { $browser = $name; break; }
 		}
-
 		$os = '';
 		foreach ( $os_map as $key => $name ) {
-			if ( strpos( $ua, $key ) !== false ) {
-				$os = $name;
-				break;
-			}
+			if ( strpos( $ua, $key ) !== false ) { $os = $name; break; }
 		}
-
 		return $os ? $browser . ' / ' . $os : $browser;
 	}
 
-	// ── Tab: Settings ─────────────────────────────────────────────────────────
+	// ── Tab: Settings ─────────────────────────────────────────────────────
 
 	private function render_tab_settings() {
-		$settings = get_option( 'am_settings', array( 'retention_days' => 90 ) );
 		$channels = get_option( 'am_notification_channels', array() );
 		?>
-
-		<div class="am-settings-section">
-			<h2 class="am-section-title">
-				<span class="dashicons dashicons-admin-settings"></span>
-				<?php esc_html_e( 'General Settings', 'activity-monitor' ); ?>
-			</h2>
-			<form method="post" action="options.php">
-				<?php settings_fields( 'am_settings_group' ); ?>
-				<table class="form-table" role="presentation">
-					<tr>
-						<th scope="row">
-							<label for="am_retention_days"><?php esc_html_e( 'Log Retention', 'activity-monitor' ); ?></label>
-						</th>
-						<td>
-							<input type="number"
-							       id="am_retention_days"
-							       name="am_settings[retention_days]"
-							       value="<?php echo esc_attr( $settings['retention_days'] ?? 90 ); ?>"
-							       min="7" max="365" class="small-text">
-							<?php esc_html_e( 'days', 'activity-monitor' ); ?>
-							<p class="description">
-								<?php esc_html_e( 'Events older than this are automatically deleted (7–365 days).', 'activity-monitor' ); ?>
-							</p>
-						</td>
-					</tr>
-				</table>
-				<?php submit_button( __( 'Save Settings', 'activity-monitor' ) ); ?>
-			</form>
-		</div>
-
-		<hr class="am-section-divider">
 
 		<div class="am-settings-section">
 			<h2 class="am-section-title">
@@ -866,6 +814,22 @@ class AM_Admin {
 				<span class="dashicons dashicons-warning"></span>
 				<?php esc_html_e( 'Danger Zone', 'activity-monitor' ); ?>
 			</h2>
+
+			<p class="am-description">
+				<?php esc_html_e( 'Remove all expired sessions across every user account.', 'activity-monitor' ); ?>
+			</p>
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>"
+			      onsubmit="return confirm('<?php esc_attr_e( 'Revoke all expired sessions? This cannot be undone.', 'activity-monitor' ); ?>')">
+				<?php wp_nonce_field( 'am_revoke_expired' ); ?>
+				<input type="hidden" name="action" value="am_revoke_expired">
+				<button type="submit" class="button am-btn-danger">
+					<span class="dashicons dashicons-remove"></span>
+					<?php esc_html_e( 'Revoke All Expired Sessions', 'activity-monitor' ); ?>
+				</button>
+			</form>
+
+			<br>
+
 			<p class="am-description">
 				<?php esc_html_e( 'Permanently delete all entries from the activity log. This action cannot be undone.', 'activity-monitor' ); ?>
 			</p>
@@ -882,7 +846,7 @@ class AM_Admin {
 		<?php
 	}
 
-	// ── Notification channel card ─────────────────────────────────────────────
+	// ── Notification channel card ────────────────────────────────────────
 
 	private function render_channel_row( $index, $ch ) {
 		$type   = isset( $ch['type'] )     ? $ch['type']     : 'email';

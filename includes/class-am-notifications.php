@@ -3,10 +3,6 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 class AM_Notifications {
 
-	/**
-	 * Called by the logger after every event is written.
-	 * Checks each configured channel to see if severity threshold is met.
-	 */
 	public static function maybe_notify( int $severity, string $event_type, string $message, array $args ) {
 		$channels = get_option( 'am_notification_channels', array() );
 		if ( empty( $channels ) ) return;
@@ -25,38 +21,51 @@ class AM_Notifications {
 		}
 	}
 
-	// ── Email ─────────────────────────────────────────────────────────────────
+	// ── Email ──────────────────────────────────────────────────────────
 
 	private static function send_email( array $channel, int $severity, string $event_type, string $message, array $args ) {
 		$raw_recipients = $channel['recipients'] ?? '';
-		$recipients = array_filter( array_map( 'trim', explode( ',', $raw_recipients ) ) );
+		$recipients     = array_filter( array_map( 'trim', explode( ',', $raw_recipients ) ) );
 		if ( empty( $recipients ) ) return;
 
 		$site    = get_bloginfo( 'name' );
 		$label   = AM_Logger::severity_label( $severity );
 		$user    = $args['user_name'] ?? 'unknown';
 		$ip      = $args['ip_address'] ?? AM_DB::get_ip();
-		$subject = "[{$site}] Activity Monitor Alert — {$label}: {$event_type}";
+		$subject = "[{$site}] Activity Monitor Alert – {$label}: {$event_type}";
+
+		/**
+		 * FIX #7: Strip tags from all user-derived values before interpolating
+		 * into the plain-text email body. Prevents crafted log messages or
+		 * usernames from injecting header-like content or misleading text.
+		 */
+		$safe_site    = wp_strip_all_tags( $site );
+		$safe_label   = wp_strip_all_tags( $label );
+		$safe_type    = wp_strip_all_tags( $event_type );
+		$safe_user    = wp_strip_all_tags( (string) $user );
+		$safe_ip      = wp_strip_all_tags( (string) $ip );
+		$safe_message = wp_strip_all_tags( (string) $message );
+		$safe_object  = wp_strip_all_tags( (string) ( $args['object_name'] ?? '' ) );
 
 		$body  = "Activity Monitor Alert\n";
 		$body .= str_repeat( '─', 50 ) . "\n\n";
-		$body .= "Site:        {$site}\n";
-		$body .= "Severity:    {$label}\n";
-		$body .= "Event:       {$event_type}\n";
-		$body .= "Time:        " . current_time( 'Y-m-d H:i:s' ) . " (UTC)\n";
-		$body .= "User:        {$user}\n";
-		$body .= "IP Address:  {$ip}\n";
-		if ( ! empty( $args['object_name'] ) ) {
-			$body .= "Object:      {$args['object_name']}\n";
+		$body .= "Site:         {$safe_site}\n";
+		$body .= "Severity:     {$safe_label}\n";
+		$body .= "Event:        {$safe_type}\n";
+		$body .= 'Time:         ' . current_time( 'Y-m-d H:i:s' ) . " (UTC)\n";
+		$body .= "User:         {$safe_user}\n";
+		$body .= "IP Address:   {$safe_ip}\n";
+		if ( '' !== $safe_object ) {
+			$body .= "Object:       {$safe_object}\n";
 		}
-		$body .= "\nMessage:\n{$message}\n\n";
+		$body .= "\nMessage:\n{$safe_message}\n\n";
 		$body .= str_repeat( '─', 50 ) . "\n";
-		$body .= "View full log: " . admin_url( 'admin.php?page=activity-monitor' ) . "\n";
+		$body .= 'View full log: ' . admin_url( 'admin.php?page=activity-monitor' ) . "\n";
 
 		wp_mail( $recipients, $subject, $body );
 	}
 
-	// ── Slack ─────────────────────────────────────────────────────────────────
+	// ── Slack ──────────────────────────────────────────────────────────
 
 	private static function send_slack( array $channel, int $severity, string $event_type, string $message, array $args ) {
 		$webhook = $channel['webhook_url'] ?? '';
@@ -77,18 +86,18 @@ class AM_Notifications {
 		$color = $color_map[ $severity ] ?? '#9e9e9e';
 
 		$payload = array(
-			'text'        => "*Activity Monitor Alert* — {$site}",
+			'text'        => "*Activity Monitor Alert* – {$site}",
 			'attachments' => array(
 				array(
 					'color'  => $color,
 					'fields' => array(
-						array( 'title' => 'Severity',   'value' => $label,       'short' => true ),
-						array( 'title' => 'Event',      'value' => $event_type,  'short' => true ),
-						array( 'title' => 'User',       'value' => $user,        'short' => true ),
-						array( 'title' => 'IP Address', 'value' => $ip,          'short' => true ),
-						array( 'title' => 'Object',     'value' => $object,      'short' => true ),
+						array( 'title' => 'Severity',   'value' => $label,        'short' => true ),
+						array( 'title' => 'Event',      'value' => $event_type,   'short' => true ),
+						array( 'title' => 'User',       'value' => $user,         'short' => true ),
+						array( 'title' => 'IP Address', 'value' => $ip,           'short' => true ),
+						array( 'title' => 'Object',     'value' => $object,       'short' => true ),
 						array( 'title' => 'Time',       'value' => current_time( 'Y-m-d H:i:s' ) . ' UTC', 'short' => true ),
-						array( 'title' => 'Message',    'value' => $message,     'short' => false ),
+						array( 'title' => 'Message',    'value' => $message,      'short' => false ),
 					),
 					'footer' => 'Activity Monitor | ' . admin_url( 'admin.php?page=activity-monitor' ),
 				),
@@ -96,10 +105,10 @@ class AM_Notifications {
 		);
 
 		wp_remote_post( esc_url_raw( $webhook ), array(
-			'headers'     => array( 'Content-Type' => 'application/json' ),
-			'body'        => wp_json_encode( $payload ),
-			'timeout'     => 10,
-			'blocking'    => false,
+			'headers'  => array( 'Content-Type' => 'application/json' ),
+			'body'     => wp_json_encode( $payload ),
+			'timeout'  => 10,
+			'blocking' => false,
 		) );
 	}
 }
