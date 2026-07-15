@@ -39,3 +39,5 @@ v1.3.0 introduced a full security patch set:
 ## License
 
 GPL-2.0+
+
+Another edit
