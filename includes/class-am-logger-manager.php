@@ -23,10 +23,10 @@ class AM_Logger_Manager {
 		'AM_Logger_Plugins',
 		'AM_Logger_Themes',
 		'AM_Logger_Core',
+		'AM_Logger_Terms',
+		'AM_Logger_Menus',
+		'AM_Logger_Widgets',
 		// TODO (spec §9 item 2): port the remaining v1.x AM_Hooks callbacks:
-		// 'AM_Logger_Terms',    - created/edited/deleted (categories, tags)
-		// 'AM_Logger_Menus',    - update/delete
-		// 'AM_Logger_Widgets',  - save
 		// 'AM_Logger_Passwords',- reset/retrieve/set
 		// 'AM_Logger_Sites',    - multisite create/delete
 		// 'AM_Logger_Sessions', - see issue #5, ported onto am_sessions table separately

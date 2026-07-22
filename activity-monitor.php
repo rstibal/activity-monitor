@@ -3,7 +3,7 @@
  * Plugin Name: Activity Monitor
  * Plugin URI:  https://robstibal.com
  * Description: Comprehensive WordPress audit log – tracks logins, content changes, settings updates, security events, and more.
- * Version:     2.0.0-dev.6
+ * Version:     2.0.0-dev.7
  * Author:      Rob Stibal
  * Author URI:  http://robstibal.com
  * License:     GPL-2.0+
@@ -14,7 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'AM_VERSION',     '2.0.0-dev.6' );
+define( 'AM_VERSION',     '2.0.0-dev.7' );
 define( 'AM_FILE',        __FILE__ );
 define( 'AM_DIR',         plugin_dir_path( __FILE__ ) );
 define( 'AM_URL',         plugin_dir_url( __FILE__ ) );
@@ -40,6 +40,9 @@ require_once AM_DIR . 'includes/loggers/class-am-logger-comments.php';
 require_once AM_DIR . 'includes/loggers/class-am-logger-plugins.php';
 require_once AM_DIR . 'includes/loggers/class-am-logger-themes.php';
 require_once AM_DIR . 'includes/loggers/class-am-logger-core.php';
+require_once AM_DIR . 'includes/loggers/class-am-logger-terms.php';
+require_once AM_DIR . 'includes/loggers/class-am-logger-menus.php';
+require_once AM_DIR . 'includes/loggers/class-am-logger-widgets.php';
 require_once AM_DIR . 'includes/class-am-logger-manager.php';
 
 // ── v1.x legacy (still present during the port; see TODOs above) ─────────

@@ -40,12 +40,12 @@ class AM_Hooks {
 		// NOTE (v2.0 port): switch_theme / customize_save_after are now owned
 		// by AM_Logger_Themes (see includes/loggers/class-am-logger-themes.php)
 		// — registrations removed here to avoid duplicate logging.
-		add_action( 'created_term',          array( $instance, 'on_term_created' ), 10, 3 );
-		add_action( 'edited_term',           array( $instance, 'on_term_edited' ), 10, 3 );
-		add_action( 'delete_term',           array( $instance, 'on_term_deleted' ), 10, 4 );
-		add_action( 'wp_update_nav_menu',    array( $instance, 'on_menu_update' ) );
-		add_action( 'wp_delete_nav_menu',    array( $instance, 'on_menu_delete' ) );
-		add_action( 'sidebar_admin_setup',   array( $instance, 'on_widget_save' ) );
+		// NOTE (v2.0 port): created_term / edited_term / delete_term are now
+		// owned by AM_Logger_Terms (see includes/loggers/class-am-logger-terms.php),
+		// wp_update_nav_menu / wp_delete_nav_menu by AM_Logger_Menus (see
+		// includes/loggers/class-am-logger-menus.php), and sidebar_admin_setup
+		// by AM_Logger_Widgets (see includes/loggers/class-am-logger-widgets.php)
+		// — all removed here to avoid duplicate logging.
 		add_action( 'password_reset',        array( $instance, 'on_password_reset' ), 10, 2 );
 		add_action( 'retrieve_password',     array( $instance, 'on_password_retrieve' ) );
 		add_action( 'wp_set_password',       array( $instance, 'on_password_set' ), 10, 2 );
