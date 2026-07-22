@@ -15,11 +15,11 @@ class AM_Hooks {
 		add_action( 'delete_user',           array( $instance, 'on_user_delete' ) );
 		add_action( 'set_user_role',         array( $instance, 'on_role_change' ), 10, 3 );
 		add_action( 'add_user_to_blog',      array( $instance, 'on_add_user_to_blog' ), 10, 3 );
-		add_action( 'post_updated',          array( $instance, 'on_post_updated' ), 10, 3 );
-		add_action( 'transition_post_status',array( $instance, 'on_post_status_change' ), 10, 3 );
-		add_action( 'before_delete_post',    array( $instance, 'on_post_delete' ) );
-		add_action( 'wp_trash_post',         array( $instance, 'on_post_trash' ) );
-		add_action( 'untrash_post',          array( $instance, 'on_post_untrash' ) );
+		// NOTE (v2.0 port): post_updated / transition_post_status / before_delete_post /
+		// wp_trash_post / untrash_post are now owned by AM_Logger_Posts (see
+		// includes/loggers/class-am-logger-posts.php) — registrations removed here
+		// to avoid duplicate logging. Remove this whole class once all other event
+		// types are ported per activity-monitor-v2-spec.md §9 item 2.
 		add_action( 'attachment_updated',    array( $instance, 'on_attachment_updated' ), 10, 3 );
 		add_action( 'add_attachment',        array( $instance, 'on_attachment_add' ) );
 		add_action( 'delete_attachment',     array( $instance, 'on_attachment_delete' ) );

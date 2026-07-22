@@ -14,13 +14,28 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'AM_VERSION',     '1.4.0' );
+define( 'AM_VERSION',     '2.0.0-dev' );
 define( 'AM_FILE',        __FILE__ );
 define( 'AM_DIR',         plugin_dir_path( __FILE__ ) );
 define( 'AM_URL',         plugin_dir_url( __FILE__ ) );
-define( 'AM_TABLE',       'am_activity_log' );
+define( 'AM_TABLE',       'am_activity_log' ); // Legacy v1.x table name — retained until migration UI (issue #2) is confirmed by the admin.
 
-// ── Autoload core files ──────────────────────────────────────────────────
+// ── v2.0 core (schema, event writer, logger architecture) ────────────────
+// See activity-monitor-v2-spec.md §9 for build order. Files below are the
+// v2.0 scaffold; v1.x files (class-am-db.php, class-am-logger.php,
+// class-am-hooks.php) remain temporarily for reference during the port
+// and are removed once AM_Logger_Manager::REGISTERED_LOGGER_CLASSES covers
+// full event parity (spec §9 item 2).
+require_once AM_DIR . 'includes/schema/class-am-schema.php';
+require_once AM_DIR . 'includes/class-am-db-legacy-ip.php';
+require_once AM_DIR . 'includes/class-am-log-levels.php';
+require_once AM_DIR . 'includes/class-am-initiator-detector.php';
+require_once AM_DIR . 'includes/class-am-event-writer.php';
+require_once AM_DIR . 'includes/loggers/class-am-logger-base.php';
+require_once AM_DIR . 'includes/loggers/class-am-logger-posts.php';
+require_once AM_DIR . 'includes/class-am-logger-manager.php';
+
+// ── v1.x legacy (still present during the port; see TODOs above) ─────────
 require_once AM_DIR . 'includes/class-am-db.php';
 require_once AM_DIR . 'includes/class-am-logger.php';
 require_once AM_DIR . 'includes/class-am-hooks.php';
@@ -28,11 +43,18 @@ require_once AM_DIR . 'includes/class-am-notifications.php';
 require_once AM_DIR . 'admin/class-am-admin.php';
 
 // ── Activation / deactivation ────────────────────────────────────────────
-register_activation_hook( AM_FILE,   array( 'AM_DB', 'install' ) );
+register_activation_hook( AM_FILE, array( 'AM_Schema', 'install' ) );
 register_deactivation_hook( AM_FILE, array( 'AM_DB', 'deactivate' ) );
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────
 function am_init() {
+	AM_Schema::maybe_upgrade();
+	AM_Logger_Manager::init();
+
+	// Legacy v1.x hooks remain active for event types not yet ported
+	// (see AM_Logger_Manager::REGISTERED_LOGGER_CLASSES TODO list).
+	// AM_Logger_Posts (registered above) supersedes the post-related
+	// callbacks in AM_Hooks; the rest of AM_Hooks still runs until ported.
 	AM_Hooks::init();
 	AM_Admin::init();
 }

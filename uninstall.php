@@ -13,14 +13,17 @@ if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 
 global $wpdb;
 
-// Drop the log table.
-$table = $wpdb->prefix . 'am_activity_log';
-$wpdb->query( "DROP TABLE IF EXISTS `{$table}`" ); // phpcs:ignore
+// v2.0: drop am_events / am_event_context, plus the legacy am_activity_log
+// table if it's still present, and all v1.x + v2.0 options.
+// See includes/schema/class-am-schema.php AM_Schema::uninstall() and
+// activity-monitor-v2-spec.md §7 (public-release uninstall bar).
+require_once __DIR__ . '/includes/schema/class-am-schema.php';
+AM_Schema::uninstall();
 
-// Remove plugin options.
-delete_option( 'am_db_version' );
+// Remaining plugin options not covered by AM_Schema::uninstall().
 delete_option( 'am_notification_channels' );
 delete_option( 'am_retention_days' );
+delete_option( 'am_disabled_loggers' );
 
 // Clear the scheduled cron event.
 $timestamp = wp_next_scheduled( 'am_log_prune' );
