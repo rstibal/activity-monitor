@@ -29,13 +29,19 @@ class AM_Logger_Manager {
 		'AM_Logger_Passwords',
 		'AM_Logger_Sites',
 		'AM_Logger_Security',
-		// TODO (spec §9 item 2): 'AM_Logger_Sessions' — see issue #5, this is
-		// its own body of work (new am_sessions table, revoke, concurrent
-		// limits, emergency lockdown), not just an event-logging port like
-		// the loggers above. Once this is done, AM_Hooks (v1.x legacy hook
-		// registration class) has nothing left except on_authenticate(),
-		// which should get its own small logger too before AM_Hooks,
-		// AM_DB, and AM_Logger (v1.x classes) can be fully retired.
+		// All 13 v1.x AM_Hooks event-source callbacks are now ported (dev.12).
+		// AM_Hooks itself has been fully retired -- it had nothing left to run.
+		// Session management (concurrent limit, emergency lockdown) is handled
+		// separately by AM_Sessions, not a logger in this list, since sessions
+		// are read/written via WP core's own session_tokens user meta rather
+		// than events on this table -- see includes/class-am-sessions.php.
+		//
+		// Still legacy: admin/class-am-admin.php's "Activity Log" tab reads
+		// AM_DB::get_events() directly and uses AM_Logger's severity constants
+		// for display. AM_DB and AM_Logger (the v1.x classes, not this
+		// AM_Logger_* family) stay required in activity-monitor.php until that
+		// tab is either removed in favor of the v2.0 preview tab, or migrated
+		// onto AM_Event_Query -- a UI decision, not made unilaterally here.
 	);
 
 	public static function init() {
