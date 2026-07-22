@@ -21,11 +21,9 @@ class AM_Logger_Manager {
 		'AM_Logger_Media',
 		'AM_Logger_Comments',
 		'AM_Logger_Plugins',
+		'AM_Logger_Themes',
+		'AM_Logger_Core',
 		// TODO (spec §9 item 2): port the remaining v1.x AM_Hooks callbacks:
-		// 'AM_Logger_Themes',   - switch/customizer save + theme-update branch
-		//                         of on_upgrader_complete (currently legacy)
-		// 'AM_Logger_Core',     - core-update branch of on_upgrader_complete
-		//                         (currently legacy, bundled with themes there)
 		// 'AM_Logger_Terms',    - created/edited/deleted (categories, tags)
 		// 'AM_Logger_Menus',    - update/delete
 		// 'AM_Logger_Widgets',  - save

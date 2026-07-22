@@ -29,13 +29,17 @@ class AM_Hooks {
 		// NOTE (v2.0 port): activated_plugin / deactivated_plugin / delete_plugin
 		// are now owned by AM_Logger_Plugins (see
 		// includes/loggers/class-am-logger-plugins.php) — registrations
-		// removed here to avoid duplicate logging. upgrader_process_complete
-		// stays registered below for its theme/core branches only (see
-		// on_upgrader_complete() doc comment).
-		add_action( 'upgrader_process_complete', array( $instance, 'on_upgrader_complete' ), 10, 2 );
+		// removed here to avoid duplicate logging.
+		// NOTE (v2.0 port): upgrader_process_complete's three branches are now
+		// fully split across AM_Logger_Plugins (plugin), AM_Logger_Themes
+		// (theme), and AM_Logger_Core (core) — the legacy
+		// on_upgrader_complete() below has no branches left to run, so its
+		// registration is removed. The method body stays as dead code for
+		// reference only.
 		// (delete_plugin now owned by AM_Logger_Plugins — see note above.)
-		add_action( 'switch_theme',          array( $instance, 'on_theme_switch' ), 10, 3 );
-		add_action( 'customize_save_after',  array( $instance, 'on_customizer_save' ) );
+		// NOTE (v2.0 port): switch_theme / customize_save_after are now owned
+		// by AM_Logger_Themes (see includes/loggers/class-am-logger-themes.php)
+		// — registrations removed here to avoid duplicate logging.
 		add_action( 'created_term',          array( $instance, 'on_term_created' ), 10, 3 );
 		add_action( 'edited_term',           array( $instance, 'on_term_edited' ), 10, 3 );
 		add_action( 'delete_term',           array( $instance, 'on_term_deleted' ), 10, 4 );
