@@ -26,10 +26,16 @@ class AM_Logger_Manager {
 		'AM_Logger_Terms',
 		'AM_Logger_Menus',
 		'AM_Logger_Widgets',
-		// TODO (spec §9 item 2): port the remaining v1.x AM_Hooks callbacks:
-		// 'AM_Logger_Passwords',- reset/retrieve/set
-		// 'AM_Logger_Sites',    - multisite create/delete
-		// 'AM_Logger_Sessions', - see issue #5, ported onto am_sessions table separately
+		'AM_Logger_Passwords',
+		'AM_Logger_Sites',
+		'AM_Logger_Security',
+		// TODO (spec §9 item 2): 'AM_Logger_Sessions' — see issue #5, this is
+		// its own body of work (new am_sessions table, revoke, concurrent
+		// limits, emergency lockdown), not just an event-logging port like
+		// the loggers above. Once this is done, AM_Hooks (v1.x legacy hook
+		// registration class) has nothing left except on_authenticate(),
+		// which should get its own small logger too before AM_Hooks,
+		// AM_DB, and AM_Logger (v1.x classes) can be fully retired.
 	);
 
 	public static function init() {

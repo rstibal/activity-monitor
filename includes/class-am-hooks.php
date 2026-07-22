@@ -46,14 +46,21 @@ class AM_Hooks {
 		// includes/loggers/class-am-logger-menus.php), and sidebar_admin_setup
 		// by AM_Logger_Widgets (see includes/loggers/class-am-logger-widgets.php)
 		// — all removed here to avoid duplicate logging.
-		add_action( 'password_reset',        array( $instance, 'on_password_reset' ), 10, 2 );
-		add_action( 'retrieve_password',     array( $instance, 'on_password_retrieve' ) );
-		add_action( 'wp_set_password',       array( $instance, 'on_password_set' ), 10, 2 );
-		if ( is_multisite() ) {
-			add_action( 'wpmu_new_blog',     array( $instance, 'on_site_created' ), 10, 6 );
-			add_action( 'delete_blog',       array( $instance, 'on_site_deleted' ) );
-		}
-		add_action( 'admin_init',            array( $instance, 'on_admin_access' ) );
+		// NOTE (v2.0 port): password_reset / retrieve_password / wp_set_password
+		// are now owned by AM_Logger_Passwords (see
+		// includes/loggers/class-am-logger-passwords.php), and
+		// wpmu_new_blog / delete_blog by AM_Logger_Sites (see
+		// includes/loggers/class-am-logger-sites.php) — all removed here to
+		// avoid duplicate logging. This is the last of the ported callbacks;
+		// only on_authenticate() and on_admin_access() below still run from
+		// this class.
+		// (wpmu_new_blog / delete_blog now owned by AM_Logger_Sites — see note above.)
+		// NOTE (v2.0 port): admin_init/on_admin_access is now owned by
+		// AM_Logger_Security (see includes/loggers/class-am-logger-security.php)
+		// -- caught this callback while confirming nothing else remained
+		// registered here besides on_authenticate. AM_Hooks now has exactly
+		// one active registration (on_authenticate) — everything else is
+		// fully ported.
 	}
 
 	/**
