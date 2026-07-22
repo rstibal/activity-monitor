@@ -3,7 +3,7 @@
  * Plugin Name: Activity Monitor
  * Plugin URI:  https://robstibal.com
  * Description: Comprehensive WordPress audit log – tracks logins, content changes, settings updates, security events, and more.
- * Version:     2.0.0-dev.5
+ * Version:     2.0.0-dev.6
  * Author:      Rob Stibal
  * Author URI:  http://robstibal.com
  * License:     GPL-2.0+
@@ -14,7 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'AM_VERSION',     '2.0.0-dev.5' );
+define( 'AM_VERSION',     '2.0.0-dev.6' );
 define( 'AM_FILE',        __FILE__ );
 define( 'AM_DIR',         plugin_dir_path( __FILE__ ) );
 define( 'AM_URL',         plugin_dir_url( __FILE__ ) );
@@ -50,17 +50,48 @@ require_once AM_DIR . 'includes/class-am-notifications.php';
 require_once AM_DIR . 'admin/class-am-admin.php';
 
 // ── Activation / deactivation ────────────────────────────────────────────
-register_activation_hook( AM_FILE, array( 'AM_Schema', 'install' ) );
+/**
+ * BUGFIX (dev.5 → dev.6): activation previously called only
+ * AM_Schema::install(), which creates am_events/am_event_context and
+ * migrates FROM the legacy table if present -- but never CREATES the
+ * legacy table itself. AM_DB::install() is what always created
+ * wp_am_activity_log. Swapping the hook silently stopped creating it on
+ * fresh installs, breaking the still-active v1.x "Activity Log" tab
+ * (which several loggers -- comments, themes, core, etc. -- still write
+ * to) with "table doesn't exist" errors. Both must run on activation
+ * until the legacy table and v1.x admin screens are fully retired.
+ */
+function am_activate() {
+	AM_DB::install();
+	AM_Schema::install();
+}
+register_activation_hook( AM_FILE, 'am_activate' );
 register_deactivation_hook( AM_FILE, array( 'AM_DB', 'deactivate' ) );
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────
 function am_init() {
+	// Self-healing safety net: if the legacy table is somehow missing
+	// (e.g. this exact activation-hook bug from dev.5, or a manual DB
+	// change), recreate it. dbDelta() is idempotent and cheap to call on
+	// every load -- this runs once via the 'am_legacy_table_checked'
+	// transient so it isn't a query on every single page load.
+	if ( ! get_transient( 'am_legacy_table_checked' ) ) {
+		global $wpdb;
+		$legacy_table = $wpdb->prefix . AM_TABLE;
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant.
+		$exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $legacy_table ) );
+		if ( $exists !== $legacy_table ) {
+			AM_DB::install();
+		}
+		set_transient( 'am_legacy_table_checked', 1, DAY_IN_SECONDS );
+	}
+
 	AM_Schema::maybe_upgrade();
 	AM_Logger_Manager::init();
 
 	// Legacy v1.x hooks remain active for event types not yet ported
 	// (see AM_Logger_Manager::REGISTERED_LOGGER_CLASSES TODO list).
-	// AM_Logger_Posts (registered above) supersedes the post-related
+	// Ported loggers (registered above) supersede their corresponding
 	// callbacks in AM_Hooks; the rest of AM_Hooks still runs until ported.
 	AM_Hooks::init();
 	AM_Admin::init();
