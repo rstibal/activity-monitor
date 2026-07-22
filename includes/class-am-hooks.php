@@ -6,15 +6,13 @@ class AM_Hooks {
 	public static function init() {
 		$instance = new self();
 
-		add_action( 'wp_login',              array( $instance, 'on_login' ), 10, 2 );
-		add_action( 'wp_login_failed',       array( $instance, 'on_login_failed' ) );
-		add_action( 'wp_logout',             array( $instance, 'on_logout' ) );
+		// NOTE (v2.0 port): wp_login / wp_login_failed / wp_logout / user_register /
+		// profile_update / delete_user / set_user_role / add_user_to_blog are now
+		// owned by AM_Logger_Users (see includes/loggers/class-am-logger-users.php)
+		// — registrations removed here to avoid duplicate logging.
+		// on_authenticate() (auth.error on failed WP_Error auth, distinct from a
+		// plain failed-login) has not been ported yet and still runs here.
 		add_filter( 'authenticate',          array( $instance, 'on_authenticate' ), 30, 3 );
-		add_action( 'user_register',         array( $instance, 'on_user_register' ) );
-		add_action( 'profile_update',        array( $instance, 'on_profile_update' ), 10, 2 );
-		add_action( 'delete_user',           array( $instance, 'on_user_delete' ) );
-		add_action( 'set_user_role',         array( $instance, 'on_role_change' ), 10, 3 );
-		add_action( 'add_user_to_blog',      array( $instance, 'on_add_user_to_blog' ), 10, 3 );
 		// NOTE (v2.0 port): post_updated / transition_post_status / before_delete_post /
 		// wp_trash_post / untrash_post are now owned by AM_Logger_Posts (see
 		// includes/loggers/class-am-logger-posts.php) — registrations removed here

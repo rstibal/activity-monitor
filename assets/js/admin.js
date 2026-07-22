@@ -15,6 +15,17 @@
 		.fail(function () { $('#am-modal-body').html('<p>Request failed.</p>'); });
 	});
 
+	/* v2.0 preview tab — reads am_events via a separate AJAX action
+	   (am_get_v2_event_detail) since it's a different schema/table than
+	   the v1.x am_get_event_detail handler above. Shares the same modal. */
+	$(document).on('click', '.am-view-detail-v2', function () {
+		var id = $(this).data('id');
+		openModal();
+		$.post(amData.ajaxUrl, { action: 'am_get_v2_event_detail', entry_id: id, nonce: amData.nonce })
+		.done(function (r) { $('#am-modal-body').html(r.success ? r.data.html : '<p>Error.</p>'); })
+		.fail(function () { $('#am-modal-body').html('<p>Request failed.</p>'); });
+	});
+
 	/* FIX #2: Only pass user_id + token_hash to the session detail handler.
 	   All other data is now re-fetched server-side from session_tokens. */
 	$(document).on('click', '.am-view-session-detail', function () {

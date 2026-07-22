@@ -17,8 +17,8 @@ class AM_Logger_Manager {
 
 	const REGISTERED_LOGGER_CLASSES = array(
 		'AM_Logger_Posts',
+		'AM_Logger_Users',
 		// TODO (spec §9 item 2): port the remaining v1.x AM_Hooks callbacks:
-		// 'AM_Logger_Users',    - login/logout/register/profile/role/delete
 		// 'AM_Logger_Media',    - upload/update/delete
 		// 'AM_Logger_Comments', - create/edit/delete/status
 		// 'AM_Logger_Plugins',  - activate/deactivate/update/delete

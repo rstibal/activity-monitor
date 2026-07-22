@@ -32,6 +32,7 @@ class AM_Admin {
 		add_action( 'admin_post_am_revoke_expired',           array( $instance, 'handle_revoke_expired' ) );
 		add_action( 'admin_notices',                          array( $instance, 'show_notices' ) );
 		add_action( 'wp_ajax_am_get_event_detail',            array( $instance, 'ajax_event_detail' ) );
+		add_action( 'wp_ajax_am_get_v2_event_detail',         array( $instance, 'ajax_v2_event_detail' ) );
 		add_action( 'wp_ajax_am_get_session_detail',          array( $instance, 'ajax_session_detail' ) );
 	}
 
@@ -238,6 +239,79 @@ class AM_Admin {
 
 	// ── AJAX ─────────────────────────────────────────────────────────────
 
+	public function ajax_v2_event_detail() {
+		check_ajax_referer( 'am_ajax', 'nonce' );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( '-1' );
+		}
+
+		global $wpdb;
+		$id    = absint( $_POST['entry_id'] ?? 0 );
+		$table = $wpdb->prefix . AM_Schema::EVENTS_TABLE;
+		$row   = $wpdb->get_row( $wpdb->prepare(
+			"SELECT * FROM `{$table}` WHERE id = %d",
+			$id
+		) );
+
+		if ( ! $row ) {
+			wp_send_json_error( 'Not found' );
+		}
+
+		$context = AM_Event_Query::get_context( $id );
+
+		ob_start();
+		?>
+		<table class="am-detail-table">
+			<tr><th><?php esc_html_e( 'ID', 'activity-monitor' ); ?></th><td><?php echo esc_html( $row->id ); ?></td></tr>
+			<tr><th><?php esc_html_e( 'Date / Time', 'activity-monitor' ); ?></th><td><?php echo esc_html( $row->date ); ?> UTC</td></tr>
+			<tr>
+				<th><?php esc_html_e( 'Level', 'activity-monitor' ); ?></th>
+				<td><span class="am-badge"><?php echo esc_html( AM_Log_Levels::label( $row->level ) ); ?></span></td>
+			</tr>
+			<tr>
+				<th><?php esc_html_e( 'Initiator', 'activity-monitor' ); ?></th>
+				<td><span class="am-badge"><?php echo esc_html( AM_Initiator_Detector::label( $row->initiator ) ); ?></span></td>
+			</tr>
+			<tr><th><?php esc_html_e( 'Event', 'activity-monitor' ); ?></th><td><?php echo esc_html( $row->event_type . '.' . $row->action ); ?></td></tr>
+			<tr>
+				<th><?php esc_html_e( 'User', 'activity-monitor' ); ?></th>
+				<td><?php echo esc_html( $row->user_login ); ?><?php if ( $row->user_role ) echo ' (' . esc_html( $row->user_role ) . ')'; ?></td>
+			</tr>
+			<tr><th><?php esc_html_e( 'IP Address', 'activity-monitor' ); ?></th><td><?php echo esc_html( $row->ip_address ); ?></td></tr>
+			<tr>
+				<th><?php esc_html_e( 'Object', 'activity-monitor' ); ?></th>
+				<td>
+					<?php echo esc_html( $row->object_type ); ?>
+					<?php if ( $row->object_name ) echo ' – ' . esc_html( $row->object_name ); ?>
+					<?php if ( $row->object_id )   echo ' (ID: ' . esc_html( $row->object_id ) . ')'; ?>
+				</td>
+			</tr>
+			<tr><th><?php esc_html_e( 'Message', 'activity-monitor' ); ?></th><td><?php echo esc_html( $row->message ); ?></td></tr>
+			<?php if ( (int) $row->repeat_count > 1 ) : ?>
+			<tr><th><?php esc_html_e( 'Repeated', 'activity-monitor' ); ?></th><td><?php printf( esc_html__( '%d times (occasion grouping)', 'activity-monitor' ), (int) $row->repeat_count ); ?></td></tr>
+			<?php endif; ?>
+			<?php if ( ! empty( $context['diff'] ) && is_array( $context['diff'] ) ) : ?>
+			<tr>
+				<th><?php esc_html_e( 'Changes', 'activity-monitor' ); ?></th>
+				<td>
+					<table class="am-diff-table">
+						<?php foreach ( $context['diff'] as $field => $change ) : ?>
+						<tr>
+							<td><strong><?php echo esc_html( $field ); ?></strong></td>
+							<td class="am-diff-before"><?php echo esc_html( wp_trim_words( (string) ( $change['before'] ?? '' ), 20 ) ); ?></td>
+							<td>&rarr;</td>
+							<td class="am-diff-after"><?php echo esc_html( wp_trim_words( (string) ( $change['after'] ?? '' ), 20 ) ); ?></td>
+						</tr>
+						<?php endforeach; ?>
+					</table>
+				</td>
+			</tr>
+			<?php endif; ?>
+		</table>
+		<?php
+		wp_send_json_success( array( 'html' => ob_get_clean() ) );
+	}
+
 	public function ajax_event_detail() {
 		check_ajax_referer( 'am_ajax', 'nonce' );
 		if ( ! current_user_can( 'manage_options' ) ) {
@@ -377,6 +451,7 @@ class AM_Admin {
 
 		$tabs = array(
 			'log'      => __( 'Activity Log',    'activity-monitor' ),
+			'v2-log'   => __( 'Activity Log (v2.0 preview)', 'activity-monitor' ),
 			'sessions' => __( 'Active Sessions', 'activity-monitor' ),
 			'settings' => __( 'Settings',        'activity-monitor' ),
 		);
@@ -414,6 +489,9 @@ class AM_Admin {
 				switch ( $active_tab ) {
 					case 'log':
 						$this->render_tab_log();
+						break;
+					case 'v2-log':
+						$this->render_tab_v2_log();
 						break;
 					case 'sessions':
 						$this->render_tab_sessions();
@@ -571,6 +649,208 @@ class AM_Admin {
 						</td>
 						<td>
 							<button class="button button-small am-view-detail"
+							        data-id="<?php echo esc_attr( $row->id ); ?>">
+								<?php esc_html_e( 'Details', 'activity-monitor' ); ?>
+							</button>
+						</td>
+					</tr>
+					<?php endforeach; ?>
+				</tbody>
+			</table>
+
+			<?php if ( $num_pages > 1 ) : ?>
+			<div class="tablenav bottom">
+				<div class="tablenav-pages">
+					<span class="displaying-num">
+						<?php printf(
+							esc_html( _n( '%s item', '%s items', $total, 'activity-monitor' ) ),
+							number_format_i18n( $total )
+						); ?>
+					</span>
+					<?php
+					echo wp_kses_post( paginate_links( array(
+						'base'      => add_query_arg( 'paged', '%#%' ),
+						'format'    => '',
+						'prev_text' => '&laquo;',
+						'next_text' => '&raquo;',
+						'total'     => $num_pages,
+						'current'   => $page,
+					) ) );
+					?>
+				</div>
+			</div>
+			<?php endif; ?>
+			<?php endif; ?>
+		</div>
+		<?php
+	}
+
+	// ── Tab: Activity Log (v2.0 preview) ─────────────────────────────────
+	//
+	// Reads from the new am_events / am_event_context schema only.
+	// Currently only AM_Logger_Posts writes here (see
+	// AM_Logger_Manager::REGISTERED_LOGGER_CLASSES) — every other event
+	// type still only appears on the v1.x "Activity Log" tab until ported.
+	// This tab exists so occasion grouping (repeat count), initiators, and
+	// PSR-3 levels are visible while the rest of the loggers are converted.
+	// See activity-monitor-v2-spec.md §9 and GitHub issue #4.
+
+	private function render_tab_v2_log() {
+		$per_page   = 50;
+		$page       = max( 1, absint( $_GET['paged'] ?? 1 ) );
+		$level      = sanitize_key( $_GET['am_level'] ?? '' );
+		$initiator  = sanitize_key( $_GET['am_initiator'] ?? '' );
+		$event_type = sanitize_key( $_GET['am_type'] ?? '' );
+		$search     = sanitize_text_field( $_GET['am_search'] ?? '' );
+
+		$data        = AM_Event_Query::get_events( compact( 'per_page', 'page', 'level', 'initiator', 'event_type', 'search' ) );
+		$items       = $data['items'];
+		$total       = $data['total'];
+		$num_pages   = (int) ceil( $total / $per_page );
+		$event_types = AM_Event_Query::get_event_types();
+
+		$base_url = add_query_arg(
+			array( 'page' => 'activity-monitor', self::TAB_PARAM => 'v2-log' ),
+			admin_url( 'admin.php' )
+		);
+
+		$level_options = array();
+		foreach ( AM_Log_Levels::ORDER as $lvl ) {
+			$level_options[ $lvl ] = AM_Log_Levels::label( $lvl );
+		}
+
+		$initiator_options = array();
+		foreach ( AM_Initiator_Detector::all() as $init ) {
+			$initiator_options[ $init ] = AM_Initiator_Detector::label( $init );
+		}
+		?>
+
+		<div class="am-stats-bar">
+			<span class="am-stat">
+				<strong><?php echo esc_html( number_format( $total ) ); ?></strong>
+				<?php esc_html_e( 'Total Events (v2.0 schema)', 'activity-monitor' ); ?>
+			</span>
+		</div>
+
+		<?php if ( 0 === AM_Event_Query::total_count() ) : ?>
+			<div class="notice notice-info inline">
+				<p>
+					<?php esc_html_e( 'No events logged to the new schema yet. Only post/page/CPT events are wired up so far — try editing, publishing, or trashing a post, then check back here.', 'activity-monitor' ); ?>
+				</p>
+			</div>
+		<?php endif; ?>
+
+		<div class="am-filter-bar">
+			<form method="get" action="">
+				<input type="hidden" name="page" value="activity-monitor">
+				<input type="hidden" name="<?php echo esc_attr( self::TAB_PARAM ); ?>" value="v2-log">
+
+				<div class="am-filter-group">
+					<span class="am-filter-label"><?php esc_html_e( 'Level:', 'activity-monitor' ); ?></span>
+					<a href="<?php echo esc_url( remove_query_arg( 'am_level', $base_url ) ); ?>"
+					   class="am-pill <?php echo '' === $level ? 'active' : ''; ?>">
+						<?php esc_html_e( 'All', 'activity-monitor' ); ?>
+					</a>
+					<?php foreach ( $level_options as $lvl_val => $lvl_label ) :
+						$url = add_query_arg( 'am_level', $lvl_val, $base_url );
+					?>
+					<a href="<?php echo esc_url( $url ); ?>"
+					   class="am-pill <?php echo ( $lvl_val === $level ) ? 'active' : ''; ?>">
+						<?php echo esc_html( $lvl_label ); ?>
+					</a>
+					<?php endforeach; ?>
+				</div>
+
+				<div class="am-filter-group">
+					<span class="am-filter-label"><?php esc_html_e( 'Initiator:', 'activity-monitor' ); ?></span>
+					<select name="am_initiator" onchange="this.form.submit()">
+						<option value=""><?php esc_html_e( '— All Initiators —', 'activity-monitor' ); ?></option>
+						<?php foreach ( $initiator_options as $init_val => $init_label ) : ?>
+							<option value="<?php echo esc_attr( $init_val ); ?>" <?php selected( $init_val, $initiator ); ?>>
+								<?php echo esc_html( $init_label ); ?>
+							</option>
+						<?php endforeach; ?>
+					</select>
+				</div>
+
+				<div class="am-filter-group">
+					<span class="am-filter-label"><?php esc_html_e( 'Type:', 'activity-monitor' ); ?></span>
+					<select name="am_type" onchange="this.form.submit()">
+						<option value=""><?php esc_html_e( '— All Types —', 'activity-monitor' ); ?></option>
+						<?php foreach ( $event_types as $et ) : ?>
+							<option value="<?php echo esc_attr( $et ); ?>" <?php selected( $et, $event_type ); ?>>
+								<?php echo esc_html( $et ); ?>
+							</option>
+						<?php endforeach; ?>
+					</select>
+				</div>
+
+				<div class="am-filter-group am-filter-search">
+					<input type="search" name="am_search"
+					       value="<?php echo esc_attr( $search ); ?>"
+					       placeholder="<?php esc_attr_e( 'Search message, user, object…', 'activity-monitor' ); ?>">
+					<button type="submit" class="button"><?php esc_html_e( 'Search', 'activity-monitor' ); ?></button>
+					<?php if ( $level || $initiator || $event_type || $search ) : ?>
+						<a href="<?php echo esc_url( $base_url ); ?>" class="button button-secondary">
+							<?php esc_html_e( 'Reset', 'activity-monitor' ); ?>
+						</a>
+					<?php endif; ?>
+				</div>
+			</form>
+		</div>
+
+		<div class="am-table-wrap am-table-scroll">
+			<?php if ( empty( $items ) ) : ?>
+				<div class="am-empty">
+					<span class="dashicons dashicons-info-outline"></span>
+					<p><?php esc_html_e( 'No activity recorded yet.', 'activity-monitor' ); ?></p>
+				</div>
+			<?php else : ?>
+			<table class="wp-list-table widefat striped am-log-table">
+				<thead>
+					<tr>
+						<th><?php esc_html_e( 'Level',      'activity-monitor' ); ?></th>
+						<th><?php esc_html_e( 'Date',       'activity-monitor' ); ?></th>
+						<th><?php esc_html_e( 'Initiator',  'activity-monitor' ); ?></th>
+						<th><?php esc_html_e( 'Event',      'activity-monitor' ); ?></th>
+						<th><?php esc_html_e( 'User',       'activity-monitor' ); ?></th>
+						<th><?php esc_html_e( 'Object',     'activity-monitor' ); ?></th>
+						<th><?php esc_html_e( 'Repeats',    'activity-monitor' ); ?></th>
+						<th><?php esc_html_e( 'Actions',    'activity-monitor' ); ?></th>
+					</tr>
+				</thead>
+				<tbody>
+					<?php foreach ( $items as $row ) : ?>
+					<tr class="am-row">
+						<td><span class="am-badge"><?php echo esc_html( AM_Log_Levels::label( $row->level ) ); ?></span></td>
+						<td>
+							<span title="<?php echo esc_attr( $row->date ); ?> UTC">
+								<?php echo esc_html( wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), strtotime( $row->date ) ) ); ?>
+							</span>
+						</td>
+						<td><span class="am-badge"><?php echo esc_html( AM_Initiator_Detector::label( $row->initiator ) ); ?></span></td>
+						<td>
+							<code class="am-event-type"><?php echo esc_html( $row->event_type . '.' . $row->action ); ?></code>
+						</td>
+						<td>
+							<?php echo esc_html( $row->user_login ); ?>
+							<?php if ( $row->user_role ) : ?>
+								<small class="am-role"><?php echo esc_html( $row->user_role ); ?></small>
+							<?php endif; ?>
+						</td>
+						<td>
+							<?php if ( $row->object_type ) : ?>
+								<small class="am-object-type"><?php echo esc_html( $row->object_type ); ?></small>
+							<?php endif; ?>
+							<?php echo esc_html( $row->object_name ); ?>
+						</td>
+						<td>
+							<?php if ( (int) $row->repeat_count > 1 ) : ?>
+								<span class="am-badge">&times;<?php echo esc_html( $row->repeat_count ); ?></span>
+							<?php endif; ?>
+						</td>
+						<td>
+							<button class="button button-small am-view-detail-v2"
 							        data-id="<?php echo esc_attr( $row->id ); ?>">
 								<?php esc_html_e( 'Details', 'activity-monitor' ); ?>
 							</button>
