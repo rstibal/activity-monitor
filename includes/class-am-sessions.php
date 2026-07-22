@@ -63,7 +63,7 @@ class AM_Sessions {
 		foreach ( $to_revoke as $token_hash => $session ) {
 			unset( $sessions[ $token_hash ] );
 		}
-		update_user_meta( $user_id, 'session_tokens', $sessions );
+		self::update_session_meta_quietly( $user_id, $sessions );
 
 		$user = get_userdata( $user_id );
 		AM_Event_Writer::log(
@@ -123,7 +123,7 @@ class AM_Sessions {
 			}
 
 			if ( count( $keep ) !== count( $sessions ) ) {
-				update_user_meta( $user->ID, 'session_tokens', $keep );
+				self::update_session_meta_quietly( $user->ID, $keep );
 			}
 		}
 
@@ -170,5 +170,34 @@ class AM_Sessions {
 	private static function get_raw_sessions( int $user_id ): array {
 		$raw = get_user_meta( $user_id, 'session_tokens', true );
 		return is_array( $raw ) ? $raw : array();
+	}
+
+	/**
+	 * BUGFIX (reported by Rob after testing the concurrent-limit revoke):
+	 * update_user_meta() on the 'session_tokens' key triggers WordPress
+	 * core's clean_user_cache(), which calls wp_cache_flush_group('users')
+	 * (technically 'user_meta', added in WP 6.1). Object cache backends
+	 * that don't implement group-level flushing -- notably WP Engine's,
+	 * which is where this surfaced -- trigger a _doing_it_wrong() notice
+	 * on every call, visible right on wp-login.php after the revoked
+	 * user's session dies and they're bounced back to the login screen.
+	 *
+	 * This is a known WordPress-core / third-party-object-cache
+	 * interaction (core added wp_cache_flush_group in 6.1; not every
+	 * persistent cache backend implements it), not a bug in this
+	 * function's own logic -- update_user_meta() is still the correct API
+	 * to call here. The notice is silenced narrowly, only around this one
+	 * call, only for this one doing_it_wrong trigger, so any other
+	 * doing-it-wrong notice this plugin or another plugin generates during
+	 * the same request still surfaces normally.
+	 */
+	private static function update_session_meta_quietly( int $user_id, array $sessions ) {
+		$suppress = function ( $trigger, $function_name ) {
+			return ( 'wp_cache_flush_group' === $function_name ) ? false : $trigger;
+		};
+
+		add_filter( 'doing_it_wrong_trigger_error', $suppress, 10, 2 );
+		update_user_meta( $user_id, 'session_tokens', $sessions );
+		remove_filter( 'doing_it_wrong_trigger_error', $suppress, 10 );
 	}
 }
