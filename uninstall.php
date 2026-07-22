@@ -3,8 +3,7 @@
  * Activity Monitor – Uninstall
  *
  * FIX #9: Fires when the plugin is deleted via Plugins > Delete (not on deactivation).
- * Removes the log table and all plugin options so no data or credentials
- * (Slack webhook URLs) are left behind.
+ * Removes the log tables and all plugin options so no data is left behind.
  */
 
 if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
@@ -24,6 +23,8 @@ AM_Schema::uninstall();
 delete_option( 'am_notification_channels' );
 delete_option( 'am_retention_days' );
 delete_option( 'am_disabled_loggers' );
+delete_option( 'am_session_concurrent_limit' );
+delete_option( 'am_session_active_threshold_minutes' );
 
 // Clear the scheduled cron event.
 $timestamp = wp_next_scheduled( 'am_log_prune' );

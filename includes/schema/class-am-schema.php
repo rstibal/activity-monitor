@@ -222,4 +222,38 @@ class AM_Schema {
 			$wpdb->query( "TRUNCATE TABLE `{$wpdb->prefix}{$table}`" );
 		}
 	}
+
+	/**
+	 * Retention pruning for the v2.0 schema. Replaces the legacy
+	 * am_run_prune() cron callback in activity-monitor.php, which ran a
+	 * raw DELETE against the now-retired am_activity_log table directly
+	 * -- removing that without a v2.0 replacement would have silently
+	 * turned off log retention entirely (unbounded table growth) rather
+	 * than actually finishing the retirement. Deletes am_event_context
+	 * rows first (via a subquery on the events being pruned) so no
+	 * orphaned context rows are left behind, matching FK-less cleanup
+	 * order used elsewhere in this codebase (there are no real foreign
+	 * keys here, just the convention of children-before-parents).
+	 */
+	public static function prune( int $retention_days ) {
+		global $wpdb;
+		if ( $retention_days <= 0 ) {
+			return; // 0/negative = "never" (matches the admin setting's "Never" option).
+		}
+
+		$events_table  = $wpdb->prefix . self::EVENTS_TABLE;
+		$context_table = $wpdb->prefix . self::CONTEXT_TABLE;
+
+		$wpdb->query( $wpdb->prepare(
+			"DELETE ctx FROM `{$context_table}` ctx
+			 INNER JOIN `{$events_table}` ev ON ev.id = ctx.event_id
+			 WHERE ev.date < DATE_SUB(UTC_TIMESTAMP(), INTERVAL %d DAY)",
+			$retention_days
+		) );
+
+		$wpdb->query( $wpdb->prepare(
+			"DELETE FROM `{$events_table}` WHERE date < DATE_SUB(UTC_TIMESTAMP(), INTERVAL %d DAY)",
+			$retention_days
+		) );
+	}
 }

@@ -3,10 +3,10 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 /**
  * AM_Event_Query — read-side query layer for the v2.0 schema
- * (am_events + am_event_context). Kept separate from AM_Event_Writer
- * (write path) and from the legacy AM_DB (still used by the v1.x admin
- * screens) so the two schemas can be queried independently while the
- * port from v1.x is incomplete.
+ * (am_events + am_event_context). This is the only query layer left in
+ * the plugin -- the legacy AM_DB class it was originally kept separate
+ * from has been fully retired, and the "Activity Log" admin tab reads
+ * exclusively through this class now.
  *
  * This is the minimal query surface needed for the "New admin log screen"
  * (v2.0 build order item 5, moved earlier to make occasion grouping /

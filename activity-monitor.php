@@ -3,7 +3,7 @@
  * Plugin Name: Activity Monitor
  * Plugin URI:  https://robstibal.com
  * Description: Comprehensive WordPress audit log – tracks logins, content changes, settings updates, security events, and more.
- * Version:     2.0.0-dev.13
+ * Version:     2.0.0-dev.14
  * Author:      Rob Stibal
  * Author URI:  http://robstibal.com
  * License:     GPL-2.0+
@@ -14,16 +14,22 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'AM_VERSION',     '2.0.0-dev.13' );
-define( 'AM_FILE',        __FILE__ );
-define( 'AM_DIR',         plugin_dir_path( __FILE__ ) );
-define( 'AM_URL',         plugin_dir_url( __FILE__ ) );
-define( 'AM_TABLE',       'am_activity_log' ); // Legacy v1.x table name — retained until migration UI (issue #2) is confirmed by the admin.
+define( 'AM_VERSION', '2.0.0-dev.14' );
+define( 'AM_FILE',    __FILE__ );
+define( 'AM_DIR',     plugin_dir_path( __FILE__ ) );
+define( 'AM_URL',     plugin_dir_url( __FILE__ ) );
 
-// ── v2.0 core (schema, event writer, logger architecture) ────────────────
-// See activity-monitor-v2-spec.md §9 for build order. AM_Hooks (the v1.x
-// monolithic hook-registration class) has been fully retired -- see the
-// v1.x legacy section below for what still remains and why.
+// ── Core (schema, event writer, logger architecture) ─────────────────────
+// Full v1.x legacy retirement (dev.14): AM_Hooks (dev.12), AM_DB, and
+// AM_Logger (this build) are all gone. The am_activity_log table itself
+// is left in place on existing installs -- see AM_Schema's class doc --
+// but nothing in this plugin creates, writes to, reads from, or prunes
+// it anymore as of this version. AM_Schema::maybe_migrate_from_v1() still
+// runs its one-time backfill from that table if it exists (untouched,
+// no reason to remove a working non-destructive migration), but no
+// longer needs a sibling AM_DB::install() call to create the table in
+// the first place, since there's no legacy admin screen left that reads
+// from it. See activity-monitor-v2-spec.md §9.
 require_once AM_DIR . 'includes/schema/class-am-schema.php';
 require_once AM_DIR . 'includes/class-am-db-legacy-ip.php';
 require_once AM_DIR . 'includes/class-am-log-levels.php';
@@ -31,6 +37,7 @@ require_once AM_DIR . 'includes/class-am-initiator-detector.php';
 require_once AM_DIR . 'includes/class-am-event-writer.php';
 require_once AM_DIR . 'includes/class-am-event-query.php';
 require_once AM_DIR . 'includes/class-am-sessions.php';
+require_once AM_DIR . 'includes/class-am-notifications.php';
 require_once AM_DIR . 'includes/loggers/class-am-logger-base.php';
 require_once AM_DIR . 'includes/loggers/class-am-logger-posts.php';
 require_once AM_DIR . 'includes/loggers/class-am-logger-users.php';
@@ -46,66 +53,17 @@ require_once AM_DIR . 'includes/loggers/class-am-logger-passwords.php';
 require_once AM_DIR . 'includes/loggers/class-am-logger-sites.php';
 require_once AM_DIR . 'includes/loggers/class-am-logger-security.php';
 require_once AM_DIR . 'includes/class-am-logger-manager.php';
-
-// ── v1.x legacy (still present during the port; see TODOs above) ─────────
-// AM_Hooks retired (dev.12): its last remaining callback (on_authenticate)
-// was ported into AM_Logger_Users, and every other callback was already
-// ported in earlier builds -- the class had nothing left to run. AM_DB
-// and AM_Logger remain: admin/class-am-admin.php's legacy "Activity Log"
-// tab still reads AM_DB::get_events() / uses AM_Logger's severity
-// constants directly, so those two stay until that tab is either removed
-// or migrated onto AM_Event_Query -- a separate decision from "port the
-// remaining event callback" and not made unilaterally here.
-require_once AM_DIR . 'includes/class-am-db.php';
-require_once AM_DIR . 'includes/class-am-logger.php';
-require_once AM_DIR . 'includes/class-am-notifications.php';
 require_once AM_DIR . 'admin/class-am-admin.php';
 
 // ── Activation / deactivation ────────────────────────────────────────────
-/**
- * BUGFIX (dev.5 → dev.6): activation previously called only
- * AM_Schema::install(), which creates am_events/am_event_context and
- * migrates FROM the legacy table if present -- but never CREATES the
- * legacy table itself. AM_DB::install() is what always created
- * wp_am_activity_log. Swapping the hook silently stopped creating it on
- * fresh installs, breaking the still-active v1.x "Activity Log" tab
- * (which several loggers -- comments, themes, core, etc. -- still write
- * to) with "table doesn't exist" errors. Both must run on activation
- * until the legacy table and v1.x admin screens are fully retired.
- */
-function am_activate() {
-	AM_DB::install();
-	AM_Schema::install();
-}
-register_activation_hook( AM_FILE, 'am_activate' );
-register_deactivation_hook( AM_FILE, array( 'AM_DB', 'deactivate' ) );
+register_activation_hook( AM_FILE, array( 'AM_Schema', 'install' ) );
+// No deactivation cleanup needed -- v2.0 data is intentionally kept on
+// deactivation (only uninstall.php removes it), same policy v1.x had.
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────
 function am_init() {
-	// Self-healing safety net: if the legacy table is somehow missing
-	// (e.g. this exact activation-hook bug from dev.5, or a manual DB
-	// change), recreate it. dbDelta() is idempotent and cheap to call on
-	// every load -- this runs once via the 'am_legacy_table_checked'
-	// transient so it isn't a query on every single page load.
-	if ( ! get_transient( 'am_legacy_table_checked' ) ) {
-		global $wpdb;
-		$legacy_table = $wpdb->prefix . AM_TABLE;
-		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant.
-		$exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $legacy_table ) );
-		if ( $exists !== $legacy_table ) {
-			AM_DB::install();
-		}
-		set_transient( 'am_legacy_table_checked', 1, DAY_IN_SECONDS );
-	}
-
 	AM_Schema::maybe_upgrade();
 	AM_Logger_Manager::init();
-
-	// AM_Hooks retired (dev.12) -- all its callbacks are now ported onto
-	// AM_Logger_Manager's registered loggers. AM_Admin (below) still runs
-	// the legacy "Activity Log" tab against AM_DB directly, which is why
-	// AM_DB and AM_Logger (the legacy severity-constants class) are still
-	// required above.
 	AM_Admin::init();
 }
 add_action( 'plugins_loaded', 'am_init' );
@@ -119,20 +77,14 @@ function am_schedule_prune() {
 add_action( 'wp', 'am_schedule_prune' );
 
 /**
- * FIX #3: Use $wpdb->prepare() for the DELETE query.
- * The INTERVAL value cannot be parameterised via %d in MySQL's DATE_SUB,
- * so we validate the retention days from an option (default 90) and
- * cast it to absint before interpolation – safe because no user input
- * reaches the query string.
+ * Retention pruning, now against the v2.0 schema via AM_Schema::prune().
+ * Previously ran a raw DELETE against the legacy am_activity_log table
+ * directly in this file -- moved into AM_Schema alongside clear_all() so
+ * all schema-level maintenance operations live in one place, and so this
+ * plugin doesn't retain a dangling reference to a table nothing else
+ * touches anymore.
  */
 function am_run_prune() {
-	global $wpdb;
-	$days  = absint( get_option( 'am_retention_days', 90 ) );
-	$table = $wpdb->prefix . AM_TABLE;
-	// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-	$wpdb->query( $wpdb->prepare(
-		"DELETE FROM `{$table}` WHERE created_at < DATE_SUB(UTC_TIMESTAMP(), INTERVAL %d DAY)",
-		$days
-	) );
+	AM_Schema::prune( absint( get_option( 'am_retention_days', 90 ) ) );
 }
 add_action( 'am_log_prune', 'am_run_prune' );

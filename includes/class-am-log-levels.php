@@ -72,4 +72,21 @@ class AM_Log_Levels {
 	public static function is_valid( string $level ): bool {
 		return in_array( $level, self::ORDER, true );
 	}
+
+	/**
+	 * Compare two levels by severity. Returns true if $level is at or
+	 * above $threshold in the ORDER scale (debug lowest, emergency
+	 * highest) -- the same ">=" comparison v1.x did on its 1-4 int
+	 * severity scale, generalized to the 8-value PSR-3 scale. Used by
+	 * AM_Notifications to decide whether an event meets a channel's
+	 * configured minimum level.
+	 */
+	public static function meets_threshold( string $level, string $threshold ): bool {
+		$level_index     = array_search( $level, self::ORDER, true );
+		$threshold_index = array_search( $threshold, self::ORDER, true );
+		if ( false === $level_index || false === $threshold_index ) {
+			return false;
+		}
+		return $level_index >= $threshold_index;
+	}
 }

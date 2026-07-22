@@ -88,22 +88,28 @@ class AM_Admin {
 		}
 		$clean = array();
 		foreach ( $input as $ch ) {
+			// Slack support removed -- email-only going forward. Any
+			// stored 'slack' entries from a prior version are dropped on
+			// next save rather than migrated, since there's no webhook
+			// data worth preserving without the feature that used it.
 			$type = sanitize_key( $ch['type'] ?? '' );
-			if ( ! in_array( $type, array( 'email', 'slack' ), true ) ) {
+			if ( 'email' !== $type ) {
 				continue;
 			}
-			$entry = array(
-				'type'     => $type,
-				'name'     => sanitize_text_field( $ch['name'] ?? '' ),
-				'severity' => absint( $ch['severity'] ?? AM_Logger::CRITICAL ),
-			);
-			if ( $type === 'email' ) {
-				$emails = array_filter( array_map( 'trim', explode( ',', $ch['recipients'] ?? '' ) ) );
-				$entry['recipients'] = implode( ', ', array_filter( $emails, 'is_email' ) );
-			} elseif ( $type === 'slack' ) {
-				$entry['webhook_url'] = esc_url_raw( $ch['webhook_url'] ?? '' );
+
+			$level = isset( $ch['level'] ) ? sanitize_key( $ch['level'] ) : AM_Log_Levels::CRITICAL;
+			if ( ! AM_Log_Levels::is_valid( $level ) ) {
+				$level = AM_Log_Levels::CRITICAL;
 			}
-			$clean[] = $entry;
+
+			$emails = array_filter( array_map( 'trim', explode( ',', $ch['recipients'] ?? '' ) ) );
+
+			$clean[] = array(
+				'type'       => 'email',
+				'name'       => sanitize_text_field( $ch['name'] ?? '' ),
+				'level'      => $level,
+				'recipients' => implode( ', ', array_filter( $emails, 'is_email' ) ),
+			);
 		}
 		return $clean;
 	}
@@ -148,13 +154,11 @@ class AM_Admin {
 			wp_die( esc_html__( 'Unauthorized.', 'activity-monitor' ) );
 		}
 
-		// Clear both schemas: the legacy am_activity_log table (kept around
-		// post-migration, see AM_Schema doc) and the v2.0 am_events/
-		// am_event_context tables, which are now the only visible log.
-		// Previously this only cleared the legacy table, silently leaving
-		// the actually-displayed v2.0 log untouched -- caught while
-		// retiring the old "Activity Log" tab.
-		AM_DB::clear_all();
+		// Clears the v2.0 am_events/am_event_context tables -- the only
+		// visible log now that AM_DB and the legacy "Activity Log" tab
+		// are both fully retired. (Previously this also called
+		// AM_DB::clear_all() on the legacy table; that class no longer
+		// exists as of full legacy retirement.)
 		AM_Schema::clear_all();
 
 		AM_Event_Writer::log(
@@ -919,7 +923,7 @@ class AM_Admin {
 				<?php esc_html_e( 'Notification Channels', 'activity-monitor' ); ?>
 			</h2>
 			<p class="am-description">
-				<?php esc_html_e( 'Configure instant alerts. Each channel triggers when an event meets or exceeds its minimum severity threshold.', 'activity-monitor' ); ?>
+				<?php esc_html_e( 'Configure instant email alerts. Each channel triggers when an event meets or exceeds its minimum level.', 'activity-monitor' ); ?>
 			</p>
 			<form method="post" action="options.php" id="am-notifications-form">
 				<?php settings_fields( 'am_notifications_group' ); ?>
@@ -935,10 +939,6 @@ class AM_Admin {
 						<span class="dashicons dashicons-email-alt"></span>
 						<?php esc_html_e( 'Add Email Channel', 'activity-monitor' ); ?>
 					</button>
-					<button type="button" class="button button-secondary" id="am-add-slack">
-						<span class="dashicons dashicons-admin-links"></span>
-						<?php esc_html_e( 'Add Slack Channel', 'activity-monitor' ); ?>
-					</button>
 				</div>
 
 				<?php submit_button( __( 'Save Notification Channels', 'activity-monitor' ) ); ?>
@@ -946,10 +946,7 @@ class AM_Admin {
 
 			<div style="display:none;">
 				<div id="am-template-email">
-					<?php $this->render_channel_row( '__INDEX__', array( 'type' => 'email', 'name' => '', 'severity' => AM_Logger::CRITICAL, 'recipients' => '' ) ); ?>
-				</div>
-				<div id="am-template-slack">
-					<?php $this->render_channel_row( '__INDEX__', array( 'type' => 'slack', 'name' => '', 'severity' => AM_Logger::CRITICAL, 'webhook_url' => '' ) ); ?>
+					<?php $this->render_channel_row( '__INDEX__', array( 'type' => 'email', 'name' => '', 'level' => AM_Log_Levels::CRITICAL, 'recipients' => '' ) ); ?>
 				</div>
 			</div>
 		</div>
@@ -1059,21 +1056,23 @@ class AM_Admin {
 	// ── Notification channel card ────────────────────────────────────────
 
 	private function render_channel_row( $index, $ch ) {
-		$type   = isset( $ch['type'] )     ? $ch['type']     : 'email';
-		$name   = isset( $ch['name'] )     ? $ch['name']     : '';
-		$sev    = isset( $ch['severity'] ) ? $ch['severity'] : AM_Logger::CRITICAL;
+		$name   = isset( $ch['name'] )  ? $ch['name']  : '';
+		$level  = isset( $ch['level'] ) ? (string) $ch['level'] : AM_Log_Levels::CRITICAL;
+		if ( ! AM_Log_Levels::is_valid( $level ) ) {
+			$level = AM_Log_Levels::CRITICAL;
+		}
 		$prefix = 'am_notification_channels[' . $index . ']';
 		?>
-		<div class="am-channel-card am-channel-<?php echo esc_attr( $type ); ?>">
+		<div class="am-channel-card am-channel-email">
 			<div class="am-channel-card-header">
-				<span class="am-channel-icon dashicons <?php echo 'slack' === $type ? 'dashicons-admin-links' : 'dashicons-email-alt'; ?>"></span>
-				<strong class="am-channel-type-label"><?php echo 'slack' === $type ? 'Slack' : 'Email'; ?></strong>
+				<span class="am-channel-icon dashicons dashicons-email-alt"></span>
+				<strong class="am-channel-type-label">Email</strong>
 				<button type="button" class="am-remove-channel button-link">
 					&times; <?php esc_html_e( 'Remove', 'activity-monitor' ); ?>
 				</button>
 			</div>
 
-			<input type="hidden" name="<?php echo esc_attr( $prefix ); ?>[type]" value="<?php echo esc_attr( $type ); ?>">
+			<input type="hidden" name="<?php echo esc_attr( $prefix ); ?>[type]" value="email">
 
 			<div class="am-channel-fields">
 				<div class="am-field-row">
@@ -1089,17 +1088,23 @@ class AM_Admin {
 
 				<div class="am-field-row">
 					<label>
-						<?php esc_html_e( 'Minimum Severity', 'activity-monitor' ); ?>
-						<select name="<?php echo esc_attr( $prefix ); ?>[severity]">
-							<option value="<?php echo AM_Logger::INFO; ?>"     <?php selected( $sev, AM_Logger::INFO ); ?>><?php esc_html_e( 'Info and above',    'activity-monitor' ); ?></option>
-							<option value="<?php echo AM_Logger::NOTICE; ?>"   <?php selected( $sev, AM_Logger::NOTICE ); ?>><?php esc_html_e( 'Notice and above',  'activity-monitor' ); ?></option>
-							<option value="<?php echo AM_Logger::WARNING; ?>"  <?php selected( $sev, AM_Logger::WARNING ); ?>><?php esc_html_e( 'Warning and above', 'activity-monitor' ); ?></option>
-							<option value="<?php echo AM_Logger::CRITICAL; ?>" <?php selected( $sev, AM_Logger::CRITICAL ); ?>><?php esc_html_e( 'Critical only',     'activity-monitor' ); ?></option>
+						<?php esc_html_e( 'Minimum Level', 'activity-monitor' ); ?>
+						<select name="<?php echo esc_attr( $prefix ); ?>[level]">
+							<?php foreach ( AM_Log_Levels::ORDER as $lvl ) : ?>
+								<option value="<?php echo esc_attr( $lvl ); ?>" <?php selected( $level, $lvl ); ?>>
+									<?php
+									printf(
+										/* translators: %s: log level label, e.g. "Warning" */
+										esc_html__( '%s and above', 'activity-monitor' ),
+										esc_html( AM_Log_Levels::label( $lvl ) )
+									);
+									?>
+								</option>
+							<?php endforeach; ?>
 						</select>
 					</label>
 				</div>
 
-				<?php if ( 'email' === $type ) : ?>
 				<div class="am-field-row am-field-full">
 					<label>
 						<?php esc_html_e( 'Recipients', 'activity-monitor' ); ?>
@@ -1111,19 +1116,6 @@ class AM_Admin {
 						<p class="description"><?php esc_html_e( 'Separate multiple addresses with commas.', 'activity-monitor' ); ?></p>
 					</label>
 				</div>
-				<?php elseif ( 'slack' === $type ) : ?>
-				<div class="am-field-row am-field-full">
-					<label>
-						<?php esc_html_e( 'Webhook URL', 'activity-monitor' ); ?>
-						<input type="url"
-						       name="<?php echo esc_attr( $prefix ); ?>[webhook_url]"
-						       value="<?php echo esc_attr( isset( $ch['webhook_url'] ) ? $ch['webhook_url'] : '' ); ?>"
-						       placeholder="https://hooks.slack.com/services/…"
-						       class="large-text">
-						<p class="description"><?php esc_html_e( 'Create an Incoming Webhook in your Slack app settings.', 'activity-monitor' ); ?></p>
-					</label>
-				</div>
-				<?php endif; ?>
 			</div>
 		</div>
 		<?php

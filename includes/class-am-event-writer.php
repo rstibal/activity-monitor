@@ -93,6 +93,27 @@ class AM_Event_Writer {
 			self::write_context( $event_id, $args['context'] );
 		}
 
+		// BUGFIX: notifications were only ever wired to the legacy
+		// AM_Logger::log() call path, which every event source stopped
+		// using once ported onto this writer (dev.1-dev.12) -- silently
+		// making notifications dead for every ported event. Wired here,
+		// on genuine new-row inserts only (an occasion-grouped repeat
+		// returns early above and never reaches this point, so a
+		// brute-force burst doesn't spam a notification per attempt).
+		if ( $event_id ) {
+			AM_Notifications::maybe_notify(
+				$row['level'],
+				$row['event_type'],
+				$row['action'],
+				$row['message'],
+				array(
+					'user_login'  => $row['user_login'],
+					'ip_address'  => $row['ip_address'],
+					'object_name' => $row['object_name'],
+				)
+			);
+		}
+
 		return $event_id;
 	}
 

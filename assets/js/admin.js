@@ -47,7 +47,6 @@
 		$('#am-channels-list').append(html);
 	}
 	$('#am-add-email').on('click', function () { addChannel('email'); });
-	$('#am-add-slack').on('click', function () { addChannel('slack'); });
 	$(document).on('click', '.am-remove-channel', function () { $(this).closest('.am-channel-card').remove(); });
 	$(document).on('change', 'select[name="am_type"]', function () { $(this).closest('form').submit(); });
 }(jQuery));
