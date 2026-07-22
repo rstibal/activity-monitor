@@ -18,17 +18,22 @@ class AM_Hooks {
 		// includes/loggers/class-am-logger-posts.php) — registrations removed here
 		// to avoid duplicate logging. Remove this whole class once all other event
 		// types are ported per activity-monitor-v2-spec.md §9 item 2.
-		add_action( 'attachment_updated',    array( $instance, 'on_attachment_updated' ), 10, 3 );
-		add_action( 'add_attachment',        array( $instance, 'on_attachment_add' ) );
-		add_action( 'delete_attachment',     array( $instance, 'on_attachment_delete' ) );
-		add_action( 'wp_insert_comment',     array( $instance, 'on_comment_insert' ), 10, 2 );
-		add_action( 'edit_comment',          array( $instance, 'on_comment_edit' ) );
-		add_action( 'delete_comment',        array( $instance, 'on_comment_delete' ) );
-		add_action( 'transition_comment_status', array( $instance, 'on_comment_status' ), 10, 3 );
-		add_action( 'activated_plugin',      array( $instance, 'on_plugin_activated' ) );
-		add_action( 'deactivated_plugin',    array( $instance, 'on_plugin_deactivated' ) );
+		// NOTE (v2.0 port): attachment_updated / add_attachment / delete_attachment
+		// are now owned by AM_Logger_Media (see
+		// includes/loggers/class-am-logger-media.php) — registrations removed
+		// here to avoid duplicate logging.
+		// NOTE (v2.0 port): wp_insert_comment / edit_comment / delete_comment /
+		// transition_comment_status are now owned by AM_Logger_Comments (see
+		// includes/loggers/class-am-logger-comments.php) — registrations
+		// removed here to avoid duplicate logging.
+		// NOTE (v2.0 port): activated_plugin / deactivated_plugin / delete_plugin
+		// are now owned by AM_Logger_Plugins (see
+		// includes/loggers/class-am-logger-plugins.php) — registrations
+		// removed here to avoid duplicate logging. upgrader_process_complete
+		// stays registered below for its theme/core branches only (see
+		// on_upgrader_complete() doc comment).
 		add_action( 'upgrader_process_complete', array( $instance, 'on_upgrader_complete' ), 10, 2 );
-		add_action( 'delete_plugin',         array( $instance, 'on_plugin_delete' ) );
+		// (delete_plugin now owned by AM_Logger_Plugins — see note above.)
 		add_action( 'switch_theme',          array( $instance, 'on_theme_switch' ), 10, 3 );
 		add_action( 'customize_save_after',  array( $instance, 'on_customizer_save' ) );
 		add_action( 'created_term',          array( $instance, 'on_term_created' ), 10, 3 );
@@ -133,7 +138,13 @@ class AM_Hooks {
 	public function on_plugin_activated( string $plugin ) { AM_Logger::log( 'plugin.activate', sprintf( 'Plugin "%s" activated.', $plugin ), array( 'severity' => AM_Logger::NOTICE, 'object_type' => 'plugin', 'object_name' => $plugin ) ); }
 	public function on_plugin_deactivated( string $plugin ) { AM_Logger::log( 'plugin.deactivate', sprintf( 'Plugin "%s" deactivated.', $plugin ), array( 'severity' => AM_Logger::WARNING, 'object_type' => 'plugin', 'object_name' => $plugin ) ); }
 	public function on_plugin_delete( string $plugin ) { AM_Logger::log( 'plugin.delete', sprintf( 'Plugin "%s" deleted.', $plugin ), array( 'severity' => AM_Logger::WARNING, 'object_type' => 'plugin', 'object_name' => $plugin ) ); }
-	public function on_upgrader_complete( $upgrader, array $data ) { if ( $this->is_automated_context() ) return; if ( empty( $data['type'] ) ) return; if ( $data['type'] === 'plugin' && ! empty( $data['plugins'] ) ) { foreach ( (array) $data['plugins'] as $p ) { AM_Logger::log( 'plugin.update', sprintf( 'Plugin "%s" updated.', $p ), array( 'severity' => AM_Logger::NOTICE, 'object_type' => 'plugin', 'object_name' => $p ) ); } } elseif ( $data['type'] === 'theme' && ! empty( $data['themes'] ) ) { foreach ( (array) $data['themes'] as $t ) { AM_Logger::log( 'theme.update', sprintf( 'Theme "%s" updated.', $t ), array( 'severity' => AM_Logger::NOTICE, 'object_type' => 'theme', 'object_name' => $t ) ); } } elseif ( $data['type'] === 'core' ) { global $wp_version; AM_Logger::log( 'core.update', sprintf( 'WordPress core updated to %s.', $wp_version ), array( 'severity' => AM_Logger::NOTICE, 'object_type' => 'core', 'object_name' => 'WordPress' ) ); } }
+	// NOTE (v2.0 port): the 'plugin' branch of this method has been removed
+	// -- plugin updates are now handled by
+	// AM_Logger_Plugins::on_upgrader_complete() (see
+	// includes/loggers/class-am-logger-plugins.php). This method (and its
+	// upgrader_process_complete registration below) stays active for its
+	// theme and core branches only, until AM_Logger_Themes is ported.
+	public function on_upgrader_complete( $upgrader, array $data ) { if ( $this->is_automated_context() ) return; if ( empty( $data['type'] ) ) return; if ( $data['type'] === 'theme' && ! empty( $data['themes'] ) ) { foreach ( (array) $data['themes'] as $t ) { AM_Logger::log( 'theme.update', sprintf( 'Theme "%s" updated.', $t ), array( 'severity' => AM_Logger::NOTICE, 'object_type' => 'theme', 'object_name' => $t ) ); } } elseif ( $data['type'] === 'core' ) { global $wp_version; AM_Logger::log( 'core.update', sprintf( 'WordPress core updated to %s.', $wp_version ), array( 'severity' => AM_Logger::NOTICE, 'object_type' => 'core', 'object_name' => 'WordPress' ) ); } }
 	public function on_theme_switch( string $new_name, WP_Theme $new_theme, WP_Theme $old_theme ) { AM_Logger::log( 'theme.switch', sprintf( 'Theme switched from "%s" to "%s".', $old_theme->get( 'Name' ), $new_name ), array( 'severity' => AM_Logger::WARNING, 'object_type' => 'theme', 'object_name' => $new_name ) ); }
 	public function on_customizer_save( $manager ) { AM_Logger::log( 'theme.customize', 'Customizer settings saved.', array( 'severity' => AM_Logger::NOTICE, 'object_type' => 'theme', 'object_name' => get_stylesheet() ) ); }
 	public function on_term_created( int $term_id, int $tt_id, string $taxonomy ) { $term = get_term( $term_id, $taxonomy ); AM_Logger::log( 'term.create', sprintf( 'Term "%s" created in "%s".', $term->name, $taxonomy ), array( 'severity' => AM_Logger::INFO, 'object_type' => 'term', 'object_id' => $term_id, 'object_name' => $term->name ) ); }

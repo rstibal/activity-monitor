@@ -18,11 +18,14 @@ class AM_Logger_Manager {
 	const REGISTERED_LOGGER_CLASSES = array(
 		'AM_Logger_Posts',
 		'AM_Logger_Users',
+		'AM_Logger_Media',
+		'AM_Logger_Comments',
+		'AM_Logger_Plugins',
 		// TODO (spec §9 item 2): port the remaining v1.x AM_Hooks callbacks:
-		// 'AM_Logger_Media',    - upload/update/delete
-		// 'AM_Logger_Comments', - create/edit/delete/status
-		// 'AM_Logger_Plugins',  - activate/deactivate/update/delete
-		// 'AM_Logger_Themes',   - switch/customizer save
+		// 'AM_Logger_Themes',   - switch/customizer save + theme-update branch
+		//                         of on_upgrader_complete (currently legacy)
+		// 'AM_Logger_Core',     - core-update branch of on_upgrader_complete
+		//                         (currently legacy, bundled with themes there)
 		// 'AM_Logger_Terms',    - created/edited/deleted (categories, tags)
 		// 'AM_Logger_Menus',    - update/delete
 		// 'AM_Logger_Widgets',  - save

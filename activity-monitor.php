@@ -35,6 +35,9 @@ require_once AM_DIR . 'includes/class-am-event-query.php';
 require_once AM_DIR . 'includes/loggers/class-am-logger-base.php';
 require_once AM_DIR . 'includes/loggers/class-am-logger-posts.php';
 require_once AM_DIR . 'includes/loggers/class-am-logger-users.php';
+require_once AM_DIR . 'includes/loggers/class-am-logger-media.php';
+require_once AM_DIR . 'includes/loggers/class-am-logger-comments.php';
+require_once AM_DIR . 'includes/loggers/class-am-logger-plugins.php';
 require_once AM_DIR . 'includes/class-am-logger-manager.php';
 
 // ── v1.x legacy (still present during the port; see TODOs above) ─────────
