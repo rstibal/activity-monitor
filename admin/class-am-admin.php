@@ -1147,37 +1147,39 @@ class AM_Admin {
 				<?php esc_html_e( 'These settings apply on top of the Active Sessions tab. Sessions themselves are still WordPress\'s own session tokens -- this plugin does not maintain a separate copy.', 'activity-monitor' ); ?>
 			</p>
 
-			<table class="form-table">
-				<tr>
-					<th scope="row">
-						<label for="am_session_concurrent_limit"><?php esc_html_e( 'Concurrent session limit', 'activity-monitor' ); ?></label>
-					</th>
-					<td>
-						<input type="number" min="0" id="am_session_concurrent_limit" name="am_session_concurrent_limit"
-						       value="<?php echo esc_attr( absint( get_option( 'am_session_concurrent_limit', 0 ) ) ); ?>"
-						       class="small-text">
-						<p class="description">
-							<?php esc_html_e( '0 = disabled. When a user logs in past this limit, their oldest sessions are revoked automatically (the new login always survives).', 'activity-monitor' ); ?>
-						</p>
-					</td>
-				</tr>
-				<tr>
-					<th scope="row">
-						<label for="am_session_active_threshold_minutes"><?php esc_html_e( 'Active session threshold', 'activity-monitor' ); ?></label>
-					</th>
-					<td>
-						<input type="number" min="1" id="am_session_active_threshold_minutes" name="am_session_active_threshold_minutes"
-						       value="<?php echo esc_attr( absint( get_option( 'am_session_active_threshold_minutes', 30 ) ) ); ?>"
-						       class="small-text"> <?php esc_html_e( 'minutes', 'activity-monitor' ); ?>
-						<p class="description">
-							<?php esc_html_e( 'Display-only: sessions logged in within this window are shown as "active". Does not affect WordPress\'s own session expiration.', 'activity-monitor' ); ?>
-						</p>
-					</td>
-				</tr>
-			</table>
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 				<?php wp_nonce_field( 'am_save_session_settings' ); ?>
 				<input type="hidden" name="action" value="am_save_session_settings">
+
+				<table class="form-table">
+					<tr>
+						<th scope="row">
+							<label for="am_session_concurrent_limit"><?php esc_html_e( 'Concurrent session limit', 'activity-monitor' ); ?></label>
+						</th>
+						<td>
+							<input type="number" min="0" id="am_session_concurrent_limit" name="am_session_concurrent_limit"
+							       value="<?php echo esc_attr( absint( get_option( 'am_session_concurrent_limit', 0 ) ) ); ?>"
+							       class="small-text">
+							<p class="description">
+								<?php esc_html_e( '0 = disabled. When a user logs in past this limit, their oldest sessions are revoked automatically (the new login always survives).', 'activity-monitor' ); ?>
+							</p>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row">
+							<label for="am_session_active_threshold_minutes"><?php esc_html_e( 'Active session threshold', 'activity-monitor' ); ?></label>
+						</th>
+						<td>
+							<input type="number" min="1" id="am_session_active_threshold_minutes" name="am_session_active_threshold_minutes"
+							       value="<?php echo esc_attr( absint( get_option( 'am_session_active_threshold_minutes', 30 ) ) ); ?>"
+							       class="small-text"> <?php esc_html_e( 'minutes', 'activity-monitor' ); ?>
+							<p class="description">
+								<?php esc_html_e( 'Display-only: sessions logged in within this window are shown as "active". Does not affect WordPress\'s own session expiration.', 'activity-monitor' ); ?>
+							</p>
+						</td>
+					</tr>
+				</table>
+
 				<?php submit_button( __( 'Save Session Settings', 'activity-monitor' ), 'secondary' ); ?>
 			</form>
 		</div>
