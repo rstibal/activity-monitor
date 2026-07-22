@@ -30,6 +30,8 @@ class AM_Admin {
 		add_action( 'admin_post_am_clear_log',                array( $instance, 'handle_clear_log' ) );
 		add_action( 'admin_post_am_revoke_session',           array( $instance, 'handle_revoke_session' ) );
 		add_action( 'admin_post_am_revoke_expired',           array( $instance, 'handle_revoke_expired' ) );
+		add_action( 'admin_post_am_emergency_lockdown',       array( $instance, 'handle_emergency_lockdown' ) );
+		add_action( 'admin_post_am_save_session_settings',    array( $instance, 'handle_save_session_settings' ) );
 		add_action( 'admin_notices',                          array( $instance, 'show_notices' ) );
 		add_action( 'wp_ajax_am_get_event_detail',            array( $instance, 'ajax_event_detail' ) );
 		add_action( 'wp_ajax_am_get_v2_event_detail',         array( $instance, 'ajax_v2_event_detail' ) );
@@ -126,6 +128,16 @@ class AM_Admin {
 				esc_html( _n( '%d expired session revoked.', '%d expired sessions revoked.', $count, 'activity-monitor' ) ),
 				$count
 			) . '</p></div>';
+		}
+		if ( isset( $_GET['am_lockdown'] ) ) {
+			$count = absint( $_GET['am_lockdown'] );
+			echo '<div class="notice notice-success is-dismissible"><p>' . sprintf(
+				esc_html( _n( 'Emergency lockdown complete: %d session terminated.', 'Emergency lockdown complete: %d sessions terminated.', $count, 'activity-monitor' ) ),
+				$count
+			) . '</p></div>';
+		}
+		if ( isset( $_GET['am_session_settings_saved'] ) ) {
+			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Session settings saved.', 'activity-monitor' ) . '</p></div>';
 		}
 	}
 
@@ -232,6 +244,43 @@ class AM_Admin {
 
 		wp_safe_redirect( add_query_arg(
 			array( 'page' => 'activity-monitor', self::TAB_PARAM => 'settings', 'am_expired_revoked' => $count ),
+			admin_url( 'admin.php' )
+		) );
+		exit;
+	}
+
+	/**
+	 * v2.0 (spec §5, issue #5): terminate every session except the
+	 * caller's own. Confirmation happens client-side (the onsubmit
+	 * confirm() dialog in render_tab_settings) before this ever runs --
+	 * this handler does not prompt again, it acts immediately once called.
+	 */
+	public function handle_emergency_lockdown() {
+		check_admin_referer( 'am_emergency_lockdown' );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Unauthorized.', 'activity-monitor' ) );
+		}
+
+		$count = AM_Sessions::emergency_lockdown();
+
+		wp_safe_redirect( add_query_arg(
+			array( 'page' => 'activity-monitor', self::TAB_PARAM => 'settings', 'am_lockdown' => $count ),
+			admin_url( 'admin.php' )
+		) );
+		exit;
+	}
+
+	public function handle_save_session_settings() {
+		check_admin_referer( 'am_save_session_settings' );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Unauthorized.', 'activity-monitor' ) );
+		}
+
+		update_option( 'am_session_concurrent_limit', absint( $_POST['am_session_concurrent_limit'] ?? 0 ) );
+		update_option( 'am_session_active_threshold_minutes', max( 1, absint( $_POST['am_session_active_threshold_minutes'] ?? 30 ) ) );
+
+		wp_safe_redirect( add_query_arg(
+			array( 'page' => 'activity-monitor', self::TAB_PARAM => 'settings', 'am_session_settings_saved' => '1' ),
 			admin_url( 'admin.php' )
 		) );
 		exit;
@@ -1089,6 +1138,52 @@ class AM_Admin {
 
 		<hr class="am-section-divider">
 
+		<div class="am-settings-section">
+			<h2 class="am-section-title">
+				<span class="dashicons dashicons-groups"></span>
+				<?php esc_html_e( 'Session Management (v2.0)', 'activity-monitor' ); ?>
+			</h2>
+			<p class="am-description">
+				<?php esc_html_e( 'These settings apply on top of the Active Sessions tab. Sessions themselves are still WordPress\'s own session tokens -- this plugin does not maintain a separate copy.', 'activity-monitor' ); ?>
+			</p>
+
+			<table class="form-table">
+				<tr>
+					<th scope="row">
+						<label for="am_session_concurrent_limit"><?php esc_html_e( 'Concurrent session limit', 'activity-monitor' ); ?></label>
+					</th>
+					<td>
+						<input type="number" min="0" id="am_session_concurrent_limit" name="am_session_concurrent_limit"
+						       value="<?php echo esc_attr( absint( get_option( 'am_session_concurrent_limit', 0 ) ) ); ?>"
+						       class="small-text">
+						<p class="description">
+							<?php esc_html_e( '0 = disabled. When a user logs in past this limit, their oldest sessions are revoked automatically (the new login always survives).', 'activity-monitor' ); ?>
+						</p>
+					</td>
+				</tr>
+				<tr>
+					<th scope="row">
+						<label for="am_session_active_threshold_minutes"><?php esc_html_e( 'Active session threshold', 'activity-monitor' ); ?></label>
+					</th>
+					<td>
+						<input type="number" min="1" id="am_session_active_threshold_minutes" name="am_session_active_threshold_minutes"
+						       value="<?php echo esc_attr( absint( get_option( 'am_session_active_threshold_minutes', 30 ) ) ); ?>"
+						       class="small-text"> <?php esc_html_e( 'minutes', 'activity-monitor' ); ?>
+						<p class="description">
+							<?php esc_html_e( 'Display-only: sessions logged in within this window are shown as "active". Does not affect WordPress\'s own session expiration.', 'activity-monitor' ); ?>
+						</p>
+					</td>
+				</tr>
+			</table>
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+				<?php wp_nonce_field( 'am_save_session_settings' ); ?>
+				<input type="hidden" name="action" value="am_save_session_settings">
+				<?php submit_button( __( 'Save Session Settings', 'activity-monitor' ), 'secondary' ); ?>
+			</form>
+		</div>
+
+		<hr class="am-section-divider">
+
 		<div class="am-settings-section am-danger-zone">
 			<h2 class="am-section-title am-danger-title">
 				<span class="dashicons dashicons-warning"></span>
@@ -1105,6 +1200,21 @@ class AM_Admin {
 				<button type="submit" class="button am-btn-danger">
 					<span class="dashicons dashicons-remove"></span>
 					<?php esc_html_e( 'Revoke All Expired Sessions', 'activity-monitor' ); ?>
+				</button>
+			</form>
+
+			<br>
+
+			<p class="am-description">
+				<?php esc_html_e( 'Immediately terminate every active session on the site except your own. Every other logged-in user will be logged out.', 'activity-monitor' ); ?>
+			</p>
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>"
+			      onsubmit="return confirm('<?php esc_attr_e( 'Emergency lockdown: terminate ALL other sessions immediately? Every other logged-in user will be signed out right now. This cannot be undone.', 'activity-monitor' ); ?>')">
+				<?php wp_nonce_field( 'am_emergency_lockdown' ); ?>
+				<input type="hidden" name="action" value="am_emergency_lockdown">
+				<button type="submit" class="button am-btn-danger">
+					<span class="dashicons dashicons-lock"></span>
+					<?php esc_html_e( 'Emergency Lockdown', 'activity-monitor' ); ?>
 				</button>
 			</form>
 
