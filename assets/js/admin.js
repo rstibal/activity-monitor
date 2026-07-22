@@ -7,17 +7,11 @@
 		$('#am-modal-body').html('<p class="am-loading">Loading…</p>');
 	}
 
-	$(document).on('click', '.am-view-detail', function () {
-		var id = $(this).data('id');
-		openModal();
-		$.post(amData.ajaxUrl, { action: 'am_get_event_detail', entry_id: id, nonce: amData.nonce })
-		.done(function (r) { $('#am-modal-body').html(r.success ? r.data.html : '<p>Error.</p>'); })
-		.fail(function () { $('#am-modal-body').html('<p>Request failed.</p>'); });
-	});
-
-	/* v2.0 preview tab — reads am_events via a separate AJAX action
-	   (am_get_v2_event_detail) since it's a different schema/table than
-	   the v1.x am_get_event_detail handler above. Shares the same modal. */
+	/* Reads am_events via the am_get_v2_event_detail AJAX action. Name kept
+	   as-is (not renamed to drop the "v2") to avoid an unnecessary
+	   JS/PHP action-name rename with no functional benefit, now that the
+	   old v1.x AM_DB-backed handler and its am-view-detail button/action
+	   have been removed entirely. */
 	$(document).on('click', '.am-view-detail-v2', function () {
 		var id = $(this).data('id');
 		openModal();

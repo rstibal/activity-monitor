@@ -206,4 +206,20 @@ class AM_Schema {
 		delete_option( self::DB_VERSION_OPTION );
 		delete_option( 'am_v1_migrated' );
 	}
+
+	/**
+	 * Truncate both v2.0 tables. Used by the admin "Clear Entire Log"
+	 * action -- added when the old AM_DB-backed "Activity Log" tab was
+	 * retired in favor of this schema being the sole visible log, since
+	 * the clear-log button previously only cleared the (now invisible)
+	 * legacy am_activity_log table and left the actually-displayed data
+	 * untouched.
+	 */
+	public static function clear_all() {
+		global $wpdb;
+		foreach ( array( self::EVENTS_TABLE, self::CONTEXT_TABLE ) as $table ) {
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant.
+			$wpdb->query( "TRUNCATE TABLE `{$wpdb->prefix}{$table}`" );
+		}
+	}
 }

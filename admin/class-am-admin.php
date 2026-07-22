@@ -33,7 +33,6 @@ class AM_Admin {
 		add_action( 'admin_post_am_emergency_lockdown',       array( $instance, 'handle_emergency_lockdown' ) );
 		add_action( 'admin_post_am_save_session_settings',    array( $instance, 'handle_save_session_settings' ) );
 		add_action( 'admin_notices',                          array( $instance, 'show_notices' ) );
-		add_action( 'wp_ajax_am_get_event_detail',            array( $instance, 'ajax_event_detail' ) );
 		add_action( 'wp_ajax_am_get_v2_event_detail',         array( $instance, 'ajax_v2_event_detail' ) );
 		add_action( 'wp_ajax_am_get_session_detail',          array( $instance, 'ajax_session_detail' ) );
 	}
@@ -148,12 +147,28 @@ class AM_Admin {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_die( esc_html__( 'Unauthorized.', 'activity-monitor' ) );
 		}
+
+		// Clear both schemas: the legacy am_activity_log table (kept around
+		// post-migration, see AM_Schema doc) and the v2.0 am_events/
+		// am_event_context tables, which are now the only visible log.
+		// Previously this only cleared the legacy table, silently leaving
+		// the actually-displayed v2.0 log untouched -- caught while
+		// retiring the old "Activity Log" tab.
 		AM_DB::clear_all();
-		AM_Logger::log( 'log.clear', 'Activity log was cleared by an administrator.', array(
-			'severity'    => AM_Logger::WARNING,
-			'object_type' => 'log',
-			'object_name' => 'activity-log',
-		) );
+		AM_Schema::clear_all();
+
+		AM_Event_Writer::log(
+			'log',
+			'cleared',
+			__( 'Activity log was cleared by an administrator.', 'activity-monitor' ),
+			array(
+				'level'       => AM_Log_Levels::WARNING,
+				'object_type' => 'log',
+				'object_name' => 'activity-log',
+				'group'       => false,
+			)
+		);
+
 		wp_safe_redirect( add_query_arg(
 			array( 'page' => 'activity-monitor', self::TAB_PARAM => 'settings', 'am_cleared' => '1' ),
 			admin_url( 'admin.php' )
@@ -178,19 +193,26 @@ class AM_Admin {
 				$sessions = get_user_meta( $user_id, 'session_tokens', true );
 				if ( is_array( $sessions ) && isset( $sessions[ $token_hash ] ) ) {
 					unset( $sessions[ $token_hash ] );
-					update_user_meta( $user_id, 'session_tokens', $sessions );
+					AM_Sessions::update_session_meta_quietly( $user_id, $sessions );
 
 					$user = get_userdata( $user_id );
-					AM_Logger::log( 'user.session_revoked', sprintf(
-						'Session revoked for user "%s" (token: %s…).',
-						$user ? $user->user_login : $user_id,
-						substr( $token_hash, 0, 12 )
-					), array(
-						'severity'    => AM_Logger::WARNING,
-						'object_type' => 'user',
-						'object_id'   => $user_id,
-						'object_name' => $user ? $user->user_login : 'user-' . $user_id,
-					) );
+					AM_Event_Writer::log(
+						'session',
+						'revoked',
+						sprintf(
+							/* translators: 1: username, 2: first 12 chars of the session token hash */
+							__( 'Session revoked for user "%1$s" (token: %2$s…).', 'activity-monitor' ),
+							$user ? $user->user_login : $user_id,
+							substr( $token_hash, 0, 12 )
+						),
+						array(
+							'level'       => AM_Log_Levels::WARNING,
+							'object_type' => 'user',
+							'object_id'   => $user_id,
+							'object_name' => $user ? $user->user_login : 'user-' . $user_id,
+							'group'       => false,
+						)
+					);
 				}
 			}
 		}
@@ -227,19 +249,27 @@ class AM_Admin {
 				}
 			}
 			if ( $updated ) {
-				update_user_meta( $user->ID, 'session_tokens', $sessions );
+				AM_Sessions::update_session_meta_quietly( $user->ID, $sessions );
 			}
 		}
 
 		if ( $count > 0 ) {
-			AM_Logger::log( 'user.expired_sessions_revoked', sprintf(
-				'%d expired session(s) revoked across all users.', $count
-			), array(
-				'severity'    => AM_Logger::WARNING,
-				'object_type' => 'user',
-				'object_name' => 'all-users',
-				'meta'        => array( 'count' => $count ),
-			) );
+			AM_Event_Writer::log(
+				'session',
+				'expired_revoked',
+				sprintf(
+					/* translators: %d: number of expired sessions revoked */
+					_n( '%d expired session revoked across all users.', '%d expired sessions revoked across all users.', $count, 'activity-monitor' ),
+					$count
+				),
+				array(
+					'level'       => AM_Log_Levels::WARNING,
+					'object_type' => 'user',
+					'object_name' => 'all-users',
+					'context'     => array( 'count' => $count ),
+					'group'       => false,
+				)
+			);
 		}
 
 		wp_safe_redirect( add_query_arg(
@@ -361,57 +391,6 @@ class AM_Admin {
 		wp_send_json_success( array( 'html' => ob_get_clean() ) );
 	}
 
-	public function ajax_event_detail() {
-		check_ajax_referer( 'am_ajax', 'nonce' );
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_die( '-1' );
-		}
-
-		global $wpdb;
-		$id  = absint( $_POST['entry_id'] ?? 0 );
-		$row = $wpdb->get_row( $wpdb->prepare(
-			'SELECT * FROM ' . $wpdb->prefix . AM_TABLE . ' WHERE id = %d',
-			$id
-		) );
-
-		if ( ! $row ) {
-			wp_send_json_error( 'Not found' );
-		}
-
-		$meta = ! empty( $row->meta ) ? json_decode( $row->meta, true ) : array();
-
-		ob_start();
-		?>
-		<table class="am-detail-table">
-			<tr><th><?php esc_html_e( 'ID', 'activity-monitor' ); ?></th><td><?php echo esc_html( $row->id ); ?></td></tr>
-			<tr><th><?php esc_html_e( 'Date / Time', 'activity-monitor' ); ?></th><td><?php echo esc_html( $row->created_at ); ?> UTC</td></tr>
-			<tr>
-				<th><?php esc_html_e( 'Severity', 'activity-monitor' ); ?></th>
-				<td><span class="am-badge <?php echo esc_attr( AM_Logger::severity_class( (int) $row->severity ) ); ?>"><?php echo esc_html( AM_Logger::severity_label( (int) $row->severity ) ); ?></span></td>
-			</tr>
-			<tr><th><?php esc_html_e( 'Event Type', 'activity-monitor' ); ?></th><td><?php echo esc_html( $row->event_type ); ?></td></tr>
-			<tr>
-				<th><?php esc_html_e( 'User', 'activity-monitor' ); ?></th>
-				<td><?php echo esc_html( $row->user_name ); ?><?php if ( $row->user_role ) echo ' (' . esc_html( $row->user_role ) . ')'; ?></td>
-			</tr>
-			<tr><th><?php esc_html_e( 'IP Address', 'activity-monitor' ); ?></th><td><?php echo esc_html( $row->ip_address ); ?></td></tr>
-			<tr>
-				<th><?php esc_html_e( 'Object', 'activity-monitor' ); ?></th>
-				<td>
-					<?php echo esc_html( $row->object_type ); ?>
-					<?php if ( $row->object_name ) echo ' – ' . esc_html( $row->object_name ); ?>
-					<?php if ( $row->object_id )   echo ' (ID: ' . esc_html( $row->object_id ) . ')'; ?>
-				</td>
-			</tr>
-			<tr><th><?php esc_html_e( 'Message', 'activity-monitor' ); ?></th><td><?php echo esc_html( $row->message ); ?></td></tr>
-			<?php if ( ! empty( $meta ) ) : ?>
-			<tr><th><?php esc_html_e( 'Meta', 'activity-monitor' ); ?></th><td><pre><?php echo esc_html( wp_json_encode( $meta, JSON_PRETTY_PRINT ) ); ?></pre></td></tr>
-			<?php endif; ?>
-		</table>
-		<?php
-		wp_send_json_success( array( 'html' => ob_get_clean() ) );
-	}
-
 	/**
 	 * FIX #2: Re-fetch session data from the database rather than trusting
 	 * POST-supplied display values. Only user_id and token_hash are accepted
@@ -500,7 +479,6 @@ class AM_Admin {
 
 		$tabs = array(
 			'log'      => __( 'Activity Log',    'activity-monitor' ),
-			'v2-log'   => __( 'Activity Log (v2.0 preview)', 'activity-monitor' ),
 			'sessions' => __( 'Active Sessions', 'activity-monitor' ),
 			'settings' => __( 'Settings',        'activity-monitor' ),
 		);
@@ -537,9 +515,10 @@ class AM_Admin {
 				<?php
 				switch ( $active_tab ) {
 					case 'log':
-						$this->render_tab_log();
-						break;
-					case 'v2-log':
+						// Retired the old AM_DB-backed renderer in favor of the
+						// v2.0 schema renderer, now that column parity is
+						// complete (IP Address added) and every event source is
+						// ported. See activity-monitor-v2-spec.md §9.
 						$this->render_tab_v2_log();
 						break;
 					case 'sessions':
@@ -569,179 +548,16 @@ class AM_Admin {
 		<?php
 	}
 
-	// ── Tab: Activity Log ────────────────────────────────────────────────
-
-	private function render_tab_log() {
-		$per_page   = 50;
-		$page       = max( 1, absint( $_GET['paged'] ?? 1 ) );
-		$severity   = sanitize_text_field( $_GET['am_severity'] ?? '' );
-		$event_type = sanitize_key( $_GET['am_type'] ?? '' );
-		$search     = sanitize_text_field( $_GET['am_search'] ?? '' );
-
-		$data        = AM_DB::get_events( compact( 'per_page', 'page', 'severity', 'event_type', 'search' ) );
-		$items       = $data['items'];
-		$total       = $data['total'];
-		$num_pages   = (int) ceil( $total / $per_page );
-		$event_types = AM_DB::get_event_types();
-
-		$base_url = add_query_arg(
-			array( 'page' => 'activity-monitor', self::TAB_PARAM => 'log' ),
-			admin_url( 'admin.php' )
-		);
-
-		$severities = array(
-			AM_Logger::INFO     => __( 'Info',     'activity-monitor' ),
-			AM_Logger::NOTICE   => __( 'Notice',   'activity-monitor' ),
-			AM_Logger::WARNING  => __( 'Warning',  'activity-monitor' ),
-			AM_Logger::CRITICAL => __( 'Critical', 'activity-monitor' ),
-		);
-		?>
-
-		<div class="am-stats-bar">
-			<span class="am-stat">
-				<strong><?php echo esc_html( number_format( $total ) ); ?></strong>
-				<?php esc_html_e( 'Total Events', 'activity-monitor' ); ?>
-			</span>
-		</div>
-
-		<div class="am-filter-bar">
-			<form method="get" action="">
-				<input type="hidden" name="page" value="activity-monitor">
-				<input type="hidden" name="<?php echo esc_attr( self::TAB_PARAM ); ?>" value="log">
-
-				<div class="am-filter-group">
-					<span class="am-filter-label"><?php esc_html_e( 'Severity:', 'activity-monitor' ); ?></span>
-					<a href="<?php echo esc_url( remove_query_arg( 'am_severity', $base_url ) ); ?>"
-					   class="am-pill <?php echo '' === $severity ? 'active' : ''; ?>">
-						<?php esc_html_e( 'All', 'activity-monitor' ); ?>
-					</a>
-					<?php foreach ( $severities as $sev_val => $sev_label ) :
-						$url = add_query_arg( 'am_severity', $sev_val, $base_url );
-					?>
-					<a href="<?php echo esc_url( $url ); ?>"
-					   class="am-pill am-pill-<?php echo esc_attr( AM_Logger::severity_class( $sev_val ) ); ?> <?php echo ( (string) $sev_val === $severity ) ? 'active' : ''; ?>">
-						<?php echo esc_html( $sev_label ); ?>
-					</a>
-					<?php endforeach; ?>
-				</div>
-
-				<div class="am-filter-group">
-					<span class="am-filter-label"><?php esc_html_e( 'Type:', 'activity-monitor' ); ?></span>
-					<select name="am_type" onchange="this.form.submit()">
-						<option value=""><?php esc_html_e( '— All Types —', 'activity-monitor' ); ?></option>
-						<?php foreach ( $event_types as $et ) : ?>
-							<option value="<?php echo esc_attr( $et ); ?>" <?php selected( $et, $event_type ); ?>>
-								<?php echo esc_html( $et ); ?>
-							</option>
-						<?php endforeach; ?>
-					</select>
-				</div>
-
-				<div class="am-filter-group am-filter-search">
-					<input type="search" name="am_search"
-					       value="<?php echo esc_attr( $search ); ?>"
-					       placeholder="<?php esc_attr_e( 'Search message, user, object…', 'activity-monitor' ); ?>">
-					<button type="submit" class="button"><?php esc_html_e( 'Search', 'activity-monitor' ); ?></button>
-					<?php if ( $severity || $event_type || $search ) : ?>
-						<a href="<?php echo esc_url( $base_url ); ?>" class="button button-secondary">
-							<?php esc_html_e( 'Reset', 'activity-monitor' ); ?>
-						</a>
-					<?php endif; ?>
-				</div>
-			</form>
-		</div>
-
-		<div class="am-table-wrap am-table-scroll">
-			<?php if ( empty( $items ) ) : ?>
-				<div class="am-empty">
-					<span class="dashicons dashicons-info-outline"></span>
-					<p><?php esc_html_e( 'No activity recorded yet.', 'activity-monitor' ); ?></p>
-				</div>
-			<?php else : ?>
-			<table class="wp-list-table widefat striped am-log-table">
-				<thead>
-					<tr>
-						<th><?php esc_html_e( 'Severity',   'activity-monitor' ); ?></th>
-						<th><?php esc_html_e( 'Date',       'activity-monitor' ); ?></th>
-						<th><?php esc_html_e( 'Event Type', 'activity-monitor' ); ?></th>
-						<th><?php esc_html_e( 'User',       'activity-monitor' ); ?></th>
-						<th><?php esc_html_e( 'IP Address', 'activity-monitor' ); ?></th>
-						<th><?php esc_html_e( 'Object',     'activity-monitor' ); ?></th>
-						<th><?php esc_html_e( 'Actions',    'activity-monitor' ); ?></th>
-					</tr>
-				</thead>
-				<tbody>
-					<?php foreach ( $items as $row ) :
-						$sev_class = AM_Logger::severity_class( (int) $row->severity );
-						$sev_label = AM_Logger::severity_label( (int) $row->severity );
-					?>
-					<tr class="am-row am-row-<?php echo esc_attr( $sev_class ); ?>">
-						<td><span class="am-badge <?php echo esc_attr( $sev_class ); ?>"><?php echo esc_html( $sev_label ); ?></span></td>
-						<td>
-							<span title="<?php echo esc_attr( $row->created_at ); ?> UTC">
-								<?php echo esc_html( wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), strtotime( $row->created_at ) ) ); ?>
-							</span>
-						</td>
-						<td><code class="am-event-type"><?php echo esc_html( $row->event_type ); ?></code></td>
-						<td>
-							<?php echo esc_html( $row->user_name ); ?>
-							<?php if ( $row->user_role ) : ?>
-								<small class="am-role"><?php echo esc_html( $row->user_role ); ?></small>
-							<?php endif; ?>
-						</td>
-						<td><code><?php echo esc_html( $row->ip_address ); ?></code></td>
-						<td>
-							<?php if ( $row->object_type ) : ?>
-								<small class="am-object-type"><?php echo esc_html( $row->object_type ); ?></small>
-							<?php endif; ?>
-							<?php echo esc_html( $row->object_name ); ?>
-						</td>
-						<td>
-							<button class="button button-small am-view-detail"
-							        data-id="<?php echo esc_attr( $row->id ); ?>">
-								<?php esc_html_e( 'Details', 'activity-monitor' ); ?>
-							</button>
-						</td>
-					</tr>
-					<?php endforeach; ?>
-				</tbody>
-			</table>
-
-			<?php if ( $num_pages > 1 ) : ?>
-			<div class="tablenav bottom">
-				<div class="tablenav-pages">
-					<span class="displaying-num">
-						<?php printf(
-							esc_html( _n( '%s item', '%s items', $total, 'activity-monitor' ) ),
-							number_format_i18n( $total )
-						); ?>
-					</span>
-					<?php
-					echo wp_kses_post( paginate_links( array(
-						'base'      => add_query_arg( 'paged', '%#%' ),
-						'format'    => '',
-						'prev_text' => '&laquo;',
-						'next_text' => '&raquo;',
-						'total'     => $num_pages,
-						'current'   => $page,
-					) ) );
-					?>
-				</div>
-			</div>
-			<?php endif; ?>
-			<?php endif; ?>
-		</div>
-		<?php
-	}
-
-	// ── Tab: Activity Log (v2.0 preview) ─────────────────────────────────
+	// ── Tab: Activity Log ─────────────────────────────────────────────────
 	//
-	// Reads from the new am_events / am_event_context schema only.
-	// Currently only AM_Logger_Posts writes here (see
-	// AM_Logger_Manager::REGISTERED_LOGGER_CLASSES) — every other event
-	// type still only appears on the v1.x "Activity Log" tab until ported.
-	// This tab exists so occasion grouping (repeat count), initiators, and
-	// PSR-3 levels are visible while the rest of the loggers are converted.
+	// Reads from the am_events / am_event_context schema. This was
+	// originally a "v2.0 preview" tab running alongside the legacy
+	// AM_DB-backed "Activity Log" tab while loggers were ported one at a
+	// time; that legacy tab (and its render_tab_log() method) has been
+	// removed now that all 13 v1.x event sources are ported and this tab
+	// has full column parity (including IP Address, added when the old
+	// tab was retired). Method name (render_tab_v2_log) kept as-is to
+	// avoid an unnecessary rename churn across this file.
 	// See activity-monitor-v2-spec.md §9 and GitHub issue #4.
 
 	private function render_tab_v2_log() {
@@ -777,14 +593,14 @@ class AM_Admin {
 		<div class="am-stats-bar">
 			<span class="am-stat">
 				<strong><?php echo esc_html( number_format( $total ) ); ?></strong>
-				<?php esc_html_e( 'Total Events (v2.0 schema)', 'activity-monitor' ); ?>
+				<?php esc_html_e( 'Total Events', 'activity-monitor' ); ?>
 			</span>
 		</div>
 
 		<?php if ( 0 === AM_Event_Query::total_count() ) : ?>
 			<div class="notice notice-info inline">
 				<p>
-					<?php esc_html_e( 'No events logged to the new schema yet. Only post/page/CPT events are wired up so far — try editing, publishing, or trashing a post, then check back here.', 'activity-monitor' ); ?>
+					<?php esc_html_e( 'No activity recorded yet. Try editing a post, logging in, or changing a setting, then check back here.', 'activity-monitor' ); ?>
 				</p>
 			</div>
 		<?php endif; ?>
@@ -863,6 +679,7 @@ class AM_Admin {
 						<th><?php esc_html_e( 'Initiator',  'activity-monitor' ); ?></th>
 						<th><?php esc_html_e( 'Event',      'activity-monitor' ); ?></th>
 						<th><?php esc_html_e( 'User',       'activity-monitor' ); ?></th>
+						<th><?php esc_html_e( 'IP Address', 'activity-monitor' ); ?></th>
 						<th><?php esc_html_e( 'Object',     'activity-monitor' ); ?></th>
 						<th><?php esc_html_e( 'Repeats',    'activity-monitor' ); ?></th>
 						<th><?php esc_html_e( 'Actions',    'activity-monitor' ); ?></th>
@@ -887,6 +704,7 @@ class AM_Admin {
 								<small class="am-role"><?php echo esc_html( $row->user_role ); ?></small>
 							<?php endif; ?>
 						</td>
+						<td><code><?php echo esc_html( $row->ip_address ); ?></code></td>
 						<td>
 							<?php if ( $row->object_type ) : ?>
 								<small class="am-object-type"><?php echo esc_html( $row->object_type ); ?></small>

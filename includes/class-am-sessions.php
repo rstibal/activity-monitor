@@ -187,11 +187,18 @@ class AM_Sessions {
 	 * persistent cache backend implements it), not a bug in this
 	 * function's own logic -- update_user_meta() is still the correct API
 	 * to call here. The notice is silenced narrowly, only around this one
-	 * call, only for this one doing_it_wrong trigger, so any other
-	 * doing-it-wrong notice this plugin or another plugin generates during
-	 * the same request still surfaces normally.
+	 * This is silenced narrowly, only around this one call, only for this
+	 * one doing_it_wrong trigger, so any other doing-it-wrong notice this
+	 * plugin or another plugin generates during the same request still
+	 * surfaces normally.
+	 *
+	 * Public (not just used internally by this class): AM_Admin's
+	 * handle_revoke_session() and handle_revoke_expired() also write
+	 * directly to session_tokens and are equally exposed to the same
+	 * cache-backend notice, so they call this too rather than
+	 * update_user_meta() directly.
 	 */
-	private static function update_session_meta_quietly( int $user_id, array $sessions ) {
+	public static function update_session_meta_quietly( int $user_id, array $sessions ) {
 		$suppress = function ( $trigger, $function_name ) {
 			return ( 'wp_cache_flush_group' === $function_name ) ? false : $trigger;
 		};
