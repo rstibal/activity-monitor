@@ -3,7 +3,7 @@
  * Plugin Name: Activity Monitor
  * Plugin URI:  https://robstibal.com
  * Description: Comprehensive WordPress audit log – tracks logins, content changes, settings updates, security events, and more.
- * Version:     2.0.0-dev.14
+ * Version:     2.0.0-dev.15
  * Author:      Rob Stibal
  * Author URI:  http://robstibal.com
  * License:     GPL-2.0+
@@ -14,7 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'AM_VERSION', '2.0.0-dev.14' );
+define( 'AM_VERSION', '2.0.0-dev.15' );
 define( 'AM_FILE',    __FILE__ );
 define( 'AM_DIR',     plugin_dir_path( __FILE__ ) );
 define( 'AM_URL',     plugin_dir_url( __FILE__ ) );
@@ -38,6 +38,7 @@ require_once AM_DIR . 'includes/class-am-event-writer.php';
 require_once AM_DIR . 'includes/class-am-event-query.php';
 require_once AM_DIR . 'includes/class-am-sessions.php';
 require_once AM_DIR . 'includes/class-am-notifications.php';
+require_once AM_DIR . 'includes/class-am-digest.php';
 require_once AM_DIR . 'includes/loggers/class-am-logger-base.php';
 require_once AM_DIR . 'includes/loggers/class-am-logger-posts.php';
 require_once AM_DIR . 'includes/loggers/class-am-logger-users.php';
@@ -65,6 +66,16 @@ function am_init() {
 	AM_Schema::maybe_upgrade();
 	AM_Logger_Manager::init();
 	AM_Admin::init();
+	AM_Digest::init();
+
+	// Cheap idempotent check -- wp_next_scheduled() is a single option
+	// read, so safe on every load. Ensures a frequency change from the
+	// settings form (which already calls reschedule() directly) is also
+	// caught if the option was ever changed by any other means (WP-CLI,
+	// direct DB edit, etc.).
+	if ( ! wp_next_scheduled( AM_Digest::CRON_HOOK ) && get_option( 'am_digest_frequency', '' ) !== '' ) {
+		AM_Digest::reschedule();
+	}
 }
 add_action( 'plugins_loaded', 'am_init' );
 

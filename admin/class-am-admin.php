@@ -32,8 +32,11 @@ class AM_Admin {
 		add_action( 'admin_post_am_revoke_expired',           array( $instance, 'handle_revoke_expired' ) );
 		add_action( 'admin_post_am_emergency_lockdown',       array( $instance, 'handle_emergency_lockdown' ) );
 		add_action( 'admin_post_am_save_session_settings',    array( $instance, 'handle_save_session_settings' ) );
+		add_action( 'admin_post_am_save_digest_settings',     array( $instance, 'handle_save_digest_settings' ) );
 		add_action( 'admin_notices',                          array( $instance, 'show_notices' ) );
 		add_action( 'wp_ajax_am_get_v2_event_detail',         array( $instance, 'ajax_v2_event_detail' ) );
+		add_action( 'wp_ajax_am_digest_preview',              array( $instance, 'ajax_digest_preview' ) );
+		add_action( 'wp_ajax_am_digest_send_test',            array( $instance, 'ajax_digest_send_test' ) );
 		add_action( 'wp_ajax_am_get_session_detail',          array( $instance, 'ajax_session_detail' ) );
 	}
 
@@ -143,6 +146,9 @@ class AM_Admin {
 		}
 		if ( isset( $_GET['am_session_settings_saved'] ) ) {
 			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Session settings saved.', 'activity-monitor' ) . '</p></div>';
+		}
+		if ( isset( $_GET['am_digest_settings_saved'] ) ) {
+			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Digest settings saved.', 'activity-monitor' ) . '</p></div>';
 		}
 	}
 
@@ -320,7 +326,63 @@ class AM_Admin {
 		exit;
 	}
 
+	public function handle_save_digest_settings() {
+		check_admin_referer( 'am_save_digest_settings' );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Unauthorized.', 'activity-monitor' ) );
+		}
+
+		$frequency = sanitize_key( $_POST['am_digest_frequency'] ?? '' );
+		if ( ! in_array( $frequency, array( '', 'daily', 'weekly', 'monthly' ), true ) ) {
+			$frequency = '';
+		}
+
+		update_option( 'am_digest_frequency', $frequency );
+		update_option( 'am_digest_day_of_week', absint( $_POST['am_digest_day_of_week'] ?? 1 ) % 7 );
+
+		$emails = array_filter( array_map( 'trim', explode( ',', $_POST['am_digest_recipients'] ?? '' ) ) );
+		update_option( 'am_digest_recipients', implode( ', ', array_filter( $emails, 'is_email' ) ) );
+
+		// Reschedule to pick up the new frequency immediately rather than
+		// waiting for the next daily cron tick to notice the option changed.
+		AM_Digest::reschedule();
+
+		wp_safe_redirect( add_query_arg(
+			array( 'page' => 'activity-monitor', self::TAB_PARAM => 'settings', 'am_digest_settings_saved' => '1' ),
+			admin_url( 'admin.php' )
+		) );
+		exit;
+	}
+
 	// ── AJAX ─────────────────────────────────────────────────────────────
+
+	public function ajax_digest_preview() {
+		check_ajax_referer( 'am_ajax', 'nonce' );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( '-1' );
+		}
+
+		$frequency = get_option( 'am_digest_frequency', '' ) ?: 'weekly';
+		wp_send_json_success( array( 'html' => AM_Digest::build_html( $frequency, true ) ) );
+	}
+
+	public function ajax_digest_send_test() {
+		check_ajax_referer( 'am_ajax', 'nonce' );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( '-1' );
+		}
+
+		$email = sanitize_email( wp_unslash( $_POST['email'] ?? '' ) );
+		if ( ! is_email( $email ) ) {
+			wp_send_json_error( array( 'message' => __( 'Enter a valid email address.', 'activity-monitor' ) ) );
+		}
+
+		$sent = AM_Digest::send_test( $email );
+		if ( $sent ) {
+			wp_send_json_success( array( 'message' => __( 'Test email sent.', 'activity-monitor' ) ) );
+		}
+		wp_send_json_error( array( 'message' => __( 'Failed to send. Check your site\'s mail configuration.', 'activity-monitor' ) ) );
+	}
 
 	public function ajax_v2_event_detail() {
 		check_ajax_referer( 'am_ajax', 'nonce' );
@@ -483,6 +545,7 @@ class AM_Admin {
 
 		$tabs = array(
 			'log'      => __( 'Activity Log',    'activity-monitor' ),
+			'stats'    => __( 'Stats & Insights', 'activity-monitor' ),
 			'sessions' => __( 'Active Sessions', 'activity-monitor' ),
 			'settings' => __( 'Settings',        'activity-monitor' ),
 		);
@@ -524,6 +587,9 @@ class AM_Admin {
 						// complete (IP Address added) and every event source is
 						// ported. See activity-monitor-v2-spec.md §9.
 						$this->render_tab_v2_log();
+						break;
+					case 'stats':
+						$this->render_tab_stats();
 						break;
 					case 'sessions':
 						$this->render_tab_sessions();
@@ -758,6 +824,108 @@ class AM_Admin {
 		<?php
 	}
 
+	// ── Tab: Stats & Insights (spec §4) ───────────────────────────────────
+
+	private function render_tab_stats() {
+		$days   = absint( $_GET['am_days'] ?? 7 );
+		$days   = in_array( $days, array( 7, 14, 30 ), true ) ? $days : 7;
+		$base   = add_query_arg( array( 'page' => 'activity-monitor', self::TAB_PARAM => 'stats' ), admin_url( 'admin.php' ) );
+
+		$totals   = AM_Event_Query::get_totals_for_period( $days );
+		$trend    = AM_Event_Query::get_daily_trend( $days );
+		$by_type  = AM_Event_Query::get_breakdown_by_event_type( $days, 10 );
+		$peak     = AM_Event_Query::get_peak_activity( $days );
+		$top_users = AM_Event_Query::get_most_active_users( $days, 5 );
+
+		$delta       = $totals['current'] - $totals['previous'];
+		$delta_str   = $delta >= 0 ? "+{$delta}" : (string) $delta;
+		$max_in_trend = max( array_merge( $trend, array( 1 ) ) ); // avoid div-by-zero in the bar chart
+		?>
+
+		<div class="am-filter-bar">
+			<div class="am-filter-group">
+				<span class="am-filter-label"><?php esc_html_e( 'Period:', 'activity-monitor' ); ?></span>
+				<?php foreach ( array( 7, 14, 30 ) as $option ) : ?>
+					<a href="<?php echo esc_url( add_query_arg( 'am_days', $option, $base ) ); ?>"
+					   class="am-pill <?php echo $option === $days ? 'active' : ''; ?>">
+						<?php printf( esc_html( _n( 'Last %d day', 'Last %d days', $option, 'activity-monitor' ) ), $option ); ?>
+					</a>
+				<?php endforeach; ?>
+			</div>
+		</div>
+
+		<div class="am-stats-grid">
+			<div class="am-stats-card">
+				<div class="am-stats-card-value"><?php echo esc_html( number_format_i18n( $totals['current'] ) ); ?></div>
+				<div class="am-stats-card-label"><?php esc_html_e( 'Total events', 'activity-monitor' ); ?></div>
+				<div class="am-stats-card-delta"><?php echo esc_html( $delta_str ); ?> <?php esc_html_e( 'vs. previous period', 'activity-monitor' ); ?></div>
+			</div>
+
+			<?php if ( $peak['busiest_day'] ) : ?>
+			<div class="am-stats-card">
+				<div class="am-stats-card-value"><?php echo esc_html( $peak['busiest_day']['name'] ); ?></div>
+				<div class="am-stats-card-label"><?php esc_html_e( 'Busiest day', 'activity-monitor' ); ?></div>
+				<div class="am-stats-card-delta"><?php echo esc_html( number_format_i18n( $peak['busiest_day']['count'] ) ); ?> <?php esc_html_e( 'events', 'activity-monitor' ); ?></div>
+			</div>
+			<?php endif; ?>
+
+			<?php if ( $peak['busiest_hour'] ) : ?>
+			<div class="am-stats-card">
+				<div class="am-stats-card-value"><?php echo esc_html( wp_date( 'g A', mktime( $peak['busiest_hour']['hour'], 0, 0 ) ) ); ?></div>
+				<div class="am-stats-card-label"><?php esc_html_e( 'Busiest hour', 'activity-monitor' ); ?></div>
+				<div class="am-stats-card-delta"><?php echo esc_html( number_format_i18n( $peak['busiest_hour']['count'] ) ); ?> <?php esc_html_e( 'events', 'activity-monitor' ); ?></div>
+			</div>
+			<?php endif; ?>
+		</div>
+
+		<div class="am-settings-section">
+			<h2 class="am-section-title"><?php esc_html_e( 'Daily activity', 'activity-monitor' ); ?></h2>
+			<div class="am-trend-chart">
+				<?php foreach ( $trend as $date => $count ) :
+					$height_pct = $max_in_trend > 0 ? round( ( $count / $max_in_trend ) * 100 ) : 0;
+				?>
+					<div class="am-trend-bar-wrap" title="<?php echo esc_attr( $date . ': ' . $count ); ?>">
+						<div class="am-trend-bar" style="height: <?php echo esc_attr( max( 2, $height_pct ) ); ?>%;"></div>
+						<div class="am-trend-bar-label"><?php echo esc_html( wp_date( 'M j', strtotime( $date ) ) ); ?></div>
+					</div>
+				<?php endforeach; ?>
+			</div>
+		</div>
+
+		<div class="am-settings-section">
+			<h2 class="am-section-title"><?php esc_html_e( 'Top event types', 'activity-monitor' ); ?></h2>
+			<?php if ( empty( $by_type ) ) : ?>
+				<p class="am-description"><?php esc_html_e( 'No events in this period.', 'activity-monitor' ); ?></p>
+			<?php else : ?>
+				<table class="wp-list-table widefat striped">
+					<thead><tr><th><?php esc_html_e( 'Event type', 'activity-monitor' ); ?></th><th><?php esc_html_e( 'Count', 'activity-monitor' ); ?></th></tr></thead>
+					<tbody>
+					<?php foreach ( $by_type as $type => $count ) : ?>
+						<tr><td><code><?php echo esc_html( $type ); ?></code></td><td><?php echo esc_html( number_format_i18n( $count ) ); ?></td></tr>
+					<?php endforeach; ?>
+					</tbody>
+				</table>
+			<?php endif; ?>
+		</div>
+
+		<div class="am-settings-section">
+			<h2 class="am-section-title"><?php esc_html_e( 'Most active users', 'activity-monitor' ); ?></h2>
+			<?php if ( empty( $top_users ) ) : ?>
+				<p class="am-description"><?php esc_html_e( 'No user activity in this period.', 'activity-monitor' ); ?></p>
+			<?php else : ?>
+				<table class="wp-list-table widefat striped">
+					<thead><tr><th><?php esc_html_e( 'User', 'activity-monitor' ); ?></th><th><?php esc_html_e( 'Events', 'activity-monitor' ); ?></th></tr></thead>
+					<tbody>
+					<?php foreach ( $top_users as $u ) : ?>
+						<tr><td><?php echo esc_html( $u['user_login'] ); ?></td><td><?php echo esc_html( number_format_i18n( $u['count'] ) ); ?></td></tr>
+					<?php endforeach; ?>
+					</tbody>
+				</table>
+			<?php endif; ?>
+		</div>
+		<?php
+	}
+
 	// ── Tab: Active Sessions ──────────────────────────────────────────────
 
 	private function render_tab_sessions() {
@@ -953,6 +1121,10 @@ class AM_Admin {
 
 		<hr class="am-section-divider">
 
+		<?php $this->render_digest_section(); ?>
+
+		<hr class="am-section-divider">
+
 		<div class="am-settings-section">
 			<h2 class="am-section-title">
 				<span class="dashicons dashicons-groups"></span>
@@ -1049,6 +1221,108 @@ class AM_Admin {
 					<?php esc_html_e( 'Clear Entire Log', 'activity-monitor' ); ?>
 				</button>
 			</form>
+		</div>
+		<?php
+	}
+
+	// ── Digest settings (spec §4) ──────────────────────────────────────────
+
+	private function render_digest_section() {
+		$frequency  = get_option( 'am_digest_frequency', '' );
+		$day        = absint( get_option( 'am_digest_day_of_week', 1 ) );
+		$recipients = get_option( 'am_digest_recipients', '' );
+		$last_sent  = get_option( 'am_digest_last_sent', '' );
+		$next_run   = wp_next_scheduled( AM_Digest::CRON_HOOK );
+		$days       = array(
+			0 => __( 'Sunday', 'activity-monitor' ),
+			1 => __( 'Monday', 'activity-monitor' ),
+			2 => __( 'Tuesday', 'activity-monitor' ),
+			3 => __( 'Wednesday', 'activity-monitor' ),
+			4 => __( 'Thursday', 'activity-monitor' ),
+			5 => __( 'Friday', 'activity-monitor' ),
+			6 => __( 'Saturday', 'activity-monitor' ),
+		);
+		?>
+		<div class="am-settings-section">
+			<h2 class="am-section-title">
+				<span class="dashicons dashicons-email"></span>
+				<?php esc_html_e( 'Email Digest', 'activity-monitor' ); ?>
+			</h2>
+			<p class="am-description">
+				<?php esc_html_e( 'A scheduled summary of activity: totals, top event types, and notable (warning-and-above) events, with a link to the full log.', 'activity-monitor' ); ?>
+			</p>
+
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+				<?php wp_nonce_field( 'am_save_digest_settings' ); ?>
+				<input type="hidden" name="action" value="am_save_digest_settings">
+
+				<table class="form-table">
+					<tr>
+						<th scope="row"><label for="am_digest_frequency"><?php esc_html_e( 'Frequency', 'activity-monitor' ); ?></label></th>
+						<td>
+							<select id="am_digest_frequency" name="am_digest_frequency">
+								<option value=""        <?php selected( $frequency, '' ); ?>><?php esc_html_e( 'Off', 'activity-monitor' ); ?></option>
+								<option value="daily"    <?php selected( $frequency, 'daily' ); ?>><?php esc_html_e( 'Daily', 'activity-monitor' ); ?></option>
+								<option value="weekly"   <?php selected( $frequency, 'weekly' ); ?>><?php esc_html_e( 'Weekly', 'activity-monitor' ); ?></option>
+								<option value="monthly"  <?php selected( $frequency, 'monthly' ); ?>><?php esc_html_e( 'Monthly', 'activity-monitor' ); ?></option>
+							</select>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="am_digest_day_of_week"><?php esc_html_e( 'Day of week (weekly only)', 'activity-monitor' ); ?></label></th>
+						<td>
+							<select id="am_digest_day_of_week" name="am_digest_day_of_week">
+								<?php foreach ( $days as $val => $label ) : ?>
+									<option value="<?php echo esc_attr( $val ); ?>" <?php selected( $day, $val ); ?>><?php echo esc_html( $label ); ?></option>
+								<?php endforeach; ?>
+							</select>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="am_digest_recipients"><?php esc_html_e( 'Recipients', 'activity-monitor' ); ?></label></th>
+						<td>
+							<input type="text" id="am_digest_recipients" name="am_digest_recipients"
+							       value="<?php echo esc_attr( $recipients ); ?>"
+							       placeholder="<?php esc_attr_e( 'admin@example.com, other@example.com', 'activity-monitor' ); ?>"
+							       class="large-text">
+							<p class="description"><?php esc_html_e( 'Separate multiple addresses with commas.', 'activity-monitor' ); ?></p>
+						</td>
+					</tr>
+				</table>
+
+				<?php submit_button( __( 'Save Digest Settings', 'activity-monitor' ) ); ?>
+			</form>
+
+			<p class="am-description">
+				<?php if ( $next_run ) : ?>
+					<?php
+					printf(
+						/* translators: 1: next scheduled run date/time, 2: last-sent date/time or "never" */
+						esc_html__( 'Next check: %1$s. Last sent: %2$s.', 'activity-monitor' ),
+						esc_html( wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $next_run ) ),
+						esc_html( $last_sent ? wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), strtotime( $last_sent . ' UTC' ) ) : __( 'never', 'activity-monitor' ) )
+					);
+					?>
+				<?php else : ?>
+					<?php esc_html_e( 'Digest is currently off.', 'activity-monitor' ); ?>
+				<?php endif; ?>
+			</p>
+
+			<div class="am-channel-add-buttons">
+				<button type="button" class="button button-secondary" id="am-digest-preview">
+					<span class="dashicons dashicons-visibility"></span>
+					<?php esc_html_e( 'Preview Digest', 'activity-monitor' ); ?>
+				</button>
+				<input type="email" id="am-digest-test-email" placeholder="<?php esc_attr_e( 'test@example.com', 'activity-monitor' ); ?>" class="regular-text">
+				<button type="button" class="button button-secondary" id="am-digest-send-test">
+					<span class="dashicons dashicons-email-alt"></span>
+					<?php esc_html_e( 'Send Test Email', 'activity-monitor' ); ?>
+				</button>
+			</div>
+			<div id="am-digest-preview-frame-wrap" style="display:none; margin-top: 14px; border: 1px solid #c3c4c7; border-radius: 6px; overflow: hidden;">
+				<iframe id="am-digest-preview-frame" style="width: 100%; height: 500px; border: 0;"></iframe>
+			</div>
+			<p id="am-digest-test-result" class="am-description"></p>
 		</div>
 		<?php
 	}

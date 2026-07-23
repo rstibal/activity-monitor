@@ -106,4 +106,214 @@ class AM_Event_Query {
 		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant.
 		return (int) $wpdb->get_var( "SELECT COUNT(*) FROM `{$table}`" );
 	}
+
+	// ── Stats & Insights (spec §4) ────────────────────────────────────────
+	//
+	// All stats methods take $days (7/14/30 typical) and query only
+	// am_events -- none of this needs am_event_context. Each returns plain
+	// arrays/counts ready for the admin screen or the digest email to
+	// render directly, no further processing needed by the caller.
+
+	/**
+	 * Total event count within the last $days, and the count for the
+	 * $days before that (for a "vs. previous period" comparison).
+	 *
+	 * @return array{current: int, previous: int}
+	 */
+	public static function get_totals_for_period( int $days ): array {
+		global $wpdb;
+		$table = $wpdb->prefix . AM_Schema::EVENTS_TABLE;
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant.
+		$current = (int) $wpdb->get_var( $wpdb->prepare(
+			"SELECT COUNT(*) FROM `{$table}` WHERE date >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL %d DAY)",
+			$days
+		) );
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant.
+		$previous = (int) $wpdb->get_var( $wpdb->prepare(
+			"SELECT COUNT(*) FROM `{$table}`
+			 WHERE date >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL %d DAY)
+			   AND date <  DATE_SUB(UTC_TIMESTAMP(), INTERVAL %d DAY)",
+			$days * 2,
+			$days
+		) );
+
+		return array( 'current' => $current, 'previous' => $previous );
+	}
+
+	/**
+	 * Daily event counts for the last $days, oldest first, with every day
+	 * present (zero-filled) even if no events occurred -- so a chart
+	 * doesn't have gaps.
+	 *
+	 * @return array<string, int> date (Y-m-d) => count
+	 */
+	public static function get_daily_trend( int $days ): array {
+		global $wpdb;
+		$table = $wpdb->prefix . AM_Schema::EVENTS_TABLE;
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant.
+		$rows = $wpdb->get_results( $wpdb->prepare(
+			"SELECT DATE(date) AS day, COUNT(*) AS total
+			 FROM `{$table}`
+			 WHERE date >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL %d DAY)
+			 GROUP BY DATE(date)
+			 ORDER BY day ASC",
+			$days
+		), ARRAY_A );
+
+		$by_day = array();
+		foreach ( $rows as $row ) {
+			$by_day[ $row['day'] ] = (int) $row['total'];
+		}
+
+		// Zero-fill every day in the window so the chart has no gaps.
+		$trend = array();
+		for ( $i = $days - 1; $i >= 0; $i-- ) {
+			$date = gmdate( 'Y-m-d', strtotime( "-{$i} days" ) );
+			$trend[ $date ] = $by_day[ $date ] ?? 0;
+		}
+		return $trend;
+	}
+
+	/**
+	 * Event counts grouped by event_type, descending, for the last $days.
+	 *
+	 * @return array<string, int> event_type => count
+	 */
+	public static function get_breakdown_by_event_type( int $days, int $limit = 10 ): array {
+		global $wpdb;
+		$table = $wpdb->prefix . AM_Schema::EVENTS_TABLE;
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant.
+		$rows = $wpdb->get_results( $wpdb->prepare(
+			"SELECT event_type, COUNT(*) AS total
+			 FROM `{$table}`
+			 WHERE date >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL %d DAY)
+			 GROUP BY event_type
+			 ORDER BY total DESC
+			 LIMIT %d",
+			$days,
+			$limit
+		), ARRAY_A );
+
+		$out = array();
+		foreach ( $rows as $row ) {
+			$out[ $row['event_type'] ] = (int) $row['total'];
+		}
+		return $out;
+	}
+
+	/**
+	 * Peak activity: busiest day-of-week and busiest hour-of-day within
+	 * the window, each with its count. Hour is in the site's configured
+	 * timezone (matches how the log table itself displays times), not UTC.
+	 *
+	 * @return array{busiest_day: array{name:string,count:int}|null, busiest_hour: array{hour:int,count:int}|null}
+	 */
+	public static function get_peak_activity( int $days ): array {
+		global $wpdb;
+		$table  = $wpdb->prefix . AM_Schema::EVENTS_TABLE;
+		$offset = self::get_gmt_offset_sql();
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table/offset are plugin-controlled.
+		$day_row = $wpdb->get_row( $wpdb->prepare(
+			"SELECT DAYNAME(DATE_ADD(date, INTERVAL {$offset} SECOND)) AS day_name, COUNT(*) AS total
+			 FROM `{$table}`
+			 WHERE date >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL %d DAY)
+			 GROUP BY day_name
+			 ORDER BY total DESC
+			 LIMIT 1",
+			$days
+		), ARRAY_A );
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table/offset are plugin-controlled.
+		$hour_row = $wpdb->get_row( $wpdb->prepare(
+			"SELECT HOUR(DATE_ADD(date, INTERVAL {$offset} SECOND)) AS hour, COUNT(*) AS total
+			 FROM `{$table}`
+			 WHERE date >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL %d DAY)
+			 GROUP BY hour
+			 ORDER BY total DESC
+			 LIMIT 1",
+			$days
+		), ARRAY_A );
+
+		return array(
+			'busiest_day'  => $day_row ? array( 'name' => $day_row['day_name'], 'count' => (int) $day_row['total'] ) : null,
+			'busiest_hour' => $hour_row ? array( 'hour' => (int) $hour_row['hour'], 'count' => (int) $hour_row['total'] ) : null,
+		);
+	}
+
+	/**
+	 * Most active users by event count within the window. Excludes
+	 * non-authenticated initiators (web_user/wp_cron/wp_cli/system) since
+	 * "most active user" is only meaningful for actual logged-in users.
+	 *
+	 * @return array<array{user_login:string, count:int}>
+	 */
+	public static function get_most_active_users( int $days, int $limit = 5 ): array {
+		global $wpdb;
+		$table = $wpdb->prefix . AM_Schema::EVENTS_TABLE;
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant.
+		$rows = $wpdb->get_results( $wpdb->prepare(
+			"SELECT user_login, COUNT(*) AS total
+			 FROM `{$table}`
+			 WHERE date >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL %d DAY)
+			   AND initiator = %s
+			   AND user_login != ''
+			 GROUP BY user_login
+			 ORDER BY total DESC
+			 LIMIT %d",
+			$days,
+			AM_Initiator_Detector::WP_USER,
+			$limit
+		), ARRAY_A );
+
+		$out = array();
+		foreach ( $rows as $row ) {
+			$out[] = array( 'user_login' => $row['user_login'], 'count' => (int) $row['total'] );
+		}
+		return $out;
+	}
+
+	/**
+	 * Notable/high-severity events within the window -- warning level or
+	 * above. Used by the digest email's "notable security events" section
+	 * (spec §4).
+	 *
+	 * @return array<object> up to $limit am_events rows, most recent first
+	 */
+	public static function get_notable_events( int $days, int $limit = 10 ): array {
+		global $wpdb;
+		$table = $wpdb->prefix . AM_Schema::EVENTS_TABLE;
+
+		$notable_levels = array( AM_Log_Levels::WARNING, AM_Log_Levels::ERROR, AM_Log_Levels::CRITICAL, AM_Log_Levels::ALERT, AM_Log_Levels::EMERGENCY );
+		$placeholders   = implode( ',', array_fill( 0, count( $notable_levels ), '%s' ) );
+
+		$query_args   = $notable_levels;
+		$query_args[] = $days;
+		$query_args[] = $limit;
+
+		return $wpdb->get_results( $wpdb->prepare(
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant, placeholders are a fixed count of %s.
+			"SELECT * FROM `{$table}`
+			 WHERE level IN ({$placeholders})
+			   AND date >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL %d DAY)
+			 ORDER BY date DESC
+			 LIMIT %d",
+			$query_args
+		) );
+	}
+
+	/**
+	 * SQL fragment for converting a UTC datetime to the site's configured
+	 * timezone offset, in seconds. WordPress stores gmt_offset as a
+	 * (possibly fractional, e.g. 5.5 for India) number of hours.
+	 */
+	private static function get_gmt_offset_sql(): string {
+		$hours = (float) get_option( 'gmt_offset', 0 );
+		return (string) (int) round( $hours * HOUR_IN_SECONDS );
+	}
 }

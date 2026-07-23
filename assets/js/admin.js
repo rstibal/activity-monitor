@@ -49,4 +49,34 @@
 	$('#am-add-email').on('click', function () { addChannel('email'); });
 	$(document).on('click', '.am-remove-channel', function () { $(this).closest('.am-channel-card').remove(); });
 	$(document).on('change', 'select[name="am_type"]', function () { $(this).closest('form').submit(); });
+
+	/* Digest preview + test send (spec §4). Preview loads the same HTML
+	   AM_Digest::send()/send_test() would actually mail, rendered inline
+	   via an iframe so the layout/styling can be seen accurately without
+	   sending anything. */
+	$('#am-digest-preview').on('click', function () {
+		var $btn = $(this).prop('disabled', true);
+		$.post(amData.ajaxUrl, { action: 'am_digest_preview', nonce: amData.nonce })
+		.done(function (r) {
+			if (r.success) {
+				var frame = document.getElementById('am-digest-preview-frame');
+				frame.srcdoc = r.data.html;
+				$('#am-digest-preview-frame-wrap').show();
+			}
+		})
+		.always(function () { $btn.prop('disabled', false); });
+	});
+
+	$('#am-digest-send-test').on('click', function () {
+		var $btn   = $(this).prop('disabled', true);
+		var email  = $('#am-digest-test-email').val();
+		var $result = $('#am-digest-test-result');
+		$result.text('');
+		$.post(amData.ajaxUrl, { action: 'am_digest_send_test', nonce: amData.nonce, email: email })
+		.done(function (r) {
+			$result.text(r.success ? r.data.message : (r.data && r.data.message ? r.data.message : 'Error.'));
+		})
+		.fail(function () { $result.text('Request failed.'); })
+		.always(function () { $btn.prop('disabled', false); });
+	});
 }(jQuery));
