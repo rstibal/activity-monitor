@@ -76,6 +76,12 @@
 .am-filter-label { font-size: 12px; font-weight: 600; color: #646970; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
 .am-filter-search { margin-left: auto; }
 .am-filter-search input[type="search"] { min-width: 240px; }
+.am-filter-input-small { width: 110px; }
+
+.am-export-bar {
+	display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+	margin-top: 10px; padding-top: 10px; border-top: 1px solid #dcdcde;
+}
 
 .am-pill {
 	display: inline-flex; align-items: center; padding: 3px 10px;
@@ -135,6 +141,12 @@
 .am-detail-table th { background: #f6f7f7; font-weight: 600; width: 130px; white-space: nowrap; }
 .am-detail-table pre { background: #f6f7f7; padding: 8px; border-radius: 3px; font-size: 11px; white-space: pre-wrap; word-break: break-all; margin: 0; max-height: 200px; overflow-y: auto; }
 
+/* v2.0 preview: before/after diff table shown in the event detail modal. */
+.am-diff-table { width: 100%; border-collapse: collapse; }
+.am-diff-table td { padding: 4px 6px; font-size: 12px; vertical-align: top; border-bottom: 1px solid #f0f0f1; }
+.am-diff-before { color: #b32d2e; text-decoration: line-through; }
+.am-diff-after { color: #2271b1; }
+
 .am-settings-section { margin-bottom: 8px; }
 .am-section-title { display: flex; align-items: center; gap: 8px; font-size: 15px !important; font-weight: 600; color: #1d2327; margin: 0 0 14px !important; }
 .am-section-title .dashicons { color: #2271b1; }
@@ -154,3 +166,14 @@
 .am-channel-add-buttons { display: flex; gap: 10px; margin: 14px 0; }
 
 .am-table-wrap .tablenav { padding: 10px 12px; border-top: 1px solid #dcdcde; }
+
+/* Stats & Insights tab (spec §4) */
+.am-stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin: 16px 0 24px; }
+.am-stats-card { background: #f6f7f7; border: 1px solid #c3c4c7; border-radius: 6px; padding: 14px 16px; }
+.am-stats-card-value { font-size: 24px; font-weight: 600; color: #1d2327; line-height: 1.2; }
+.am-stats-card-label { font-size: 12px; color: #646970; margin-top: 2px; }
+.am-stats-card-delta { font-size: 11px; color: #646970; margin-top: 6px; }
+.am-trend-chart { display: flex; align-items: flex-end; gap: 4px; height: 140px; padding: 10px 0; }
+.am-trend-bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end; }
+.am-trend-bar { width: 100%; max-width: 28px; background: #2271b1; border-radius: 2px 2px 0 0; min-height: 2px; }
+.am-trend-bar-label { font-size: 10px; color: #646970; margin-top: 4px; white-space: nowrap; }

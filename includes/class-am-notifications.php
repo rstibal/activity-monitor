@@ -1,114 +1,102 @@
 <?php
 if ( ! defined( 'ABSPATH' ) ) exit;
 
+/**
+ * AM_Notifications — email alerts for events meeting a configured
+ * minimum level.
+ *
+ * BUGFIX: v1.x's AM_Notifications::maybe_notify() was only ever called
+ * from the legacy AM_Logger::log() (see the old class-am-logger.php).
+ * Every event source was ported onto AM_Event_Writer over several
+ * builds (dev.1 through dev.12), and nothing was ever added to call
+ * notifications from the new write path -- so notifications have been
+ * silently non-functional for every ported event type since the first
+ * logger (posts) was converted. This rewrite wires the call into
+ * AM_Event_Writer::log() directly, on the new schema, so it actually
+ * fires again.
+ *
+ * Also removed at Rob's request: Slack channel support. Email only.
+ *
+ * Severity scale: v1.x used a 4-value int (Info/Notice/Warning/Critical)
+ * with a simple ">=" comparison. This uses AM_Log_Levels' 8-value PSR-3
+ * scale via AM_Log_Levels::meets_threshold().
+ */
 class AM_Notifications {
 
-	public static function maybe_notify( int $severity, string $event_type, string $message, array $args ) {
+	/**
+	 * Call this from AM_Event_Writer::log() after a new event row is
+	 * written (not on an occasion-grouping repeat-count increment --
+	 * see AM_Event_Writer, which only calls this on genuine new rows).
+	 */
+	public static function maybe_notify( string $level, string $event_type, string $action, string $message, array $args ) {
 		$channels = get_option( 'am_notification_channels', array() );
-		if ( empty( $channels ) ) return;
+		if ( empty( $channels ) ) {
+			return;
+		}
 
 		foreach ( $channels as $channel ) {
-			$min_severity = absint( $channel['severity'] ?? AM_Logger::CRITICAL );
-			if ( $severity < $min_severity ) continue;
-
-			$type = $channel['type'] ?? '';
-
-			if ( $type === 'email' ) {
-				self::send_email( $channel, $severity, $event_type, $message, $args );
-			} elseif ( $type === 'slack' ) {
-				self::send_slack( $channel, $severity, $event_type, $message, $args );
+			$min_level = isset( $channel['level'] ) ? (string) $channel['level'] : AM_Log_Levels::CRITICAL;
+			if ( ! AM_Log_Levels::is_valid( $min_level ) ) {
+				$min_level = AM_Log_Levels::CRITICAL;
 			}
+			if ( ! AM_Log_Levels::meets_threshold( $level, $min_level ) ) {
+				continue;
+			}
+
+			self::send_email( $channel, $level, $event_type, $action, $message, $args );
 		}
 	}
 
-	// ── Email ──────────────────────────────────────────────────────────
-
-	private static function send_email( array $channel, int $severity, string $event_type, string $message, array $args ) {
+	private static function send_email( array $channel, string $level, string $event_type, string $action, string $message, array $args ) {
 		$raw_recipients = $channel['recipients'] ?? '';
 		$recipients     = array_filter( array_map( 'trim', explode( ',', $raw_recipients ) ) );
-		if ( empty( $recipients ) ) return;
+		if ( empty( $recipients ) ) {
+			return;
+		}
 
 		$site    = get_bloginfo( 'name' );
-		$label   = AM_Logger::severity_label( $severity );
-		$user    = $args['user_name'] ?? 'unknown';
-		$ip      = $args['ip_address'] ?? AM_DB::get_ip();
-		$subject = "[{$site}] Activity Monitor Alert – {$label}: {$event_type}";
+		$label   = AM_Log_Levels::label( $level );
+		$user    = $args['user_login'] ?? 'unknown';
+		$ip      = $args['ip_address'] ?? AM_DB_Legacy_IP::resolve();
+		/* translators: 1: site name, 2: log level label, 3: event type, 4: event action */
+		$subject = sprintf( __( '[%1$s] Activity Monitor Alert – %2$s: %3$s.%4$s', 'activity-monitor' ), $site, $label, $event_type, $action );
 
-		/**
-		 * FIX #7: Strip tags from all user-derived values before interpolating
-		 * into the plain-text email body. Prevents crafted log messages or
-		 * usernames from injecting header-like content or misleading text.
-		 */
+		// FIX #7 (carried forward from v1.x): strip tags from all
+		// user-derived values before interpolating into the plain-text
+		// email body. Prevents crafted log messages or usernames from
+		// injecting header-like content or misleading text.
 		$safe_site    = wp_strip_all_tags( $site );
 		$safe_label   = wp_strip_all_tags( $label );
-		$safe_type    = wp_strip_all_tags( $event_type );
+		$safe_type    = wp_strip_all_tags( $event_type . '.' . $action );
 		$safe_user    = wp_strip_all_tags( (string) $user );
 		$safe_ip      = wp_strip_all_tags( (string) $ip );
 		$safe_message = wp_strip_all_tags( (string) $message );
 		$safe_object  = wp_strip_all_tags( (string) ( $args['object_name'] ?? '' ) );
 
-		$body  = "Activity Monitor Alert\n";
+		$body  = __( 'Activity Monitor Alert', 'activity-monitor' ) . "\n";
 		$body .= str_repeat( '─', 50 ) . "\n\n";
-		$body .= "Site:         {$safe_site}\n";
-		$body .= "Severity:     {$safe_label}\n";
-		$body .= "Event:        {$safe_type}\n";
-		$body .= 'Time:         ' . current_time( 'Y-m-d H:i:s' ) . " (UTC)\n";
-		$body .= "User:         {$safe_user}\n";
-		$body .= "IP Address:   {$safe_ip}\n";
+		/* translators: %s: site name */
+		$body .= sprintf( __( 'Site:         %s', 'activity-monitor' ), $safe_site ) . "\n";
+		/* translators: %s: log level label */
+		$body .= sprintf( __( 'Level:        %s', 'activity-monitor' ), $safe_label ) . "\n";
+		/* translators: %s: event type and action, e.g. "post.updated" */
+		$body .= sprintf( __( 'Event:        %s', 'activity-monitor' ), $safe_type ) . "\n";
+		/* translators: %s: date and time in UTC */
+		$body .= sprintf( __( 'Time:         %s (UTC)', 'activity-monitor' ), current_time( 'Y-m-d H:i:s' ) ) . "\n";
+		/* translators: %s: WordPress username */
+		$body .= sprintf( __( 'User:         %s', 'activity-monitor' ), $safe_user ) . "\n";
+		/* translators: %s: IP address */
+		$body .= sprintf( __( 'IP Address:   %s', 'activity-monitor' ), $safe_ip ) . "\n";
 		if ( '' !== $safe_object ) {
-			$body .= "Object:       {$safe_object}\n";
+			/* translators: %s: name of the object the event happened to, e.g. a post title */
+			$body .= sprintf( __( 'Object:       %s', 'activity-monitor' ), $safe_object ) . "\n";
 		}
-		$body .= "\nMessage:\n{$safe_message}\n\n";
+		/* translators: %s: the event's human-readable log message */
+		$body .= "\n" . sprintf( __( "Message:\n%s", 'activity-monitor' ), $safe_message ) . "\n\n";
 		$body .= str_repeat( '─', 50 ) . "\n";
-		$body .= 'View full log: ' . admin_url( 'admin.php?page=activity-monitor' ) . "\n";
+		/* translators: %s: URL to the full activity log */
+		$body .= sprintf( __( 'View full log: %s', 'activity-monitor' ), admin_url( 'admin.php?page=activity-monitor' ) ) . "\n";
 
 		wp_mail( $recipients, $subject, $body );
-	}
-
-	// ── Slack ──────────────────────────────────────────────────────────
-
-	private static function send_slack( array $channel, int $severity, string $event_type, string $message, array $args ) {
-		$webhook = $channel['webhook_url'] ?? '';
-		if ( empty( $webhook ) ) return;
-
-		$label   = AM_Logger::severity_label( $severity );
-		$site    = get_bloginfo( 'name' );
-		$user    = $args['user_name'] ?? 'unknown';
-		$ip      = $args['ip_address'] ?? AM_DB::get_ip();
-		$object  = $args['object_name'] ?? '';
-
-		$color_map = array(
-			AM_Logger::INFO     => '#36a64f',
-			AM_Logger::NOTICE   => '#2196f3',
-			AM_Logger::WARNING  => '#ff9800',
-			AM_Logger::CRITICAL => '#f44336',
-		);
-		$color = $color_map[ $severity ] ?? '#9e9e9e';
-
-		$payload = array(
-			'text'        => "*Activity Monitor Alert* – {$site}",
-			'attachments' => array(
-				array(
-					'color'  => $color,
-					'fields' => array(
-						array( 'title' => 'Severity',   'value' => $label,        'short' => true ),
-						array( 'title' => 'Event',      'value' => $event_type,   'short' => true ),
-						array( 'title' => 'User',       'value' => $user,         'short' => true ),
-						array( 'title' => 'IP Address', 'value' => $ip,           'short' => true ),
-						array( 'title' => 'Object',     'value' => $object,       'short' => true ),
-						array( 'title' => 'Time',       'value' => current_time( 'Y-m-d H:i:s' ) . ' UTC', 'short' => true ),
-						array( 'title' => 'Message',    'value' => $message,      'short' => false ),
-					),
-					'footer' => 'Activity Monitor | ' . admin_url( 'admin.php?page=activity-monitor' ),
-				),
-			),
-		);
-
-		wp_remote_post( esc_url_raw( $webhook ), array(
-			'headers'  => array( 'Content-Type' => 'application/json' ),
-			'body'     => wp_json_encode( $payload ),
-			'timeout'  => 10,
-			'blocking' => false,
-		) );
 	}
 }
