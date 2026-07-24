@@ -100,9 +100,12 @@ class AM_Export {
 
 	private static function to_html( array $items ): string {
 		$site  = esc_html( get_bloginfo( 'name' ) );
-		$html  = "<!DOCTYPE html>\n<html><head><meta charset=\"utf-8\"><title>Activity Monitor Export</title>";
+		$title = esc_html__( 'Activity Monitor Export', 'activity-monitor' );
+		$html  = '<!DOCTYPE html>' . "\n" . '<html><head><meta charset="utf-8"><title>' . $title . '</title>';
 		$html .= '<style>body{font-family:sans-serif;font-size:13px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #ccc;padding:4px 8px;text-align:left}th{background:#f0f0f0}</style>';
-		$html .= "</head><body>\n<h1>Activity Monitor Export — {$site}</h1>\n<p>" . esc_html( gmdate( 'Y-m-d H:i:s' ) ) . " UTC</p>\n<table><thead><tr>";
+		/* translators: %s: site name */
+		$heading = sprintf( esc_html__( 'Activity Monitor Export — %s', 'activity-monitor' ), $site );
+		$html .= '</head><body>' . "\n" . "<h1>{$heading}</h1>" . "\n" . '<p>' . esc_html( gmdate( 'Y-m-d H:i:s' ) ) . ' UTC</p>' . "\n" . '<table><thead><tr>';
 		foreach ( self::columns() as $col ) {
 			$html .= '<th>' . esc_html( $col ) . '</th>';
 		}

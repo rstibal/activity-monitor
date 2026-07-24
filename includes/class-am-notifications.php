@@ -58,7 +58,8 @@ class AM_Notifications {
 		$label   = AM_Log_Levels::label( $level );
 		$user    = $args['user_login'] ?? 'unknown';
 		$ip      = $args['ip_address'] ?? AM_DB_Legacy_IP::resolve();
-		$subject = "[{$site}] Activity Monitor Alert – {$label}: {$event_type}.{$action}";
+		/* translators: 1: site name, 2: log level label, 3: event type, 4: event action */
+		$subject = sprintf( __( '[%1$s] Activity Monitor Alert – %2$s: %3$s.%4$s', 'activity-monitor' ), $site, $label, $event_type, $action );
 
 		// FIX #7 (carried forward from v1.x): strip tags from all
 		// user-derived values before interpolating into the plain-text
@@ -72,20 +73,29 @@ class AM_Notifications {
 		$safe_message = wp_strip_all_tags( (string) $message );
 		$safe_object  = wp_strip_all_tags( (string) ( $args['object_name'] ?? '' ) );
 
-		$body  = "Activity Monitor Alert\n";
+		$body  = __( 'Activity Monitor Alert', 'activity-monitor' ) . "\n";
 		$body .= str_repeat( '─', 50 ) . "\n\n";
-		$body .= "Site:         {$safe_site}\n";
-		$body .= "Level:        {$safe_label}\n";
-		$body .= "Event:        {$safe_type}\n";
-		$body .= 'Time:         ' . current_time( 'Y-m-d H:i:s' ) . " (UTC)\n";
-		$body .= "User:         {$safe_user}\n";
-		$body .= "IP Address:   {$safe_ip}\n";
+		/* translators: %s: site name */
+		$body .= sprintf( __( 'Site:         %s', 'activity-monitor' ), $safe_site ) . "\n";
+		/* translators: %s: log level label */
+		$body .= sprintf( __( 'Level:        %s', 'activity-monitor' ), $safe_label ) . "\n";
+		/* translators: %s: event type and action, e.g. "post.updated" */
+		$body .= sprintf( __( 'Event:        %s', 'activity-monitor' ), $safe_type ) . "\n";
+		/* translators: %s: date and time in UTC */
+		$body .= sprintf( __( 'Time:         %s (UTC)', 'activity-monitor' ), current_time( 'Y-m-d H:i:s' ) ) . "\n";
+		/* translators: %s: WordPress username */
+		$body .= sprintf( __( 'User:         %s', 'activity-monitor' ), $safe_user ) . "\n";
+		/* translators: %s: IP address */
+		$body .= sprintf( __( 'IP Address:   %s', 'activity-monitor' ), $safe_ip ) . "\n";
 		if ( '' !== $safe_object ) {
-			$body .= "Object:       {$safe_object}\n";
+			/* translators: %s: name of the object the event happened to, e.g. a post title */
+			$body .= sprintf( __( 'Object:       %s', 'activity-monitor' ), $safe_object ) . "\n";
 		}
-		$body .= "\nMessage:\n{$safe_message}\n\n";
+		/* translators: %s: the event's human-readable log message */
+		$body .= "\n" . sprintf( __( "Message:\n%s", 'activity-monitor' ), $safe_message ) . "\n\n";
 		$body .= str_repeat( '─', 50 ) . "\n";
-		$body .= 'View full log: ' . admin_url( 'admin.php?page=activity-monitor' ) . "\n";
+		/* translators: %s: URL to the full activity log */
+		$body .= sprintf( __( 'View full log: %s', 'activity-monitor' ), admin_url( 'admin.php?page=activity-monitor' ) ) . "\n";
 
 		wp_mail( $recipients, $subject, $body );
 	}

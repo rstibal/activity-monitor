@@ -1,41 +1,43 @@
 # Activity Monitor
 
-Comprehensive WordPress audit log plugin — tracks logins, logouts, post/media/user/plugin/theme/comment/settings changes, and security-relevant events.
+A complete WordPress activity log — tracks logins, content changes, plugin/theme/core updates, comments, taxonomy, menus, widgets, password changes, multisite events, and unauthorized access attempts.
 
-Built for use on client sites (not distributed via the WordPress.org plugin directory).
+Distributed on wordpress.org as a public plugin.
 
 ## Features
 
-- Single tabbed admin page (Activity Log, Active Sessions, Settings) under the Dashboard
-- Active Sessions view reads from WordPress's native `session_tokens` user meta
-- Custom `wp_am_activity_log` table for event storage
+- Single tabbed admin screen (Activity Log, Stats & Insights, Active Sessions, Settings)
+- Two-table event schema (`am_events` + `am_event_context`) with occasion grouping (repeated events collapse into one entry with a count), PSR-3 severity levels, and initiator tagging (user / visitor / cron / WP-CLI / system)
+- Pluggable per-source logger architecture — one class per event type (posts, users, media, comments, plugins, themes, core, terms, menus, widgets, passwords, sites, security)
+- Session management on top of WordPress's own `session_tokens` storage: per-session revoke, configurable concurrent-session limits, emergency lockdown
+- Stats & Insights: activity trends, peak day/hour detection, top event types, most active users
+- Scheduled email digest (daily/weekly/monthly) with in-browser preview and test send
+- Log export: CSV, JSON, HTML, and plain text, honoring the current filter set
+- Email notification channels with configurable minimum severity
 - Configurable log retention with daily pruning via WP-Cron
-- Optional Slack webhook notifications
 - Cloudflare-aware IP resolution (validates `CF-Connecting-IP` against verified Cloudflare CIDR ranges rather than trusting it blindly)
 
 ## Requirements
 
-- WordPress 6.0+
-- PHP 8.0+
+- WordPress 5.3+
+- PHP 7.4+
 
 ## Installation
 
-This plugin is not distributed as a live-editable directory. Deploy via **Plugins → Add New → Upload Plugin** using a versioned release ZIP.
+Install via **Plugins → Add New → Upload Plugin**, or by uploading the `activity-monitor` folder to `/wp-content/plugins/`.
 
 ## Deployment workflow
 
-All edits are made locally and packaged as a versioned ZIP for manual upload — no server-side editing of plugin files. See commit history for the version-by-version changelog.
+All edits are made locally and packaged as a versioned ZIP for manual upload — no server-side editing of plugin files. See `readme.txt` for the wordpress.org-formatted changelog, and commit history for full version-by-version detail.
 
 ## Security
 
-v1.3.0 introduced a full security patch set:
-
-- IP spoofing protection via Cloudflare CIDR validation in `get_ip()`
-- `ajax_session_detail` re-fetches session data from the database instead of trusting POST input
+- IP spoofing protection via Cloudflare CIDR validation
+- Session data is re-fetched from the database server-side rather than trusting POST input for display
 - Parameterized queries (`$wpdb->prepare()`) throughout
-- Output escaping (`wp_strip_all_tags()`) on email notification bodies
-- `uninstall.php` cleanly removes the log table, plugin options (including any stored Slack webhook), and scheduled cron events
+- Output escaping on all email notification and digest bodies
+- `uninstall.php` cleanly removes both database tables, all plugin options, and all scheduled cron events
 
 ## License
 
-GPL-2.0+
+GPL-2.0-or-later

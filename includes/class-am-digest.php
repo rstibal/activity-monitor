@@ -137,7 +137,8 @@ class AM_Digest {
 
 		$sent = wp_mail(
 			$recipients,
-			"[{$site}] Activity Monitor Digest",
+			/* translators: %s: site name */
+			sprintf( __( '[%s] Activity Monitor Digest', 'activity-monitor' ), $site ),
 			$html,
 			array( 'Content-Type: text/html; charset=UTF-8' )
 		);
@@ -160,7 +161,8 @@ class AM_Digest {
 
 		return wp_mail(
 			$to_email,
-			"[{$site}] Activity Monitor Digest (test)",
+			/* translators: %s: site name */
+			sprintf( __( '[%s] Activity Monitor Digest (test)', 'activity-monitor' ), $site ),
 			$html,
 			array( 'Content-Type: text/html; charset=UTF-8' )
 		);
@@ -199,7 +201,7 @@ class AM_Digest {
 			</div>
 			<?php endif; ?>
 
-			<h1 style="font-size: 20px; margin-bottom: 4px;">Activity Monitor Digest</h1>
+			<h1 style="font-size: 20px; margin-bottom: 4px;"><?php esc_html_e( 'Activity Monitor Digest', 'activity-monitor' ); ?></h1>
 			<p style="color: #646970; margin-top: 0;"><?php echo esc_html( $site ); ?> &middot; <?php echo esc_html( $period ); ?></p>
 
 			<table style="width: 100%; border-collapse: collapse; margin: 20px 0;">

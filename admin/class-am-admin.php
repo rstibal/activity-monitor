@@ -1418,7 +1418,7 @@ class AM_Admin {
 		<div class="am-channel-card am-channel-email">
 			<div class="am-channel-card-header">
 				<span class="am-channel-icon dashicons dashicons-email-alt"></span>
-				<strong class="am-channel-type-label">Email</strong>
+				<strong class="am-channel-type-label"><?php esc_html_e( 'Email', 'activity-monitor' ); ?></strong>
 				<button type="button" class="am-remove-channel button-link">
 					&times; <?php esc_html_e( 'Remove', 'activity-monitor' ); ?>
 				</button>
