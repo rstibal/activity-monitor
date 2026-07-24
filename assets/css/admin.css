@@ -76,6 +76,12 @@
 .am-filter-label { font-size: 12px; font-weight: 600; color: #646970; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
 .am-filter-search { margin-left: auto; }
 .am-filter-search input[type="search"] { min-width: 240px; }
+.am-filter-input-small { width: 110px; }
+
+.am-export-bar {
+	display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+	margin-top: 10px; padding-top: 10px; border-top: 1px solid #dcdcde;
+}
 
 .am-pill {
 	display: inline-flex; align-items: center; padding: 3px 10px;

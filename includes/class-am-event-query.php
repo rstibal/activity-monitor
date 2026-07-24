@@ -24,9 +24,14 @@ class AM_Event_Query {
 			'level'     => '',
 			'initiator' => '',
 			'event_type'=> '',
+			'action'    => '',
+			'user'      => '',   // user_login, exact match
+			'date_from' => '',   // Y-m-d, inclusive, site-local interpreted as UTC start-of-day
+			'date_to'   => '',   // Y-m-d, inclusive, site-local interpreted as UTC end-of-day
 			'search'    => '',
 			'orderby'   => 'date',
 			'order'     => 'DESC',
+			'no_limit'  => false, // export mode: ignore per_page/page, return every matching row
 		);
 		$args   = wp_parse_args( $args, $defaults );
 		$offset = ( absint( $args['page'] ) - 1 ) * absint( $args['per_page'] );
@@ -46,6 +51,22 @@ class AM_Event_Query {
 			$where[]  = 'event_type = %s';
 			$values[] = sanitize_key( $args['event_type'] );
 		}
+		if ( '' !== $args['action'] ) {
+			$where[]  = 'action = %s';
+			$values[] = sanitize_key( $args['action'] );
+		}
+		if ( '' !== $args['user'] ) {
+			$where[]  = 'user_login = %s';
+			$values[] = sanitize_user( $args['user'] );
+		}
+		if ( '' !== $args['date_from'] && false !== strtotime( $args['date_from'] ) ) {
+			$where[]  = 'date >= %s';
+			$values[] = gmdate( 'Y-m-d 00:00:00', strtotime( $args['date_from'] ) );
+		}
+		if ( '' !== $args['date_to'] && false !== strtotime( $args['date_to'] ) ) {
+			$where[]  = 'date <= %s';
+			$values[] = gmdate( 'Y-m-d 23:59:59', strtotime( $args['date_to'] ) );
+		}
 		if ( '' !== $args['search'] ) {
 			$like     = '%' . $wpdb->esc_like( $args['search'] ) . '%';
 			$where[]  = '( message LIKE %s OR user_login LIKE %s OR object_name LIKE %s )';
@@ -63,9 +84,15 @@ class AM_Event_Query {
 		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table/column names are plugin constants.
 		$count_sql = "SELECT COUNT(*) FROM `{$table}` WHERE {$where_sql}";
 		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table/column names are plugin constants.
-		$data_sql  = "SELECT * FROM `{$table}` WHERE {$where_sql} ORDER BY {$orderby} {$order} LIMIT %d OFFSET %d";
+		$data_sql  = "SELECT * FROM `{$table}` WHERE {$where_sql} ORDER BY {$orderby} {$order}";
+		if ( ! $args['no_limit'] ) {
+			$data_sql .= ' LIMIT %d OFFSET %d';
+		}
 
-		if ( ! empty( $values ) ) {
+		if ( $args['no_limit'] ) {
+			$total = empty( $values ) ? (int) $wpdb->get_var( $count_sql ) : (int) $wpdb->get_var( $wpdb->prepare( $count_sql, $values ) );
+			$items = empty( $values ) ? $wpdb->get_results( $data_sql ) : $wpdb->get_results( $wpdb->prepare( $data_sql, $values ) );
+		} elseif ( ! empty( $values ) ) {
 			$total = (int) $wpdb->get_var( $wpdb->prepare( $count_sql, $values ) );
 			$items = $wpdb->get_results( $wpdb->prepare( $data_sql, array_merge( $values, array( absint( $args['per_page'] ), $offset ) ) ) );
 		} else {

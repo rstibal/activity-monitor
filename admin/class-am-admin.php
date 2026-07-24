@@ -33,6 +33,7 @@ class AM_Admin {
 		add_action( 'admin_post_am_emergency_lockdown',       array( $instance, 'handle_emergency_lockdown' ) );
 		add_action( 'admin_post_am_save_session_settings',    array( $instance, 'handle_save_session_settings' ) );
 		add_action( 'admin_post_am_save_digest_settings',     array( $instance, 'handle_save_digest_settings' ) );
+		add_action( 'admin_post_am_export_log',               array( $instance, 'handle_export' ) );
 		add_action( 'admin_notices',                          array( $instance, 'show_notices' ) );
 		add_action( 'wp_ajax_am_get_v2_event_detail',         array( $instance, 'ajax_v2_event_detail' ) );
 		add_action( 'wp_ajax_am_digest_preview',              array( $instance, 'ajax_digest_preview' ) );
@@ -354,6 +355,36 @@ class AM_Admin {
 		exit;
 	}
 
+	/**
+	 * Streams a file download -- reads the same am_* filter params the log
+	 * tab's filter form uses (see render_tab_v2_log()) so export always
+	 * matches what's currently on screen. am_export_action maps to
+	 * AM_Event_Query's 'action' filter key; 'action' itself is reserved by
+	 * admin-post.php for dispatch routing (action=am_export_log) and can't
+	 * double as the filter key here.
+	 */
+	public function handle_export() {
+		check_admin_referer( AM_Export::NONCE_ACTION );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Unauthorized.', 'activity-monitor' ) );
+		}
+
+		$format  = sanitize_key( $_GET['am_format'] ?? 'csv' );
+		$filters = array(
+			'level'      => sanitize_key( $_GET['am_level'] ?? '' ),
+			'initiator'  => sanitize_key( $_GET['am_initiator'] ?? '' ),
+			'event_type' => sanitize_key( $_GET['am_type'] ?? '' ),
+			'action'     => sanitize_key( $_GET['am_export_action'] ?? '' ),
+			'user'       => sanitize_user( wp_unslash( $_GET['am_user'] ?? '' ) ),
+			'date_from'  => sanitize_text_field( $_GET['am_from'] ?? '' ),
+			'date_to'    => sanitize_text_field( $_GET['am_to'] ?? '' ),
+			'search'     => sanitize_text_field( $_GET['am_search'] ?? '' ),
+		);
+
+		AM_Export::stream( $format, $filters );
+		// AM_Export::stream() exits internally after writing the response.
+	}
+
 	// ── AJAX ─────────────────────────────────────────────────────────────
 
 	public function ajax_digest_preview() {
@@ -636,16 +667,20 @@ class AM_Admin {
 		$level      = sanitize_key( $_GET['am_level'] ?? '' );
 		$initiator  = sanitize_key( $_GET['am_initiator'] ?? '' );
 		$event_type = sanitize_key( $_GET['am_type'] ?? '' );
+		$action     = sanitize_key( $_GET['am_action'] ?? '' );
+		$user       = sanitize_user( wp_unslash( $_GET['am_user'] ?? '' ) );
+		$date_from  = sanitize_text_field( $_GET['am_from'] ?? '' );
+		$date_to    = sanitize_text_field( $_GET['am_to'] ?? '' );
 		$search     = sanitize_text_field( $_GET['am_search'] ?? '' );
 
-		$data        = AM_Event_Query::get_events( compact( 'per_page', 'page', 'level', 'initiator', 'event_type', 'search' ) );
+		$data        = AM_Event_Query::get_events( compact( 'per_page', 'page', 'level', 'initiator', 'event_type', 'action', 'user', 'date_from', 'date_to', 'search' ) );
 		$items       = $data['items'];
 		$total       = $data['total'];
 		$num_pages   = (int) ceil( $total / $per_page );
 		$event_types = AM_Event_Query::get_event_types();
 
 		$base_url = add_query_arg(
-			array( 'page' => 'activity-monitor', self::TAB_PARAM => 'v2-log' ),
+			array( 'page' => 'activity-monitor', self::TAB_PARAM => 'log' ),
 			admin_url( 'admin.php' )
 		);
 
@@ -678,7 +713,7 @@ class AM_Admin {
 		<div class="am-filter-bar">
 			<form method="get" action="">
 				<input type="hidden" name="page" value="activity-monitor">
-				<input type="hidden" name="<?php echo esc_attr( self::TAB_PARAM ); ?>" value="v2-log">
+				<input type="hidden" name="<?php echo esc_attr( self::TAB_PARAM ); ?>" value="log">
 
 				<div class="am-filter-group">
 					<span class="am-filter-label"><?php esc_html_e( 'Level:', 'activity-monitor' ); ?></span>
@@ -720,18 +755,61 @@ class AM_Admin {
 					</select>
 				</div>
 
+				<div class="am-filter-group">
+					<span class="am-filter-label"><?php esc_html_e( 'User:', 'activity-monitor' ); ?></span>
+					<input type="text" name="am_user" value="<?php echo esc_attr( $user ); ?>"
+					       placeholder="<?php esc_attr_e( 'username', 'activity-monitor' ); ?>" class="am-filter-input-small">
+				</div>
+
+				<div class="am-filter-group">
+					<span class="am-filter-label"><?php esc_html_e( 'From:', 'activity-monitor' ); ?></span>
+					<input type="date" name="am_from" value="<?php echo esc_attr( $date_from ); ?>">
+					<span class="am-filter-label"><?php esc_html_e( 'To:', 'activity-monitor' ); ?></span>
+					<input type="date" name="am_to" value="<?php echo esc_attr( $date_to ); ?>">
+				</div>
+
 				<div class="am-filter-group am-filter-search">
 					<input type="search" name="am_search"
 					       value="<?php echo esc_attr( $search ); ?>"
 					       placeholder="<?php esc_attr_e( 'Search message, user, object…', 'activity-monitor' ); ?>">
 					<button type="submit" class="button"><?php esc_html_e( 'Search', 'activity-monitor' ); ?></button>
-					<?php if ( $level || $initiator || $event_type || $search ) : ?>
+					<?php if ( $level || $initiator || $event_type || $action || $user || $date_from || $date_to || $search ) : ?>
 						<a href="<?php echo esc_url( $base_url ); ?>" class="button button-secondary">
 							<?php esc_html_e( 'Reset', 'activity-monitor' ); ?>
 						</a>
 					<?php endif; ?>
 				</div>
 			</form>
+
+			<div class="am-export-bar">
+				<span class="am-filter-label"><?php esc_html_e( 'Export filtered results:', 'activity-monitor' ); ?></span>
+				<?php
+				// Note: the event 'action' filter (e.g. 'created', 'deleted')
+				// is passed as am_export_action here, not 'action' -- that key
+				// is reserved by admin-post.php for its own dispatch routing
+				// (action=am_export_log) and would collide otherwise.
+				$export_filter_args = array(
+					'am_level'      => $level,
+					'am_initiator'  => $initiator,
+					'am_type'       => $event_type,
+					'am_export_action' => $action,
+					'am_user'       => $user,
+					'am_from'       => $date_from,
+					'am_to'         => $date_to,
+					'am_search'     => $search,
+				);
+				foreach ( array( 'csv' => 'CSV', 'json' => 'JSON', 'html' => 'HTML', 'txt' => 'TXT' ) as $fmt => $label ) :
+					$export_url = wp_nonce_url(
+						add_query_arg(
+							array_merge( $export_filter_args, array( 'action' => 'am_export_log', 'am_format' => $fmt ) ),
+							admin_url( 'admin-post.php' )
+						),
+						AM_Export::NONCE_ACTION
+					);
+					?>
+					<a href="<?php echo esc_url( $export_url ); ?>" class="button button-secondary button-small"><?php echo esc_html( $label ); ?></a>
+				<?php endforeach; ?>
+			</div>
 		</div>
 
 		<div class="am-table-wrap am-table-scroll">
