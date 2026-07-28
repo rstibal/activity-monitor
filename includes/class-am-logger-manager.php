@@ -29,6 +29,10 @@ class AM_Logger_Manager {
 		'AM_Logger_Passwords',
 		'AM_Logger_Sites',
 		'AM_Logger_Security',
+		'AM_Logger_Fatal_Errors',
+		'AM_Logger_File_Editor',
+		'AM_Logger_Maintenance_Mode',
+		'AM_Logger_Mail_Failures',
 		// All 13 v1.x AM_Hooks event-source callbacks are ported. AM_Hooks,
 		// AM_DB, and legacy AM_Logger have all been fully retired (dev.12
 		// through dev.14) -- the "Activity Log" admin tab now reads

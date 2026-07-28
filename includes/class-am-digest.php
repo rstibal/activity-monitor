@@ -2,20 +2,41 @@
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 /**
- * AM_Digest — scheduled email digest summarizing recent activity.
+ * AM_Digest — scheduled email digest(s) summarizing recent activity.
  *
- * Per activity-monitor-v2-spec.md §4:
- *   - Configurable frequency: daily / weekly / monthly, day-of-week
- *     picker for weekly
- *   - Recipient list (multiple), preview in-browser, send-test-email
- *   - Content: totals, top event types, notable security events, link
- *     to full log
+ * Per activity-monitor-v2-spec.md §4, extended to support MULTIPLE
+ * independent digest configs (e.g. a daily digest to one address and a
+ * separate weekly digest to another) -- originally a single
+ * frequency/day/recipients/last-sent set of scalar options, changed to
+ * a list per a later request once it became clear a single config
+ * couldn't represent "daily to ops@, weekly to owner@" at the same time.
  *
- * Settings (options):
- *   am_digest_frequency        'daily' | 'weekly' | 'monthly' | '' (off)
- *   am_digest_day_of_week      0-6 (Sunday=0), only used when weekly
- *   am_digest_recipients       comma-separated email list
- *   am_digest_last_sent        Y-m-d H:i:s UTC, set after each send
+ * Storage: am_digest_configs, an array of:
+ *   array(
+ *     'id'           => string  -- stable ID (uniqid-based), used as
+ *                                  the array key so edits/deletes/cron
+ *                                  checks target a specific config even
+ *                                  after others are added/removed
+ *     'frequency'    => 'daily' | 'weekly' | 'monthly'
+ *     'day_of_week'  => 0-6 (Sunday=0), only used when weekly
+ *     'recipients'   => comma-separated email string
+ *     'last_sent'    => Y-m-d H:i:s UTC, or '' if never sent
+ *   )
+ *
+ * Migration: the old scalar options (am_digest_frequency/
+ * am_digest_day_of_week/am_digest_recipients/am_digest_last_sent) are
+ * read once, on demand, by get_configs() if am_digest_configs doesn't
+ * exist yet -- converting any existing single config into the first
+ * entry of the new array rather than silently discarding it. The old
+ * options are left in place afterward (harmless, just unused) rather
+ * than deleted, since there's no reason to risk losing data on a
+ * migration that doesn't need to be destructive.
+ *
+ * Cron: still one single daily WP-Cron tick (there's no benefit to N
+ * separate scheduled events when the "is this one actually due today"
+ * check already has to happen per-config regardless of how many exist
+ * -- see maybe_send(), which now loops every config and sends whichever
+ * ones are due).
  */
 class AM_Digest {
 
@@ -26,10 +47,10 @@ class AM_Digest {
 	}
 
 	/**
-	 * (Re)schedule the digest cron to match the configured frequency.
-	 * Call this whenever the frequency setting changes, and once on
-	 * plugin load to catch a setting that was changed while the cron
-	 * event coincidentally didn't fire.
+	 * Ensures the daily cron tick is scheduled whenever at least one
+	 * config exists. Call this after any config is added, and once on
+	 * plugin load to catch a config that was added while the cron event
+	 * coincidentally didn't fire.
 	 */
 	public static function reschedule() {
 		$existing = wp_next_scheduled( self::CRON_HOOK );
@@ -37,16 +58,16 @@ class AM_Digest {
 			wp_unschedule_event( $existing, self::CRON_HOOK );
 		}
 
-		$frequency = get_option( 'am_digest_frequency', '' );
-		if ( '' === $frequency ) {
-			return; // Digest disabled.
+		if ( empty( self::get_configs() ) ) {
+			return; // No digests configured at all.
 		}
 
 		// All frequencies check daily and self-limit via last-sent
-		// comparison in maybe_send() -- this avoids WP-Cron's built-in
+		// comparison in is_due() -- this avoids WP-Cron's built-in
 		// schedules not offering a native 'monthly' recurrence, and
-		// keeps the "day of week" setting meaningful for weekly without
-		// fighting cron's own day-of-week scheduling.
+		// keeps "day of week" meaningful for weekly without fighting
+		// cron's own day-of-week scheduling. One tick serves every
+		// config; each is checked independently in maybe_send().
 		wp_schedule_event( self::next_daily_check_time(), 'daily', self::CRON_HOOK );
 	}
 
@@ -63,31 +84,28 @@ class AM_Digest {
 	}
 
 	/**
-	 * Cron callback -- checks whether a digest is actually due (per the
-	 * configured frequency and last-sent time) before sending, since the
-	 * underlying cron event always fires daily regardless of frequency.
+	 * Cron callback -- checks every configured digest independently and
+	 * sends whichever ones are actually due, since the underlying cron
+	 * event fires once daily regardless of any individual config's
+	 * frequency.
 	 */
 	public static function maybe_send() {
-		$frequency = get_option( 'am_digest_frequency', '' );
-		if ( '' === $frequency ) {
-			return;
+		foreach ( self::get_configs() as $config ) {
+			if ( self::is_due( $config ) ) {
+				self::send( $config['id'] );
+			}
 		}
-
-		if ( ! self::is_due( $frequency ) ) {
-			return;
-		}
-
-		self::send();
 	}
 
-	private static function is_due( string $frequency ): bool {
-		$last_sent = get_option( 'am_digest_last_sent', '' );
+	private static function is_due( array $config ): bool {
+		$last_sent = $config['last_sent'] ?? '';
 		if ( '' === $last_sent ) {
 			return true; // Never sent -- send now regardless of frequency.
 		}
 
 		$last_sent_ts = strtotime( $last_sent . ' UTC' );
 		$now          = time();
+		$frequency    = $config['frequency'] ?? '';
 
 		switch ( $frequency ) {
 			case 'daily':
@@ -96,7 +114,7 @@ class AM_Digest {
 				if ( ( $now - $last_sent_ts ) < WEEK_IN_SECONDS ) {
 					return false;
 				}
-				$configured_day = absint( get_option( 'am_digest_day_of_week', 1 ) ); // Default Monday.
+				$configured_day = absint( $config['day_of_week'] ?? 1 ); // Default Monday.
 				$offset_seconds = (int) round( (float) get_option( 'gmt_offset', 0 ) * HOUR_IN_SECONDS );
 				$today_local    = (int) gmdate( 'w', $now + $offset_seconds );
 				return $today_local === $configured_day;
@@ -124,15 +142,108 @@ class AM_Digest {
 		}
 	}
 
-	/** Send the digest now, to the configured recipients, and record the send time. */
-	public static function send(): bool {
-		$frequency  = get_option( 'am_digest_frequency', 'weekly' );
-		$recipients = self::get_recipients();
+	/**
+	 * All configured digests. Migrates the old single-config scalar
+	 * options into the new array format on first access if
+	 * am_digest_configs doesn't exist yet -- see class doc.
+	 *
+	 * @return array<int, array{id:string, frequency:string, day_of_week:int, recipients:string, last_sent:string}>
+	 */
+	public static function get_configs(): array {
+		$configs = get_option( 'am_digest_configs', null );
+		if ( is_array( $configs ) ) {
+			return array_values( $configs );
+		}
+
+		// Not yet migrated -- check for a pre-existing single config
+		// under the old option names and carry it forward as-is rather
+		// than starting empty and silently dropping someone's existing
+		// digest setup.
+		$old_frequency = get_option( 'am_digest_frequency', '' );
+		if ( '' === $old_frequency ) {
+			update_option( 'am_digest_configs', array() );
+			return array();
+		}
+
+		$migrated = array(
+			array(
+				'id'          => 'digest_' . uniqid(),
+				'frequency'   => $old_frequency,
+				'day_of_week' => absint( get_option( 'am_digest_day_of_week', 1 ) ),
+				'recipients'  => (string) get_option( 'am_digest_recipients', '' ),
+				'last_sent'   => (string) get_option( 'am_digest_last_sent', '' ),
+			),
+		);
+		update_option( 'am_digest_configs', $migrated );
+		return $migrated;
+	}
+
+	public static function get_config( string $id ): ?array {
+		foreach ( self::get_configs() as $config ) {
+			if ( $config['id'] === $id ) {
+				return $config;
+			}
+		}
+		return null;
+	}
+
+	private static function save_configs( array $configs ) {
+		update_option( 'am_digest_configs', array_values( $configs ) );
+	}
+
+	/** Adds a new digest config and returns its generated id. */
+	public static function add_config( string $frequency, int $day_of_week, string $recipients ): string {
+		$configs = self::get_configs();
+		$id      = 'digest_' . uniqid();
+		$configs[] = array(
+			'id'          => $id,
+			'frequency'   => $frequency,
+			'day_of_week' => $day_of_week,
+			'recipients'  => $recipients,
+			'last_sent'   => '',
+		);
+		self::save_configs( $configs );
+		self::reschedule();
+		return $id;
+	}
+
+	/** Updates an existing config's settings in place, preserving its last_sent history. */
+	public static function update_config( string $id, string $frequency, int $day_of_week, string $recipients ): bool {
+		$configs = self::get_configs();
+		foreach ( $configs as $i => $config ) {
+			if ( $config['id'] === $id ) {
+				$configs[ $i ]['frequency']   = $frequency;
+				$configs[ $i ]['day_of_week'] = $day_of_week;
+				$configs[ $i ]['recipients']  = $recipients;
+				self::save_configs( $configs );
+				self::reschedule();
+				return true;
+			}
+		}
+		return false;
+	}
+
+	public static function delete_config( string $id ) {
+		$configs = array_values( array_filter( self::get_configs(), function ( $c ) use ( $id ) {
+			return $c['id'] !== $id;
+		} ) );
+		self::save_configs( $configs );
+		self::reschedule();
+	}
+
+	/** Send one specific configured digest now, and record its send time. */
+	public static function send( string $config_id ): bool {
+		$config = self::get_config( $config_id );
+		if ( ! $config ) {
+			return false;
+		}
+
+		$recipients = self::get_recipients( $config['recipients'] );
 		if ( empty( $recipients ) ) {
 			return false;
 		}
 
-		$html = self::build_html( $frequency );
+		$html = self::build_html( $config['frequency'] );
 		$site = wp_strip_all_tags( get_bloginfo( 'name' ) );
 
 		$sent = wp_mail(
@@ -144,20 +255,31 @@ class AM_Digest {
 		);
 
 		if ( $sent ) {
-			update_option( 'am_digest_last_sent', current_time( 'mysql', true ) );
+			$configs = self::get_configs();
+			foreach ( $configs as $i => $c ) {
+				if ( $c['id'] === $config_id ) {
+					$configs[ $i ]['last_sent'] = current_time( 'mysql', true );
+					break;
+				}
+			}
+			self::save_configs( $configs );
 		}
 
 		return $sent;
 	}
 
-	/** Send a test digest to one address, without affecting the last-sent timestamp. */
-	public static function send_test( string $to_email ): bool {
+	/**
+	 * Send a test digest to one address using a given frequency (not
+	 * tied to any stored config -- a test picks its own frequency
+	 * ad-hoc in the modal), without affecting any config's last-sent
+	 * timestamp.
+	 */
+	public static function send_test( string $to_email, string $frequency = 'weekly' ): bool {
 		if ( ! is_email( $to_email ) ) {
 			return false;
 		}
-		$frequency = get_option( 'am_digest_frequency', 'weekly' );
-		$html      = self::build_html( $frequency, true );
-		$site      = wp_strip_all_tags( get_bloginfo( 'name' ) );
+		$html = self::build_html( $frequency, true );
+		$site = wp_strip_all_tags( get_bloginfo( 'name' ) );
 
 		return wp_mail(
 			$to_email,
@@ -168,8 +290,7 @@ class AM_Digest {
 		);
 	}
 
-	private static function get_recipients(): array {
-		$raw = get_option( 'am_digest_recipients', '' );
+	private static function get_recipients( string $raw ): array {
 		return array_filter( array_map( 'trim', explode( ',', $raw ) ), 'is_email' );
 	}
 
@@ -222,7 +343,7 @@ class AM_Digest {
 			<table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
 				<?php foreach ( $by_type as $type => $count ) : ?>
 				<tr>
-					<td style="padding: 6px 0; border-bottom: 1px solid #f0f0f1;"><code><?php echo esc_html( $type ); ?></code></td>
+					<td style="padding: 6px 0; border-bottom: 1px solid #f0f0f1;"><?php echo esc_html( AM_Event_Labels::type_label( $type ) ); ?></td>
 					<td style="padding: 6px 0; border-bottom: 1px solid #f0f0f1; text-align: right;"><?php echo esc_html( number_format_i18n( $count ) ); ?></td>
 				</tr>
 				<?php endforeach; ?>

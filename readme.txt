@@ -1,10 +1,10 @@
 === Activity Monitor ===
 Contributors: rstibal
-Tags: activity log, audit log, security, user activity, session management
+Tags: activity log, audit log, security, user activity, page traffic
 Requires at least: 5.3
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.0.0
+Stable tag: 2.0.73
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -20,6 +20,7 @@ Activity Monitor is a WordPress audit log plugin that records what happens on yo
 * Content: posts, pages, and custom post types (with before/after change details), media uploads and edits, comments, categories and tags, navigation menus, widgets
 * Site management: plugin activation/deactivation/updates/deletion, theme switches and updates, Customizer saves, WordPress core updates
 * Security: unauthorized access attempts to restricted admin pages, multisite site creation and deletion
+* Site health: PHP fatal errors, theme/plugin file editor use, maintenance mode, and failed outgoing email
 
 = Noise control, not noise =
 
@@ -29,15 +30,19 @@ Repeated events (a burst of failed logins, rapid comment status churn) are autom
 
 See every active login session across your site, revoke individual sessions, set a limit on how many concurrent sessions a user can hold, or lock the site down immediately by terminating every session except your own.
 
-= Stats, digests, and exports =
+= Page traffic =
 
-* A Stats & Insights screen shows activity trends, your busiest day and hour, top event types, and your most active users
-* An optional scheduled email digest (daily, weekly, or monthly) summarizes recent activity and flags anything at warning level or above
+Optional, self-hosted page-view tracking with no third-party service and no cookies: per-page views and unique visitors, a live feed of hits as they arrive, top pages, and a traffic-source breakdown (direct, search, social, referral, internal). Raw hits are rolled up daily and pruned on a retention schedule you set, so the tables stay small on busy sites.
+
+= Dashboard, digests, and exports =
+
+* A Dashboard shows totals and trends at a glance: daily activity stacked by severity, peak activity, pages needing attention, top pages, and where your traffic came from
+* An optional scheduled email digest (daily, weekly, or monthly) summarizes recent activity and flags anything at warning level or above. Multiple digests can be configured independently, each with its own schedule and recipients
 * Export the log — filtered by date range, user, event type, or action — as CSV, JSON, HTML, or plain text
 
-= Email alerts =
+= Alerts =
 
-Configure one or more email channels, each with its own minimum severity threshold, to get notified the moment something notable happens.
+Configure one or more notification channels — email or Slack — each with its own minimum severity threshold, to get notified the moment something notable happens.
 
 == Installation ==
 
@@ -65,11 +70,25 @@ Yes, retention is configurable and old entries are pruned automatically on a dai
 
 == Screenshots ==
 
-1. The Activity Log screen, with filtering by level, initiator, event type, user, and date range.
-2. Stats & Insights: activity trends, busiest times, and top event types.
-3. Active Sessions, with per-session revoke and site-wide emergency lockdown.
+1. The Dashboard: daily activity by severity, peak activity, top pages, and traffic sources.
+2. The Activity Log screen, with filtering by level, initiator, event type, and date range.
+3. Page traffic, with a live feed of incoming hits.
+4. Active Sessions, with per-session revoke and site-wide emergency lockdown.
 
 == Changelog ==
+
+= 2.0.73 =
+* Added: page traffic tracking — per-page views and unique visitors, a live feed, top pages, and a traffic-source breakdown (direct / search / social / referral / internal), with its own daily rollup and retention setting.
+* Added: Dashboard replacing the Stats & Insights screen — daily activity stacked by severity level, peak activity, a "needs attention" count, top pages, and traffic sources.
+* Added: new loggers for PHP fatal errors, theme/plugin file editor use, maintenance mode, and failed outgoing email (a wp_mail() failure is no longer invisible).
+* Added: a Date & Time Display setting controlling how timestamps are shown throughout the plugin.
+* Added: clickable usernames in the activity log, opening a profile card with the user's role, registration date, logged event count, and last activity.
+* Added: an event Type column, and readable event names throughout — the filter now offers both whole categories and specific events.
+* Restored: Slack notification channels, removed during the 2.0.0 rewrite.
+* Changed: email digests can now be configured as multiple independent schedules rather than a single global one.
+* Fixed: page view totals showed zero for today and yesterday, because the daily rollup only ever processes completed days.
+* Fixed: filtering or exporting by an event type carried over from a pre-2.0 install matched nothing.
+* Fixed: notification sends were never checked for failure.
 
 = 2.0.0 =
 * Complete rewrite: new database schema (events + structured context, replacing a single wide table), a pluggable per-source logger architecture, and full event-type parity with the previous version.
@@ -88,6 +107,9 @@ Yes, retention is configurable and old entries are pruned automatically on a dai
 * Initial internal release.
 
 == Upgrade Notice ==
+
+= 2.0.73 =
+Adds page traffic tracking (off until enabled in Settings) and replaces Stats & Insights with a Dashboard. Slack notification channels are available again.
 
 = 2.0.0 =
 Major rewrite with a new database schema. Existing log data is migrated automatically and non-destructively on activation; nothing is deleted. Slack notifications are removed — reconfigure any alerting using email channels.

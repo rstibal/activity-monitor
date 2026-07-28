@@ -149,13 +149,25 @@ class AM_Schema {
 			4 => 'critical',
 		);
 
+		// v1.x only stored user_login (as 'user_name'), never the real
+		// display name. Look it up from user_id where possible so
+		// migrated rows show the same real name as events logged after
+		// the v2.0 upgrade, rather than silently duplicating the login.
+		$display_name = $row['user_name'];
+		if ( ! empty( $row['user_id'] ) ) {
+			$user = get_userdata( (int) $row['user_id'] );
+			if ( $user ) {
+				$display_name = $user->display_name;
+			}
+		}
+
 		$wpdb->insert( $events_table, array(
 			'date'              => $row['created_at'],
 			'level'             => $level_map[ (int) $row['severity'] ] ?? 'notice',
 			'initiator'         => 'wp_user', // v1.x didn't track this distinctly; safe default.
 			'user_id'           => absint( $row['user_id'] ),
 			'user_login'        => $row['user_name'],
-			'user_display_name' => $row['user_name'],
+			'user_display_name' => $display_name,
 			'user_role'         => $row['user_role'],
 			'ip_address'        => $row['ip_address'],
 			'event_type'        => $row['event_type'],
