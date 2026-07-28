@@ -47,6 +47,16 @@ class AM_Event_Writer {
 			'object_name' => '',
 			'context'     => array(),
 			'group'       => true,
+			// Set true only when logging a notification-delivery failure
+			// itself (see AM_Notifications::log_slack_failure and
+			// AM_Logger_Mail_Failures) -- without this, a failing
+			// channel logging its own failure could re-trigger
+			// maybe_notify() on the very same (still-failing) channel,
+			// which logs another failure, which triggers another
+			// attempt, and so on for every event that would otherwise
+			// have notified. Every other caller leaves this at the
+			// default false and behaves exactly as before.
+			'skip_notify' => false,
 		);
 		$args = wp_parse_args( $args, $defaults );
 
@@ -100,7 +110,7 @@ class AM_Event_Writer {
 		// on genuine new-row inserts only (an occasion-grouped repeat
 		// returns early above and never reaches this point, so a
 		// brute-force burst doesn't spam a notification per attempt).
-		if ( $event_id ) {
+		if ( $event_id && ! $args['skip_notify'] ) {
 			AM_Notifications::maybe_notify(
 				$row['level'],
 				$row['event_type'],

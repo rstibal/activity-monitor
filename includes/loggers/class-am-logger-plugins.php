@@ -91,12 +91,47 @@ class AM_Logger_Plugins extends AM_Logger_Base {
 	}
 
 	/**
-	 * Only handles the plugin-update branch. Theme and core branches are
-	 * intentionally left to the legacy AM_Hooks::on_upgrader_complete()
-	 * until AM_Logger_Themes exists — see class doc.
+	 * Handles both the plugin-update branch (existing) and, as of this
+	 * change, the plugin-install branch. Theme and core branches are
+	 * intentionally left to AM_Logger_Themes / AM_Logger_Core.
+	 *
+	 * The install and update branches use different shapes: update
+	 * provides $data['plugins'] (an array, since bulk updates are
+	 * possible); a fresh single-plugin install provides no such key at
+	 * all -- the installed plugin's identity has to be read from
+	 * $upgrader->plugin_info(), which WP core itself uses for this
+	 * exact purpose (see Plugin_Upgrader::plugin_info() -- resolves
+	 * $upgrader->result['destination_name'] to the actual main plugin
+	 * file via get_plugins()).
 	 */
 	public function on_upgrader_complete( $upgrader, array $data ) {
-		if ( empty( $data['type'] ) || 'plugin' !== $data['type'] || empty( $data['plugins'] ) ) {
+		if ( empty( $data['type'] ) || 'plugin' !== $data['type'] ) {
+			return;
+		}
+
+		if ( 'install' === ( $data['action'] ?? '' ) ) {
+			$plugin = ( $upgrader instanceof Plugin_Upgrader ) ? $upgrader->plugin_info() : false;
+			if ( ! $plugin ) {
+				return;
+			}
+			$this->log(
+				'plugin',
+				'installed',
+				sprintf(
+					/* translators: %s: plugin file path */
+					__( 'Plugin "%s" installed.', 'activity-monitor' ),
+					$plugin
+				),
+				array(
+					'level'       => AM_Log_Levels::NOTICE,
+					'object_type' => 'plugin',
+					'object_name' => $plugin,
+				)
+			);
+			return;
+		}
+
+		if ( empty( $data['plugins'] ) ) {
 			return;
 		}
 

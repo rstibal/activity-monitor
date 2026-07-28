@@ -3,7 +3,7 @@
  * Plugin Name: Activity Monitor
  * Plugin URI:  https://robstibal.com
  * Description: Comprehensive WordPress audit log – tracks logins, content changes, settings updates, security events, and more.
- * Version:     2.0.0-dev.17
+ * Version:     2.0.73
  * Author:      Rob Stibal
  * Author URI:  http://robstibal.com
  * License:     GPL v2 or later
@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'AM_VERSION', '2.0.0-dev.17' );
+define( 'AM_VERSION', '2.0.73' );
 define( 'AM_FILE',    __FILE__ );
 define( 'AM_DIR',     plugin_dir_path( __FILE__ ) );
 define( 'AM_URL',     plugin_dir_url( __FILE__ ) );
@@ -34,11 +34,17 @@ define( 'AM_URL',     plugin_dir_url( __FILE__ ) );
 // the first place, since there's no legacy admin screen left that reads
 // from it. See activity-monitor-v2-spec.md §9.
 require_once AM_DIR . 'includes/schema/class-am-schema.php';
+require_once AM_DIR . 'includes/schema/class-am-traffic-schema.php';
 require_once AM_DIR . 'includes/class-am-db-legacy-ip.php';
 require_once AM_DIR . 'includes/class-am-log-levels.php';
+require_once AM_DIR . 'includes/class-am-date-format.php';
+require_once AM_DIR . 'includes/class-am-event-labels.php';
 require_once AM_DIR . 'includes/class-am-initiator-detector.php';
 require_once AM_DIR . 'includes/class-am-event-writer.php';
 require_once AM_DIR . 'includes/class-am-event-query.php';
+require_once AM_DIR . 'includes/class-am-traffic.php';
+require_once AM_DIR . 'includes/class-am-traffic-query.php';
+require_once AM_DIR . 'includes/class-am-traffic-rollup.php';
 require_once AM_DIR . 'includes/class-am-sessions.php';
 require_once AM_DIR . 'includes/class-am-notifications.php';
 require_once AM_DIR . 'includes/class-am-digest.php';
@@ -57,29 +63,38 @@ require_once AM_DIR . 'includes/loggers/class-am-logger-widgets.php';
 require_once AM_DIR . 'includes/loggers/class-am-logger-passwords.php';
 require_once AM_DIR . 'includes/loggers/class-am-logger-sites.php';
 require_once AM_DIR . 'includes/loggers/class-am-logger-security.php';
+require_once AM_DIR . 'includes/loggers/class-am-logger-fatal-errors.php';
+require_once AM_DIR . 'includes/loggers/class-am-logger-file-editor.php';
+require_once AM_DIR . 'includes/loggers/class-am-logger-maintenance-mode.php';
+require_once AM_DIR . 'includes/loggers/class-am-logger-mail-failures.php';
 require_once AM_DIR . 'includes/class-am-logger-manager.php';
 require_once AM_DIR . 'admin/class-am-admin.php';
 
 // ── Activation / deactivation ────────────────────────────────────────────
 register_activation_hook( AM_FILE, array( 'AM_Schema', 'install' ) );
+register_activation_hook( AM_FILE, array( 'AM_Traffic_Schema', 'install' ) );
 // No deactivation cleanup needed -- v2.0 data is intentionally kept on
 // deactivation (only uninstall.php removes it), same policy v1.x had.
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────
 function am_init() {
 	AM_Schema::maybe_upgrade();
+	AM_Traffic_Schema::maybe_upgrade();
 	AM_Logger_Manager::init();
+	AM_Traffic::init();
 	AM_Admin::init();
 	AM_Digest::init();
 
 	// Cheap idempotent check -- wp_next_scheduled() is a single option
-	// read, so safe on every load. Ensures a frequency change from the
-	// settings form (which already calls reschedule() directly) is also
-	// caught if the option was ever changed by any other means (WP-CLI,
+	// read, so safe on every load. Ensures a config change from the
+	// settings modal (which already calls reschedule() directly) is
+	// also caught if it was ever changed by any other means (WP-CLI,
 	// direct DB edit, etc.).
-	if ( ! wp_next_scheduled( AM_Digest::CRON_HOOK ) && get_option( 'am_digest_frequency', '' ) !== '' ) {
+	if ( ! wp_next_scheduled( AM_Digest::CRON_HOOK ) && ! empty( AM_Digest::get_configs() ) ) {
 		AM_Digest::reschedule();
 	}
+
+	AM_Traffic_Rollup::reschedule();
 }
 add_action( 'plugins_loaded', 'am_init' );
 
@@ -103,3 +118,6 @@ function am_run_prune() {
 	AM_Schema::prune( absint( get_option( 'am_retention_days', 90 ) ) );
 }
 add_action( 'am_log_prune', 'am_run_prune' );
+
+// ── Traffic rollup + retention cron ──────────────────────────────────────
+add_action( AM_Traffic_Rollup::CRON_HOOK, array( 'AM_Traffic_Rollup', 'run' ) );

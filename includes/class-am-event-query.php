@@ -48,8 +48,12 @@ class AM_Event_Query {
 			$values[] = $args['initiator'];
 		}
 		if ( '' !== $args['event_type'] ) {
+			// Not sanitize_key() here: that strips dots, and rows migrated
+			// from v1.x can hold a dotted slug in this column (e.g.
+			// 'post.delete'). Stripping would silently turn the filter
+			// into a search for 'postdelete' and match nothing.
 			$where[]  = 'event_type = %s';
-			$values[] = sanitize_key( $args['event_type'] );
+			$values[] = preg_replace( '/[^a-z0-9_.\-]/', '', strtolower( $args['event_type'] ) );
 		}
 		if ( '' !== $args['action'] ) {
 			$where[]  = 'action = %s';
@@ -119,11 +123,30 @@ class AM_Event_Query {
 		return $context;
 	}
 
-	public static function get_event_types(): array {
+	/**
+	 * Distinct event_type + action pairs present in the log, for the
+	 * Activity Log's Type filter, which uses them to offer both whole
+	 * categories ("Media") and the specific events within them
+	 * ("Media Uploaded").
+	 *
+	 * Rows migrated from v1.x have an empty action (see AM_Schema's
+	 * migrate_legacy_row()), so those come back as a single pair with
+	 * action = '' -- for them the category and the specific event are
+	 * the same thing, and the caller renders one option rather than a
+	 * group.
+	 *
+	 * @return array<array{event_type:string, action:string}>
+	 */
+	public static function get_event_type_actions(): array {
 		global $wpdb;
 		$table = $wpdb->prefix . AM_Schema::EVENTS_TABLE;
 		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant.
-		return $wpdb->get_col( "SELECT DISTINCT event_type FROM `{$table}` ORDER BY event_type ASC" );
+		return $wpdb->get_results(
+			"SELECT DISTINCT event_type, action
+			 FROM `{$table}`
+			 ORDER BY event_type ASC, action ASC",
+			ARRAY_A
+		);
 	}
 
 	/** Row count in am_events — used to distinguish "no events yet" from "no v2.0 loggers active yet". */
@@ -134,7 +157,7 @@ class AM_Event_Query {
 		return (int) $wpdb->get_var( "SELECT COUNT(*) FROM `{$table}`" );
 	}
 
-	// ── Stats & Insights (spec §4) ────────────────────────────────────────
+	// ── Dashboard (formerly "Stats & Insights", spec §4) ──────────────────
 	//
 	// All stats methods take $days (7/14/30 typical) and query only
 	// am_events -- none of this needs am_event_context. Each returns plain
@@ -205,6 +228,49 @@ class AM_Event_Query {
 	}
 
 	/**
+	 * Same window and zero-filling as get_daily_trend() above, but split
+	 * by level so the Dashboard's Daily activity chart can render each
+	 * day as a stacked column instead of a single-value bar.
+	 *
+	 * Every day is filled with every level (including zeros), so callers
+	 * can iterate AM_Log_Levels::ORDER without existence checks and the
+	 * stack segments stay in a consistent order across days. The daily
+	 * total is just array_sum() of a day's row, so callers needing both
+	 * the stack and the total only need this one query.
+	 *
+	 * @return array<string, array<string, int>> 'Y-m-d' => level => count
+	 */
+	public static function get_daily_trend_by_level( int $days ): array {
+		global $wpdb;
+		$table = $wpdb->prefix . AM_Schema::EVENTS_TABLE;
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant.
+		$rows = $wpdb->get_results( $wpdb->prepare(
+			"SELECT DATE(date) AS day, level, COUNT(*) AS total
+			 FROM `{$table}`
+			 WHERE date >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL %d DAY)
+			 GROUP BY DATE(date), level
+			 ORDER BY day ASC",
+			$days
+		), ARRAY_A );
+
+		$by_day = array();
+		foreach ( $rows as $row ) {
+			$by_day[ $row['day'] ][ $row['level'] ] = (int) $row['total'];
+		}
+
+		$trend = array();
+		for ( $i = $days - 1; $i >= 0; $i-- ) {
+			$date            = gmdate( 'Y-m-d', strtotime( "-{$i} days" ) );
+			$trend[ $date ]  = array();
+			foreach ( AM_Log_Levels::ORDER as $level ) {
+				$trend[ $date ][ $level ] = $by_day[ $date ][ $level ] ?? 0;
+			}
+		}
+		return $trend;
+	}
+
+	/**
 	 * Event counts grouped by event_type, descending, for the last $days.
 	 *
 	 * @return array<string, int> event_type => count
@@ -228,6 +294,72 @@ class AM_Event_Query {
 		$out = array();
 		foreach ( $rows as $row ) {
 			$out[ $row['event_type'] ] = (int) $row['total'];
+		}
+		return $out;
+	}
+
+	/**
+	 * Event counts grouped by level for the last $days. Zero-filled for
+	 * every AM_Log_Levels::ORDER value (not just ones that occurred) so
+	 * a chart built from this always shows the same complete set of
+	 * bars/segments in a consistent order, rather than the set shifting
+	 * around depending on what happened to log in the period.
+	 *
+	 * @return array<string, int> level => count, in AM_Log_Levels::ORDER
+	 */
+	public static function get_breakdown_by_level( int $days ): array {
+		global $wpdb;
+		$table = $wpdb->prefix . AM_Schema::EVENTS_TABLE;
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant.
+		$rows = $wpdb->get_results( $wpdb->prepare(
+			"SELECT level, COUNT(*) AS total
+			 FROM `{$table}`
+			 WHERE date >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL %d DAY)
+			 GROUP BY level",
+			$days
+		), ARRAY_A );
+
+		$counts = array();
+		foreach ( $rows as $row ) {
+			$counts[ $row['level'] ] = (int) $row['total'];
+		}
+
+		$out = array();
+		foreach ( AM_Log_Levels::ORDER as $level ) {
+			$out[ $level ] = $counts[ $level ] ?? 0;
+		}
+		return $out;
+	}
+
+	/**
+	 * Event counts grouped by initiator for the last $days. Zero-filled
+	 * for every AM_Initiator_Detector::all() value, same reasoning as
+	 * get_breakdown_by_level() above.
+	 *
+	 * @return array<string, int> initiator => count
+	 */
+	public static function get_breakdown_by_initiator( int $days ): array {
+		global $wpdb;
+		$table = $wpdb->prefix . AM_Schema::EVENTS_TABLE;
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant.
+		$rows = $wpdb->get_results( $wpdb->prepare(
+			"SELECT initiator, COUNT(*) AS total
+			 FROM `{$table}`
+			 WHERE date >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL %d DAY)
+			 GROUP BY initiator",
+			$days
+		), ARRAY_A );
+
+		$counts = array();
+		foreach ( $rows as $row ) {
+			$counts[ $row['initiator'] ] = (int) $row['total'];
+		}
+
+		$out = array();
+		foreach ( AM_Initiator_Detector::all() as $initiator ) {
+			$out[ $initiator ] = $counts[ $initiator ] ?? 0;
 		}
 		return $out;
 	}
