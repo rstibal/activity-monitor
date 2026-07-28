@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, page traffic
 Requires at least: 5.3
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.0.74
+Stable tag: 2.0.75
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -76,6 +76,9 @@ Yes, retention is configurable and old entries are pruned automatically on a dai
 4. Active Sessions, with per-session revoke and site-wide emergency lockdown.
 
 == Changelog ==
+
+= 2.0.75 =
+* Changed: removed the poll-interval/feed-size explainer sentence above the Traffic tab's live feed.
 
 = 2.0.74 =
 * Fixed: the Active Sessions tab produced an "Undefined array key" warning for every row, and showed no name alongside the username. Sessions now show the user's real name where one is set, falling back to the username.

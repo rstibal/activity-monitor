@@ -2155,16 +2155,6 @@ class AM_Admin {
 			<span class="am-live-dot"></span>
 			<?php esc_html_e( 'Live traffic', 'activity-monitor' ); ?>
 		</h2>
-		<p class="am-description">
-			<?php
-			printf(
-				/* translators: 1: poll interval in seconds, 2: number of hits shown */
-				esc_html__( 'Refreshes every %1$d seconds, showing the last %2$d page views. Configurable in Settings.', 'activity-monitor' ),
-				absint( get_option( 'am_traffic_live_poll_seconds', 10 ) ),
-				absint( get_option( 'am_traffic_live_feed_limit', 25 ) )
-			);
-			?>
-		</p>
 		<div class="am-table-wrap am-table-scroll">
 			<table class="wp-list-table widefat am-log-table" id="am-live-traffic-table">
 				<thead>
