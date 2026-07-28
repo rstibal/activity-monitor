@@ -2195,10 +2195,22 @@ class AM_Admin {
 			$raw      = get_user_meta( $user->ID, 'session_tokens', true );
 			$sessions = is_array( $raw ) ? $raw : array();
 
+			// Skip before the name lookup below: most users on a site have
+			// no active session, and there's no reason to resolve a name
+			// for a row that will never be rendered.
+			if ( empty( $sessions ) ) {
+				continue;
+			}
+
+			// Resolved once per user rather than once per session, since a
+			// user can hold several at a time.
+			$name = self::real_name( $user->ID );
+
 			foreach ( $sessions as $token_hash => $session ) {
 				$sessions_data[] = array(
 					'user_id'      => $user->ID,
 					'user_login'   => $user->user_login,
+					'name'         => $name,
 					'token_hash'   => $token_hash,
 					'expiration'   => $session['expiration'] ?? 0,
 					'login'        => $session['login']      ?? 0,
@@ -2248,8 +2260,16 @@ class AM_Admin {
 					?>
 					<tr<?php echo $row_class ? ' class="' . esc_attr( $row_class ) . '"' : ''; ?>>
 						<td>
-							<strong><?php echo esc_html( $s['display_name'] ); ?></strong>
-							<small class="am-role"><?php echo esc_html( $s['user_login'] ); ?></small>
+							<?php // real_name() returns '' whenever the user never filled in
+							      // first/last name, which is common. Falling back to the
+							      // login as the primary line avoids an empty <strong> above
+							      // a lone gray username, and avoids printing the login twice. ?>
+							<?php if ( '' !== $s['name'] ) : ?>
+								<strong><?php echo esc_html( $s['name'] ); ?></strong>
+								<small class="am-role"><?php echo esc_html( $s['user_login'] ); ?></small>
+							<?php else : ?>
+								<strong><?php echo esc_html( $s['user_login'] ); ?></strong>
+							<?php endif; ?>
 							<?php if ( $is_current ) : ?>
 								<span class="am-badge am-info"><?php esc_html_e( 'You', 'activity-monitor' ); ?></span>
 							<?php endif; ?>
