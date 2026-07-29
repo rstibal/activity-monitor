@@ -51,7 +51,7 @@ class AM_Notifications {
 
 			$type = $channel['type'] ?? 'email';
 			if ( 'slack' === $type ) {
-				self::send_slack( $channel, $message );
+				self::send_slack( $channel, $message, $args['user_login'] ?? '' );
 			} else {
 				self::send_email( $channel, $level, $event_type, $action, $message, $args );
 			}
@@ -138,14 +138,27 @@ class AM_Notifications {
 	 * checked here and logged as a genuine, informative failure rather
 	 * than assumed success, which is the exact gap Slack support is
 	 * meant to close relative to email.
+	 *
+	 * The message is read as one sentence rather than "message + fields":
+	 * a " by {user} on {domain}." clause is appended after stripping the
+	 * message's own trailing period, e.g. 'File "x" uploaded.' becomes
+	 * 'File "x" uploaded by rstibal on injurylawyers.com.' System-initiated
+	 * events with no logged-in user (WP-Cron, WP-CLI, core, failed logins)
+	 * drop the "by" clause and read '... on injurylawyers.com.' instead.
 	 */
-	private static function send_slack( array $channel, string $message ) {
+	private static function send_slack( array $channel, string $message, string $user_login ) {
 		$webhook_url = trim( $channel['webhook_url'] ?? '' );
 		if ( '' === $webhook_url ) {
 			return;
 		}
 
-		$msg     = wp_strip_all_tags( (string) $message );
+		$domain = wp_strip_all_tags( (string) wp_parse_url( home_url(), PHP_URL_HOST ) );
+		$user   = wp_strip_all_tags( $user_login );
+		$suffix = ( '' !== $user )
+			? " by {$user} on {$domain}."
+			: " on {$domain}.";
+
+		$msg     = rtrim( wp_strip_all_tags( (string) $message ), '.' ) . $suffix;
 		$log_url = admin_url( 'admin.php?page=activity-monitor' );
 
 		$blocks = array(

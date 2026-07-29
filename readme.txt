@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, page traffic
 Requires at least: 5.3
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.0.79
+Stable tag: 2.0.80
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -76,6 +76,9 @@ Yes, retention is configurable and old entries are pruned automatically on a dai
 4. Active Sessions, with per-session revoke and site-wide emergency lockdown.
 
 == Changelog ==
+
+= 2.0.80 =
+* Changed: Slack alert notifications now read as one sentence — the event message is followed by "by {user} on {domain}" (or just "on {domain}" for system-initiated events with no logged-in user) instead of the bare message.
 
 = 2.0.79 =
 * Fixed: Added the missing `phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared` annotations to the Active Installs table's queries, matching the convention used elsewhere for plugin-constant table names.
