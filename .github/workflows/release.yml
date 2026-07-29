@@ -1,0 +1,36 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build plugin zip
+        run: |
+          mkdir -p build/activity-monitor
+          cp activity-monitor.php readme.txt uninstall.php build/activity-monitor/
+          cp -r admin assets includes build/activity-monitor/
+          cd build
+          zip -r ../activity-monitor.zip activity-monitor
+
+      - name: Attach zip to release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: activity-monitor.zip
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: activity-monitor
+          path: activity-monitor.zip
