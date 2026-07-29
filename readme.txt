@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, page traffic
 Requires at least: 5.3
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.0.75
+Stable tag: 2.0.76
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -76,6 +76,9 @@ Yes, retention is configurable and old entries are pruned automatically on a dai
 4. Active Sessions, with per-session revoke and site-wide emergency lockdown.
 
 == Changelog ==
+
+= 2.0.76 =
+* Changed: Slack alert notifications now show just the event message, with "View full log" linked inline at the end, instead of a header/fields card.
 
 = 2.0.75 =
 * Changed: removed the poll-interval/feed-size explainer sentence above the Traffic tab's live feed.

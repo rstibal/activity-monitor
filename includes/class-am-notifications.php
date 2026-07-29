@@ -51,7 +51,7 @@ class AM_Notifications {
 
 			$type = $channel['type'] ?? 'email';
 			if ( 'slack' === $type ) {
-				self::send_slack( $channel, $level, $event_type, $action, $message, $args );
+				self::send_slack( $channel, $message );
 			} else {
 				self::send_email( $channel, $level, $event_type, $action, $message, $args );
 			}
@@ -124,12 +124,12 @@ class AM_Notifications {
 	}
 
 	/**
-	 * Posts a formatted alert to a Slack incoming webhook. Uses Block
-	 * Kit (header + a two-column fields section) for a readable card
-	 * rather than a single wall-of-text message, with 'text' also set
-	 * as the required plain-text fallback (Slack rejects a payload
-	 * with blocks but no text, and 'text' is what shows in
-	 * notifications/previews where blocks don't render).
+	 * Posts a formatted alert to a Slack incoming webhook: just the
+	 * event message with "View full log" linked inline after its
+	 * trailing period, plus 'text' set as the required plain-text
+	 * fallback (Slack rejects a payload with blocks but no text, and
+	 * 'text' is what shows in notifications/previews where blocks
+	 * don't render).
 	 *
 	 * Unlike wp_mail(), a webhook POST gets an immediate, checkable
 	 * result: HTTP 200 means Slack accepted and posted the message;
@@ -139,52 +139,19 @@ class AM_Notifications {
 	 * than assumed success, which is the exact gap Slack support is
 	 * meant to close relative to email.
 	 */
-	private static function send_slack( array $channel, string $level, string $event_type, string $action, string $message, array $args ) {
+	private static function send_slack( array $channel, string $message ) {
 		$webhook_url = trim( $channel['webhook_url'] ?? '' );
 		if ( '' === $webhook_url ) {
 			return;
 		}
 
-		$site   = wp_strip_all_tags( get_bloginfo( 'name' ) );
-		$label  = wp_strip_all_tags( AM_Log_Levels::label( $level ) );
-		$type   = wp_strip_all_tags( $event_type . '.' . $action );
-		$user   = wp_strip_all_tags( (string) ( $args['user_login'] ?? 'unknown' ) );
-		$ip     = wp_strip_all_tags( (string) ( $args['ip_address'] ?? AM_DB_Legacy_IP::resolve() ) );
-		$msg    = wp_strip_all_tags( (string) $message );
-		$object = wp_strip_all_tags( (string) ( $args['object_name'] ?? '' ) );
+		$msg     = wp_strip_all_tags( (string) $message );
 		$log_url = admin_url( 'admin.php?page=activity-monitor' );
-
-		/* translators: 1: site name, 2: log level label */
-		$header_text = sprintf( __( '%1$s Alert – %2$s', 'activity-monitor' ), $site, $label );
-
-		$fields = array(
-			array( 'type' => 'mrkdwn', 'text' => "*Event:*\n{$type}" ),
-			array( 'type' => 'mrkdwn', 'text' => "*User:*\n{$user}" ),
-			array( 'type' => 'mrkdwn', 'text' => "*IP Address:*\n{$ip}" ),
-			array( 'type' => 'mrkdwn', 'text' => '*Time:*' . "\n" . current_time( 'Y-m-d H:i:s' ) . ' UTC' ),
-		);
-		if ( '' !== $object ) {
-			$fields[] = array( 'type' => 'mrkdwn', 'text' => "*Object:*\n{$object}" );
-		}
 
 		$blocks = array(
 			array(
-				'type' => 'header',
-				'text' => array( 'type' => 'plain_text', 'text' => $header_text, 'emoji' => true ),
-			),
-			array(
-				'type'   => 'section',
-				'fields' => $fields,
-			),
-			array(
 				'type' => 'section',
-				'text' => array( 'type' => 'mrkdwn', 'text' => "*Message:*\n{$msg}" ),
-			),
-			array(
-				'type' => 'context',
-				'elements' => array(
-					array( 'type' => 'mrkdwn', 'text' => "<{$log_url}|View full log>" ),
-				),
+				'text' => array( 'type' => 'mrkdwn', 'text' => "{$msg} <{$log_url}|View full log>" ),
 			),
 		);
 
@@ -196,7 +163,7 @@ class AM_Notifications {
 				// payload with no top-level 'text', and this is also
 				// what appears in notification previews where blocks
 				// don't render.
-				'text'   => "{$header_text}: {$type} ({$user})",
+				'text'   => "{$msg} View full log: {$log_url}",
 				'blocks' => $blocks,
 			) ),
 		) );
