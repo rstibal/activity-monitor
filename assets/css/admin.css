@@ -133,19 +133,6 @@
 	border-radius: 0 0 4px 4px;
 }
 
-.am-stats-bar {
-	display: flex;
-	gap: 24px;
-	background: #f6f7f7;
-	border: 1px solid #dcdcde;
-	border-radius: 4px;
-	padding: 10px 16px;
-	margin-bottom: 16px;
-}
-
-.am-stat { font-size: 13px; color: #50575e; }
-.am-stat strong { color: #1d2327; font-size: 18px; margin-right: 5px; }
-
 .am-filter-bar {
 	background: #f6f7f7;
 	border: 1px solid #dcdcde;
@@ -605,6 +592,24 @@
 .am-channel-add-buttons { display: flex; gap: 10px; margin: 14px 0; }
 
 .am-table-wrap .tablenav { padding: 10px 12px; border-top: 1px solid #dcdcde; }
+
+/* Top tablenav (Filters toggle + pagination): mirrors the bottom
+   tablenav's padding exactly ("same look and spacing"), just divides
+   from the table below it rather than above, and lays its two
+   children out at opposite ends of the row. */
+.am-table-wrap .tablenav.top {
+	border-top: none;
+	border-bottom: 1px solid #dcdcde;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	flex-wrap: wrap;
+	gap: 12px;
+}
+
+#am-filter-toggle { display: inline-flex; align-items: center; gap: 6px; }
+.am-filter-toggle-caret { font-size: 10px; transition: transform 0.15s; }
+#am-filter-toggle[aria-expanded="true"] .am-filter-toggle-caret { transform: rotate(180deg); }
 
 /* Pagination -- paginate_links() is WP core's own function; every link
    and the current-page indicator get class="page-numbers" (confirmed

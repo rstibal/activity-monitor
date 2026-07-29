@@ -1374,14 +1374,25 @@ class AM_Admin {
 		foreach ( AM_Initiator_Detector::all() as $init ) {
 			$initiator_options[ $init ] = AM_Initiator_Detector::label( $init );
 		}
+		$pagination_html = '';
+		if ( $num_pages > 1 ) {
+			$pagination_html = wp_kses_post( paginate_links( array(
+				'base'      => add_query_arg( 'paged', '%#%' ),
+				'format'    => '',
+				'prev_text' => '&laquo;',
+				'next_text' => '&raquo;',
+				'total'     => $num_pages,
+				'current'   => $page,
+			) ) );
+		}
+		// Built once and reused in both the top and bottom tablenav rows,
+		// same as $pagination_html above -- avoids two copies of the same
+		// _n()/number_format_i18n() call drifting apart.
+		$displaying_num_html = sprintf(
+			esc_html( _n( '%s item', '%s items', $total, 'activity-monitor' ) ),
+			number_format_i18n( $total )
+		);
 		?>
-
-		<div class="am-stats-bar">
-			<span class="am-stat">
-				<strong><?php echo esc_html( number_format( $total ) ); ?></strong>
-				<?php esc_html_e( 'Total Events', 'activity-monitor' ); ?>
-			</span>
-		</div>
 
 		<?php if ( 0 === AM_Event_Query::total_count() ) : ?>
 			<div class="notice notice-info inline">
@@ -1391,7 +1402,7 @@ class AM_Admin {
 			</div>
 		<?php endif; ?>
 
-		<div class="am-filter-bar">
+		<div class="am-filter-bar" id="am-filter-panel" hidden>
 			<form method="get" action="">
 				<input type="hidden" name="page" value="activity-monitor">
 				<input type="hidden" name="<?php echo esc_attr( self::TAB_PARAM ); ?>" value="log">
@@ -1513,6 +1524,20 @@ class AM_Admin {
 		</div>
 
 		<div class="am-table-wrap am-table-scroll">
+			<div class="tablenav top">
+				<button type="button" class="button" id="am-filter-toggle"
+				        aria-expanded="false" aria-controls="am-filter-panel">
+					<?php esc_html_e( 'Filters', 'activity-monitor' ); ?>
+					<span class="am-filter-toggle-caret" aria-hidden="true">&#9662;</span>
+				</button>
+				<?php if ( $num_pages > 1 ) : ?>
+				<div class="tablenav-pages">
+					<span class="displaying-num"><?php echo $displaying_num_html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- built via esc_html() above. ?></span>
+					<?php echo $pagination_html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- already wp_kses_post()'d above. ?>
+				</div>
+				<?php endif; ?>
+			</div>
+
 			<?php if ( empty( $items ) ) : ?>
 				<div class="am-empty">
 					<span class="dashicons dashicons-info-outline"></span>
@@ -1564,22 +1589,8 @@ class AM_Admin {
 			<?php if ( $num_pages > 1 ) : ?>
 			<div class="tablenav bottom">
 				<div class="tablenav-pages">
-					<span class="displaying-num">
-						<?php printf(
-							esc_html( _n( '%s item', '%s items', $total, 'activity-monitor' ) ),
-							number_format_i18n( $total )
-						); ?>
-					</span>
-					<?php
-					echo wp_kses_post( paginate_links( array(
-						'base'      => add_query_arg( 'paged', '%#%' ),
-						'format'    => '',
-						'prev_text' => '&laquo;',
-						'next_text' => '&raquo;',
-						'total'     => $num_pages,
-						'current'   => $page,
-					) ) );
-					?>
+					<span class="displaying-num"><?php echo $displaying_num_html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- built via esc_html() above. ?></span>
+					<?php echo $pagination_html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- already wp_kses_post()'d above. ?>
 				</div>
 			</div>
 			<?php endif; ?>

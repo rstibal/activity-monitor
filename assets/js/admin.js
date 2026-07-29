@@ -129,6 +129,18 @@
 	$('#am-modal-overlay').on('click', function (e) { if (e.target === this) $(this).hide(); });
 	$(document).on('keydown', function (e) { if (e.key === 'Escape') $('#am-modal-overlay').hide(); });
 
+	/* Activity Log's Filters panel: collapsed by default (the "hidden"
+	   attribute set server-side), toggled here rather than via a plain
+	   <details>/<summary> since the toggle button lives in the top
+	   tablenav row while the panel it controls is a separate element
+	   above the table. */
+	$(document).on('click', '#am-filter-toggle', function () {
+		var $panel = $('#am-filter-panel');
+		var isOpen = !$panel.prop('hidden');
+		$panel.prop('hidden', isOpen);
+		$(this).attr('aria-expanded', String(!isOpen));
+	});
+
 	/* Notification channel management (Settings > Alerts & Reports).
 	   Add/Edit both open the shared modal, fetching its form HTML from
 	   ajax_channel_form() (server-rendered, since it needs the current
