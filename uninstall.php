@@ -19,8 +19,12 @@ global $wpdb;
 require_once __DIR__ . '/includes/schema/class-am-schema.php';
 AM_Schema::uninstall();
 
-require_once __DIR__ . '/includes/schema/class-am-installs-schema.php';
-AM_Installs_Schema::uninstall();
+// Active Installs hub feature was removed in 2.0.81; the table itself has
+// no surviving class, so it's dropped here directly rather than via
+// AM_Installs_Schema (same precedent as AM_Schema's legacy v1 table drop).
+// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant.
+$wpdb->query( "DROP TABLE IF EXISTS `{$wpdb->prefix}am_installs`" );
+delete_option( 'am_installs_db_version' );
 
 // Remaining plugin options not covered by AM_Schema::uninstall().
 delete_option( 'am_notification_channels' );
@@ -33,16 +37,6 @@ delete_option( 'am_digest_frequency' );
 delete_option( 'am_digest_day_of_week' );
 delete_option( 'am_digest_recipients' );
 delete_option( 'am_digest_last_sent' );
-
-// Active Installs hub feature options.
-delete_option( 'am_hub_enabled' );
-delete_option( 'am_hub_secret' );
-delete_option( 'am_report_enabled' );
-delete_option( 'am_report_hub_url' );
-delete_option( 'am_report_secret' );
-delete_option( 'am_report_last_status' );
-delete_option( 'am_report_last_message' );
-delete_option( 'am_report_last_attempt' );
 
 // Clear scheduled cron events.
 $timestamp = wp_next_scheduled( 'am_log_prune' );
