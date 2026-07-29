@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, page traffic
 Requires at least: 5.3
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.0.85
+Stable tag: 2.0.86
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -76,6 +76,9 @@ Yes, retention is configurable and old entries are pruned automatically on a dai
 4. Active Sessions, with per-session revoke and site-wide emergency lockdown.
 
 == Changelog ==
+
+= 2.0.86 =
+* Changed: Activity Log tab -- removed the Filters toggle button; the filters are always visible again. Moved the Search box to the top row (left-aligned, next to the pagination), which now stacks under the pagination on narrow screens instead of crowding one row.
 
 = 2.0.85 =
 * Changed: Activity Log tab — removed the Total Events stats bar, added a right-aligned pagination row above the table (matching the one below it), and made the filters collapsible behind a Filters button in that same top row, collapsed by default.

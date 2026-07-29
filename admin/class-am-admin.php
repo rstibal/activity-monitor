@@ -1402,8 +1402,8 @@ class AM_Admin {
 			</div>
 		<?php endif; ?>
 
-		<div class="am-filter-bar" id="am-filter-panel" hidden>
-			<form method="get" action="">
+		<div class="am-filter-bar">
+			<form method="get" action="" id="am-filter-form">
 				<input type="hidden" name="page" value="activity-monitor">
 				<input type="hidden" name="<?php echo esc_attr( self::TAB_PARAM ); ?>" value="log">
 				<?php if ( '' !== $user ) : ?>
@@ -1478,18 +1478,6 @@ class AM_Admin {
 					<span class="am-filter-label"><?php esc_html_e( 'To:', 'activity-monitor' ); ?></span>
 					<input type="date" name="am_to" value="<?php echo esc_attr( $date_to ); ?>">
 				</div>
-
-				<div class="am-filter-group am-filter-search">
-					<input type="search" name="am_search"
-					       value="<?php echo esc_attr( $search ); ?>"
-					       placeholder="<?php esc_attr_e( 'Search message, user, object…', 'activity-monitor' ); ?>">
-					<button type="submit" class="button"><?php esc_html_e( 'Search', 'activity-monitor' ); ?></button>
-					<?php if ( $level || $initiator || $type_filter || $action || $user || $date_from || $date_to || $search ) : ?>
-						<a href="<?php echo esc_url( $base_url ); ?>" class="button button-secondary">
-							<?php esc_html_e( 'Reset', 'activity-monitor' ); ?>
-						</a>
-					<?php endif; ?>
-				</div>
 			</form>
 
 			<div class="am-export-bar">
@@ -1525,11 +1513,17 @@ class AM_Admin {
 
 		<div class="am-table-wrap am-table-scroll">
 			<div class="tablenav top">
-				<button type="button" class="button" id="am-filter-toggle"
-				        aria-expanded="false" aria-controls="am-filter-panel">
-					<?php esc_html_e( 'Filters', 'activity-monitor' ); ?>
-					<span class="am-filter-toggle-caret" aria-hidden="true">&#9662;</span>
-				</button>
+				<div class="am-filter-group am-filter-search">
+					<input type="search" name="am_search" form="am-filter-form"
+					       value="<?php echo esc_attr( $search ); ?>"
+					       placeholder="<?php esc_attr_e( 'Search message, user, object…', 'activity-monitor' ); ?>">
+					<button type="submit" form="am-filter-form" class="button"><?php esc_html_e( 'Search', 'activity-monitor' ); ?></button>
+					<?php if ( $level || $initiator || $type_filter || $action || $user || $date_from || $date_to || $search ) : ?>
+						<a href="<?php echo esc_url( $base_url ); ?>" class="button button-secondary">
+							<?php esc_html_e( 'Reset', 'activity-monitor' ); ?>
+						</a>
+					<?php endif; ?>
+				</div>
 				<?php if ( $num_pages > 1 ) : ?>
 				<div class="tablenav-pages">
 					<span class="displaying-num"><?php echo $displaying_num_html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- built via esc_html() above. ?></span>

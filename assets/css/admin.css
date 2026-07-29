@@ -144,7 +144,6 @@
 .am-filter-bar form { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; }
 .am-filter-group { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .am-filter-label { font-size: 12px; font-weight: 600; color: #646970; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
-.am-filter-search { margin-left: auto; }
 .am-filter-search input[type="search"] { min-width: 240px; }
 
 .am-export-bar {
@@ -593,7 +592,7 @@
 
 .am-table-wrap .tablenav { padding: 10px 12px; border-top: 1px solid #dcdcde; }
 
-/* Top tablenav (Filters toggle + pagination): mirrors the bottom
+/* Top tablenav (search box + pagination): mirrors the bottom
    tablenav's padding exactly ("same look and spacing"), just divides
    from the table below it rather than above, and lays its two
    children out at opposite ends of the row. */
@@ -607,9 +606,13 @@
 	gap: 12px;
 }
 
-#am-filter-toggle { display: inline-flex; align-items: center; gap: 6px; }
-.am-filter-toggle-caret { font-size: 10px; transition: transform 0.15s; }
-#am-filter-toggle[aria-expanded="true"] .am-filter-toggle-caret { transform: rotate(180deg); }
+/* Stacks the search box under the pagination on narrow screens rather
+   than squeezing both onto one row -- same 782px breakpoint (where the
+   admin sidebar itself collapses) used by .am-chart-row/.am-pie-row
+   elsewhere in this file. */
+@media (max-width: 782px) {
+	.am-table-wrap .tablenav.top { flex-direction: column; align-items: stretch; }
+}
 
 /* Pagination -- paginate_links() is WP core's own function; every link
    and the current-page indicator get class="page-numbers" (confirmed
