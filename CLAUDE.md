@@ -125,12 +125,22 @@ There is no test suite. Before committing:
 
 ```bash
 find . -name '*.php' -print0 | xargs -0 -n1 php -l    # syntax
-phpcs --standard=WordPress .                          # escaping, nonces, prepared statements
-phpcs --standard=PHPCompatibilityWP --runtime-set testVersion 7.4- .
+composer install                                      # once, pulls phpcs + standards into vendor/
+vendor/bin/phpcs .                                     # escaping, nonces, prepared statements, 7.4 floor
 ```
 
-The PHPCompatibility run is the one that enforces the 7.4 floor — `php -l`
-against a modern binary will happily accept syntax that fatals on 7.4.
+`phpcs` auto-discovers `phpcs.xml.dist` at the repo root — no `--standard` flag
+needed. That ruleset runs `WordPress-Extra` (security/correctness) plus
+`PHPCompatibilityWP` (the check that enforces the 7.4 floor; `php -l` against
+a modern binary will happily accept syntax that fatals on 7.4) in one pass,
+with formatting/doc-block sniffs excluded — this codebase doesn't conform to
+WPCS's structured doc-block or whitespace style, and that's a style choice,
+not a defect. If a genuinely new `phpcs.xml.dist` finding is a plugin-constant
+table name interpolated into SQL text (not a placeholder), that's accepted
+project-wide; suppress it inline with
+`// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant.`
+rather than touching the ruleset, matching every other occurrence in
+`includes/`.
 
 Most sites run with `WP_DEBUG` off, which hides undefined-array-key warnings; a
 `display_name` key was read but never built in the sessions table for a long

@@ -24,6 +24,7 @@ class AM_Installs {
 		$now  = current_time( 'mysql', true );
 
 		$wpdb->query( $wpdb->prepare(
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant.
 			"INSERT INTO `{$table}` (site_url, site_url_hash, plugin_version, wp_version, php_version, last_checkin)
 			 VALUES (%s, %s, %s, %s, %s, %s)
 			 ON DUPLICATE KEY UPDATE
@@ -45,6 +46,7 @@ class AM_Installs {
 	public static function get_all() {
 		global $wpdb;
 		$table = $wpdb->prefix . AM_Installs_Schema::TABLE;
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant.
 		return $wpdb->get_results( "SELECT * FROM `{$table}` ORDER BY last_checkin DESC" );
 	}
 

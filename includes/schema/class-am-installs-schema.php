@@ -63,6 +63,7 @@ class AM_Installs_Schema {
 	public static function uninstall() {
 		global $wpdb;
 		$table = $wpdb->prefix . self::TABLE;
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant.
 		$wpdb->query( "DROP TABLE IF EXISTS `{$table}`" );
 		delete_option( self::DB_VERSION_OPTION );
 	}
