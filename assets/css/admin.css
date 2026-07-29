@@ -335,11 +335,6 @@
    ordinal ramp, which is what it isn't. The palette lives in
    --am-pie-src-* at the top of this file; see the note there.
 
-   .am-pie-solo below IS still unused -- it existed for the case where
-   Events by level had no Top pages to pair with, and Traffic source
-   has no equivalent, since it and its row partner are both inside the
-   same traffic-enabled check and disappear together.
-
    Pie + legend — SVG wedges rendered server-side in PHP, no JS or
    chart library.
    Slice fills use the --am-pie-* variables at the top of this file --
@@ -373,11 +368,6 @@
    needs to appear a second time. */
 .am-pie-legend-label { display: inline-flex; align-items: center; gap: 6px; color: #1d2327; }
 .am-pie-swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
-/* Applied to Events by level only when there's no Top pages to pair it
-   with (traffic logging disabled) -- without a cap here, .am-pie-svg's
-   width:50% would size the pie against the *full* row width instead
-   of half of it, ballooning it well past its normal paired size. */
-.am-pie-solo { max-width: 660px; }
 @media (max-width: 782px) {
 	.am-pie-row { flex-direction: column; align-items: stretch; }
 	.am-pie-svg { align-self: center; }

@@ -101,22 +101,15 @@ list of distinct `event_type` values in the database.
 
 ## Known issues
 
-1. **Timezone handling is inconsistent** and is the highest-value fix. Some call
-   sites do `strtotime( $row->date )` with no `' UTC'` suffix (Activity Log
-   table, Recent notable events) while others append it (page view modal).
-   Dates are stored UTC, so the unsuffixed ones are read as server-local and can
-   display shifted times. Decide between appending UTC everywhere or normalising
-   at read time, then apply it uniformly.
-2. Stacked chart day labels are `nowrap` and centred under ~6px columns, so at
+1. Stacked chart day labels are `nowrap` and centred under ~6px columns, so at
    30 days on a phone they overlap into a smear. Usual fix is thinning labels at
    narrow widths.
-3. No on-screen indicator when the user filter is active — the visible User
+2. No on-screen indicator when the user filter is active — the visible User
    search box was removed, but `am_user` still filters (the profile modal links
    with it) and only the Clear filters button hints that it's on.
-4. `--am-pie-*` is a misleading name now that the severity palette feeds a
+3. `--am-pie-*` is a misleading name now that the severity palette feeds a
    stacked column chart rather than a pie. `--am-level-*` would be honest.
-5. `.am-pie-solo` in `admin.css` is genuinely unused.
-6. No admin UI to toggle individual loggers, though `AM_Logger_Manager` supports
+4. No admin UI to toggle individual loggers, though `AM_Logger_Manager` supports
    it via the `am_disabled_loggers` option.
 
 ## Verifying changes

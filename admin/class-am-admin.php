@@ -1557,7 +1557,7 @@ class AM_Admin {
 						<td><span class="am-badge am-<?php echo esc_attr( $row->level ); ?>"><?php echo esc_html( AM_Log_Levels::label( $row->level ) ); ?></span></td>
 						<td class="am-type-cell" title="<?php echo esc_attr( AM_Event_Labels::raw( $row->event_type, $row->action ) ); ?>"><?php echo esc_html( AM_Event_Labels::label( $row->event_type, $row->action ) ); ?></td>
 						<td>
-							<span class="am-datetime-cell" title="<?php echo esc_attr( $row->date ); ?> UTC"><?php echo esc_html( wp_date( AM_Date_Format::combined(), strtotime( $row->date ) ) ); ?></span>
+							<span class="am-datetime-cell" title="<?php echo esc_attr( $row->date ); ?> UTC"><?php echo esc_html( wp_date( AM_Date_Format::combined(), strtotime( $row->date . ' UTC' ) ) ); ?></span>
 						</td>
 						<td><span class="am-badge am-init-<?php echo esc_attr( $row->initiator ); ?>"><?php echo esc_html( AM_Initiator_Detector::label( $row->initiator ) ); ?></span></td>
 						<td>
@@ -1800,7 +1800,7 @@ class AM_Admin {
 								<td><span class="am-badge am-<?php echo esc_attr( $row->level ); ?>"><?php echo esc_html( AM_Log_Levels::label( $row->level ) ); ?></span></td>
 								<td>
 									<span title="<?php echo esc_attr( $row->date ); ?> UTC">
-										<?php echo esc_html( wp_date( AM_Date_Format::combined(), strtotime( $row->date ) ) ); ?>
+										<?php echo esc_html( wp_date( AM_Date_Format::combined(), strtotime( $row->date . ' UTC' ) ) ); ?>
 									</span>
 								</td>
 								<td><?php echo esc_html( $row->message ); ?></td>
