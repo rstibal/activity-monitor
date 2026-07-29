@@ -48,12 +48,6 @@ class AM_Installs {
 		return $wpdb->get_results( "SELECT * FROM `{$table}` ORDER BY last_checkin DESC" );
 	}
 
-	public static function delete( $id ) {
-		global $wpdb;
-		$table = $wpdb->prefix . AM_Installs_Schema::TABLE;
-		$wpdb->delete( $table, array( 'id' => (int) $id ), array( '%d' ) );
-	}
-
 	/**
 	 * Registers this site's own row, so a hub always sees itself in its
 	 * own Active Installs list without a self-referential HTTP round trip.

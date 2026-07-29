@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, page traffic
 Requires at least: 5.3
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.0.77
+Stable tag: 2.0.78
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -76,6 +76,9 @@ Yes, retention is configurable and old entries are pruned automatically on a dai
 4. Active Sessions, with per-session revoke and site-wide emergency lockdown.
 
 == Changelog ==
+
+= 2.0.78 =
+* Changed: Active Installs tab — removed the per-row Remove action (a site simply reappears the next time it checks in, so removing it had no lasting effect), linked each Site URL to the actual site, and shortened the version column headers to Plugin/WordPress/PHP.
 
 = 2.0.77 =
 * Added: Active Installs tab — an opt-in hub feature where one site can collect periodic check-ins (site URL, plugin/WordPress/PHP versions, last check-in time) from other sites running the plugin. Configured under Settings → Multi-Site Monitoring; nothing reports anywhere unless explicitly turned on.

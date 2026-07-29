@@ -38,7 +38,6 @@ class AM_Admin {
 		add_action( 'admin_post_am_save_hub_settings',        array( $instance, 'handle_save_hub_settings' ) );
 		add_action( 'admin_post_am_regenerate_hub_secret',    array( $instance, 'handle_regenerate_hub_secret' ) );
 		add_action( 'admin_post_am_save_report_settings',     array( $instance, 'handle_save_report_settings' ) );
-		add_action( 'admin_post_am_remove_install',           array( $instance, 'handle_remove_install' ) );
 		add_action( 'admin_notices',                          array( $instance, 'show_notices' ) );
 		add_action( 'wp_ajax_am_get_v2_event_detail',         array( $instance, 'ajax_v2_event_detail' ) );
 		add_action( 'wp_ajax_am_digest_preview',              array( $instance, 'ajax_digest_preview' ) );
@@ -214,9 +213,6 @@ class AM_Admin {
 		}
 		if ( isset( $_GET['am_report_settings_saved'] ) ) {
 			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Report settings saved.', 'activity-monitor' ) . '</p></div>';
-		}
-		if ( isset( $_GET['am_install_removed'] ) ) {
-			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Install removed.', 'activity-monitor' ) . '</p></div>';
 		}
 	}
 
@@ -502,22 +498,6 @@ class AM_Admin {
 
 		wp_safe_redirect( add_query_arg(
 			array( 'page' => 'activity-monitor', self::TAB_PARAM => 'settings', 'am_report_settings_saved' => '1' ),
-			admin_url( 'admin.php' )
-		) );
-		exit;
-	}
-
-	/** Removes one row from the hub's Active Installs list. */
-	public function handle_remove_install() {
-		check_admin_referer( 'am_remove_install' );
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_die( esc_html__( 'Unauthorized.', 'activity-monitor' ) );
-		}
-
-		AM_Installs::delete( absint( $_POST['install_id'] ?? 0 ) );
-
-		wp_safe_redirect( add_query_arg(
-			array( 'page' => 'activity-monitor', self::TAB_PARAM => 'installs', 'am_install_removed' => '1' ),
 			admin_url( 'admin.php' )
 		) );
 		exit;
@@ -2449,12 +2429,11 @@ class AM_Admin {
 			<table class="wp-list-table widefat am-log-table">
 				<thead>
 					<tr>
-						<th><?php esc_html_e( 'Site URL',         'activity-monitor' ); ?></th>
-						<th><?php esc_html_e( 'Last Check-in',    'activity-monitor' ); ?></th>
-						<th><?php esc_html_e( 'Plugin Version',   'activity-monitor' ); ?></th>
-						<th><?php esc_html_e( 'WordPress Version','activity-monitor' ); ?></th>
-						<th><?php esc_html_e( 'PHP Version',      'activity-monitor' ); ?></th>
-						<th><?php esc_html_e( 'Actions',          'activity-monitor' ); ?></th>
+						<th><?php esc_html_e( 'Site URL',      'activity-monitor' ); ?></th>
+						<th><?php esc_html_e( 'Last Check-in', 'activity-monitor' ); ?></th>
+						<th><?php esc_html_e( 'Plugin',        'activity-monitor' ); ?></th>
+						<th><?php esc_html_e( 'WordPress',     'activity-monitor' ); ?></th>
+						<th><?php esc_html_e( 'PHP',           'activity-monitor' ); ?></th>
 					</tr>
 				</thead>
 				<tbody>
@@ -2467,23 +2446,11 @@ class AM_Admin {
 						$checkin_text = wp_date( AM_Date_Format::combined(), strtotime( $row->last_checkin . ' UTC' ) );
 					?>
 					<tr>
-						<td><?php echo esc_html( $row->site_url ); ?></td>
+						<td><a href="<?php echo esc_url( $row->site_url ); ?>" target="_blank" rel="noopener noreferrer"><?php echo esc_html( $row->site_url ); ?></a></td>
 						<td><?php echo esc_html( $checkin_text ); ?></td>
 						<td><?php echo esc_html( $row->plugin_version ); ?></td>
 						<td><?php echo esc_html( $row->wp_version ); ?></td>
 						<td><?php echo esc_html( $row->php_version ); ?></td>
-						<td>
-							<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>"
-							      onsubmit="return confirm('<?php esc_attr_e( 'Remove this install from the list?', 'activity-monitor' ); ?>')"
-							      style="display:inline;">
-								<?php wp_nonce_field( 'am_remove_install' ); ?>
-								<input type="hidden" name="action"     value="am_remove_install">
-								<input type="hidden" name="install_id" value="<?php echo esc_attr( $row->id ); ?>">
-								<button type="submit" class="button button-small am-btn-danger">
-									<?php esc_html_e( 'Remove', 'activity-monitor' ); ?>
-								</button>
-							</form>
-						</td>
 					</tr>
 					<?php endforeach; ?>
 				</tbody>
