@@ -3,7 +3,7 @@
  * Plugin Name: Activity Monitor
  * Plugin URI:  https://robstibal.com
  * Description: Comprehensive WordPress audit log – tracks logins, content changes, settings updates, security events, and more.
- * Version:     2.0.76
+ * Version:     2.0.77
  * Author:      Rob Stibal
  * Author URI:  http://robstibal.com
  * License:     GPL v2 or later
@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'AM_VERSION', '2.0.76' );
+define( 'AM_VERSION', '2.0.77' );
 define( 'AM_FILE',    __FILE__ );
 define( 'AM_DIR',     plugin_dir_path( __FILE__ ) );
 define( 'AM_URL',     plugin_dir_url( __FILE__ ) );
@@ -35,6 +35,7 @@ define( 'AM_URL',     plugin_dir_url( __FILE__ ) );
 // from it. See activity-monitor-v2-spec.md §9.
 require_once AM_DIR . 'includes/schema/class-am-schema.php';
 require_once AM_DIR . 'includes/schema/class-am-traffic-schema.php';
+require_once AM_DIR . 'includes/schema/class-am-installs-schema.php';
 require_once AM_DIR . 'includes/class-am-db-legacy-ip.php';
 require_once AM_DIR . 'includes/class-am-log-levels.php';
 require_once AM_DIR . 'includes/class-am-date-format.php';
@@ -47,6 +48,9 @@ require_once AM_DIR . 'includes/class-am-traffic-query.php';
 require_once AM_DIR . 'includes/class-am-traffic-rollup.php';
 require_once AM_DIR . 'includes/class-am-sessions.php';
 require_once AM_DIR . 'includes/class-am-notifications.php';
+require_once AM_DIR . 'includes/class-am-installs.php';
+require_once AM_DIR . 'includes/class-am-hub-receiver.php';
+require_once AM_DIR . 'includes/class-am-hub-reporter.php';
 require_once AM_DIR . 'includes/class-am-digest.php';
 require_once AM_DIR . 'includes/class-am-export.php';
 require_once AM_DIR . 'includes/loggers/class-am-logger-base.php';
@@ -73,6 +77,7 @@ require_once AM_DIR . 'admin/class-am-admin.php';
 // ── Activation / deactivation ────────────────────────────────────────────
 register_activation_hook( AM_FILE, array( 'AM_Schema', 'install' ) );
 register_activation_hook( AM_FILE, array( 'AM_Traffic_Schema', 'install' ) );
+register_activation_hook( AM_FILE, array( 'AM_Installs_Schema', 'install' ) );
 // No deactivation cleanup needed -- v2.0 data is intentionally kept on
 // deactivation (only uninstall.php removes it), same policy v1.x had.
 
@@ -80,6 +85,7 @@ register_activation_hook( AM_FILE, array( 'AM_Traffic_Schema', 'install' ) );
 function am_init() {
 	AM_Schema::maybe_upgrade();
 	AM_Traffic_Schema::maybe_upgrade();
+	AM_Installs_Schema::maybe_upgrade();
 	AM_Logger_Manager::init();
 	AM_Traffic::init();
 	AM_Admin::init();
@@ -95,6 +101,7 @@ function am_init() {
 	}
 
 	AM_Traffic_Rollup::reschedule();
+	AM_Hub_Reporter::reschedule();
 }
 add_action( 'plugins_loaded', 'am_init' );
 
@@ -121,3 +128,7 @@ add_action( 'am_log_prune', 'am_run_prune' );
 
 // ── Traffic rollup + retention cron ──────────────────────────────────────
 add_action( AM_Traffic_Rollup::CRON_HOOK, array( 'AM_Traffic_Rollup', 'run' ) );
+
+// ── Active Installs hub feature ──────────────────────────────────────────
+add_action( 'rest_api_init', array( 'AM_Hub_Receiver', 'register_routes' ) );
+add_action( AM_Hub_Reporter::CRON_HOOK, array( 'AM_Hub_Reporter', 'run' ) );

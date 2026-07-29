@@ -19,6 +19,9 @@ global $wpdb;
 require_once __DIR__ . '/includes/schema/class-am-schema.php';
 AM_Schema::uninstall();
 
+require_once __DIR__ . '/includes/schema/class-am-installs-schema.php';
+AM_Installs_Schema::uninstall();
+
 // Remaining plugin options not covered by AM_Schema::uninstall().
 delete_option( 'am_notification_channels' );
 delete_option( 'am_retention_days' );
@@ -31,7 +34,17 @@ delete_option( 'am_digest_day_of_week' );
 delete_option( 'am_digest_recipients' );
 delete_option( 'am_digest_last_sent' );
 
-// Clear both scheduled cron events.
+// Active Installs hub feature options.
+delete_option( 'am_hub_enabled' );
+delete_option( 'am_hub_secret' );
+delete_option( 'am_report_enabled' );
+delete_option( 'am_report_hub_url' );
+delete_option( 'am_report_secret' );
+delete_option( 'am_report_last_status' );
+delete_option( 'am_report_last_message' );
+delete_option( 'am_report_last_attempt' );
+
+// Clear scheduled cron events.
 $timestamp = wp_next_scheduled( 'am_log_prune' );
 if ( $timestamp ) {
 	wp_unschedule_event( $timestamp, 'am_log_prune' );
@@ -39,4 +52,8 @@ if ( $timestamp ) {
 $digest_timestamp = wp_next_scheduled( 'am_send_digest' );
 if ( $digest_timestamp ) {
 	wp_unschedule_event( $digest_timestamp, 'am_send_digest' );
+}
+$hub_checkin_timestamp = wp_next_scheduled( 'am_hub_checkin' );
+if ( $hub_checkin_timestamp ) {
+	wp_unschedule_event( $hub_checkin_timestamp, 'am_hub_checkin' );
 }

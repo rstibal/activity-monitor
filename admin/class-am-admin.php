@@ -35,6 +35,10 @@ class AM_Admin {
 		add_action( 'admin_post_am_save_traffic_settings',    array( $instance, 'handle_save_traffic_settings' ) );
 		add_action( 'admin_post_am_save_display_settings',    array( $instance, 'handle_save_display_settings' ) );
 		add_action( 'admin_post_am_export_log',               array( $instance, 'handle_export' ) );
+		add_action( 'admin_post_am_save_hub_settings',        array( $instance, 'handle_save_hub_settings' ) );
+		add_action( 'admin_post_am_regenerate_hub_secret',    array( $instance, 'handle_regenerate_hub_secret' ) );
+		add_action( 'admin_post_am_save_report_settings',     array( $instance, 'handle_save_report_settings' ) );
+		add_action( 'admin_post_am_remove_install',           array( $instance, 'handle_remove_install' ) );
 		add_action( 'admin_notices',                          array( $instance, 'show_notices' ) );
 		add_action( 'wp_ajax_am_get_v2_event_detail',         array( $instance, 'ajax_v2_event_detail' ) );
 		add_action( 'wp_ajax_am_digest_preview',              array( $instance, 'ajax_digest_preview' ) );
@@ -201,6 +205,18 @@ class AM_Admin {
 		}
 		if ( isset( $_GET['am_traffic_settings_saved'] ) ) {
 			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Traffic settings saved.', 'activity-monitor' ) . '</p></div>';
+		}
+		if ( isset( $_GET['am_hub_settings_saved'] ) ) {
+			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Hub settings saved.', 'activity-monitor' ) . '</p></div>';
+		}
+		if ( isset( $_GET['am_hub_secret_regenerated'] ) ) {
+			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Hub secret regenerated.', 'activity-monitor' ) . '</p></div>';
+		}
+		if ( isset( $_GET['am_report_settings_saved'] ) ) {
+			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Report settings saved.', 'activity-monitor' ) . '</p></div>';
+		}
+		if ( isset( $_GET['am_install_removed'] ) ) {
+			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Install removed.', 'activity-monitor' ) . '</p></div>';
 		}
 	}
 
@@ -418,6 +434,90 @@ class AM_Admin {
 
 		wp_safe_redirect( add_query_arg(
 			array( 'page' => 'activity-monitor', self::TAB_PARAM => 'settings', 'am_traffic_settings_saved' => '1' ),
+			admin_url( 'admin.php' )
+		) );
+		exit;
+	}
+
+	/** Turns hub mode on/off; lazily generates am_hub_secret the first time it's enabled. */
+	public function handle_save_hub_settings() {
+		check_admin_referer( 'am_save_hub_settings' );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Unauthorized.', 'activity-monitor' ) );
+		}
+
+		$enabled = ! empty( $_POST['am_hub_enabled'] );
+		update_option( 'am_hub_enabled', $enabled ? '1' : '' );
+
+		if ( $enabled && '' === (string) get_option( 'am_hub_secret', '' ) ) {
+			update_option( 'am_hub_secret', wp_generate_password( 40, false, false ) );
+		}
+
+		wp_safe_redirect( add_query_arg(
+			array( 'page' => 'activity-monitor', self::TAB_PARAM => 'settings', 'am_hub_settings_saved' => '1' ),
+			admin_url( 'admin.php' )
+		) );
+		exit;
+	}
+
+	/** Rotates the hub secret; every reporting site needs the new value afterward. */
+	public function handle_regenerate_hub_secret() {
+		check_admin_referer( 'am_regenerate_hub_secret' );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Unauthorized.', 'activity-monitor' ) );
+		}
+
+		update_option( 'am_hub_secret', wp_generate_password( 40, false, false ) );
+
+		wp_safe_redirect( add_query_arg(
+			array( 'page' => 'activity-monitor', self::TAB_PARAM => 'settings', 'am_hub_secret_regenerated' => '1' ),
+			admin_url( 'admin.php' )
+		) );
+		exit;
+	}
+
+	/**
+	 * Saves the reporter settings and triggers one immediate check-in
+	 * synchronously, so the admin gets feedback right away instead of
+	 * waiting up to an hour for the first cron tick.
+	 */
+	public function handle_save_report_settings() {
+		check_admin_referer( 'am_save_report_settings' );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Unauthorized.', 'activity-monitor' ) );
+		}
+
+		$enabled = ! empty( $_POST['am_report_enabled'] );
+		$hub_url = esc_url_raw( trim( wp_unslash( $_POST['am_report_hub_url'] ?? '' ) ) );
+		$secret  = sanitize_text_field( wp_unslash( $_POST['am_report_secret'] ?? '' ) );
+
+		update_option( 'am_report_enabled', $enabled ? '1' : '' );
+		update_option( 'am_report_hub_url', $hub_url );
+		update_option( 'am_report_secret', $secret );
+
+		AM_Hub_Reporter::reschedule();
+		if ( $enabled ) {
+			AM_Hub_Reporter::run();
+		}
+
+		wp_safe_redirect( add_query_arg(
+			array( 'page' => 'activity-monitor', self::TAB_PARAM => 'settings', 'am_report_settings_saved' => '1' ),
+			admin_url( 'admin.php' )
+		) );
+		exit;
+	}
+
+	/** Removes one row from the hub's Active Installs list. */
+	public function handle_remove_install() {
+		check_admin_referer( 'am_remove_install' );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Unauthorized.', 'activity-monitor' ) );
+		}
+
+		AM_Installs::delete( absint( $_POST['install_id'] ?? 0 ) );
+
+		wp_safe_redirect( add_query_arg(
+			array( 'page' => 'activity-monitor', self::TAB_PARAM => 'installs', 'am_install_removed' => '1' ),
 			admin_url( 'admin.php' )
 		) );
 		exit;
@@ -1208,8 +1308,16 @@ class AM_Admin {
 			'log'      => __( 'Activity Log',    'activity-monitor' ),
 			'traffic'  => __( 'Traffic',          'activity-monitor' ),
 			'sessions' => __( 'Active Sessions', 'activity-monitor' ),
-			'settings' => __( 'Settings',        'activity-monitor' ),
 		);
+
+		// Only shown once this site is acting as a hub -- the vast
+		// majority of installs never will be, so this stays out of the
+		// nav for everyone else.
+		if ( get_option( 'am_hub_enabled' ) ) {
+			$tabs['installs'] = __( 'Active Installs', 'activity-monitor' );
+		}
+
+		$tabs['settings'] = __( 'Settings', 'activity-monitor' );
 
 		$default_tab = array_key_first( $tabs );
 		$active_tab  = sanitize_key( $_GET[ self::TAB_PARAM ] ?? $default_tab );
@@ -1259,6 +1367,9 @@ class AM_Admin {
 						break;
 					case 'sessions':
 						$this->render_tab_sessions();
+						break;
+					case 'installs':
+						$this->render_tab_installs();
 						break;
 					case 'settings':
 						$this->render_tab_settings();
@@ -2319,6 +2430,69 @@ class AM_Admin {
 		<?php
 	}
 
+	// ── Tab: Active Installs ─────────────────────────────────────────────
+
+	private function render_tab_installs() {
+		// Self-register in-process (no HTTP round trip needed) so the
+		// hub's own site always appears with fresh version info, even
+		// before any satellite has ever checked in.
+		AM_Installs::self_register();
+		$installs = AM_Installs::get_all();
+		?>
+		<div class="am-table-wrap am-table-scroll">
+			<?php if ( empty( $installs ) ) : ?>
+				<div class="am-empty">
+					<span class="dashicons dashicons-admin-multisite"></span>
+					<p><?php esc_html_e( 'No installs have checked in yet.', 'activity-monitor' ); ?></p>
+				</div>
+			<?php else : ?>
+			<table class="wp-list-table widefat am-log-table">
+				<thead>
+					<tr>
+						<th><?php esc_html_e( 'Site URL',         'activity-monitor' ); ?></th>
+						<th><?php esc_html_e( 'Last Check-in',    'activity-monitor' ); ?></th>
+						<th><?php esc_html_e( 'Plugin Version',   'activity-monitor' ); ?></th>
+						<th><?php esc_html_e( 'WordPress Version','activity-monitor' ); ?></th>
+						<th><?php esc_html_e( 'PHP Version',      'activity-monitor' ); ?></th>
+						<th><?php esc_html_e( 'Actions',          'activity-monitor' ); ?></th>
+					</tr>
+				</thead>
+				<tbody>
+					<?php foreach ( $installs as $row ) :
+						// last_checkin is stored in UTC (current_time('mysql', true));
+						// the ' UTC' suffix here is required so strtotime() doesn't
+						// read it as server-local time -- see CLAUDE.md's known
+						// timezone issue and the page-view-modal's correct handling
+						// of the same problem.
+						$checkin_text = wp_date( AM_Date_Format::combined(), strtotime( $row->last_checkin . ' UTC' ) );
+					?>
+					<tr>
+						<td><?php echo esc_html( $row->site_url ); ?></td>
+						<td><?php echo esc_html( $checkin_text ); ?></td>
+						<td><?php echo esc_html( $row->plugin_version ); ?></td>
+						<td><?php echo esc_html( $row->wp_version ); ?></td>
+						<td><?php echo esc_html( $row->php_version ); ?></td>
+						<td>
+							<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>"
+							      onsubmit="return confirm('<?php esc_attr_e( 'Remove this install from the list?', 'activity-monitor' ); ?>')"
+							      style="display:inline;">
+								<?php wp_nonce_field( 'am_remove_install' ); ?>
+								<input type="hidden" name="action"     value="am_remove_install">
+								<input type="hidden" name="install_id" value="<?php echo esc_attr( $row->id ); ?>">
+								<button type="submit" class="button button-small am-btn-danger">
+									<?php esc_html_e( 'Remove', 'activity-monitor' ); ?>
+								</button>
+							</form>
+						</td>
+					</tr>
+					<?php endforeach; ?>
+				</tbody>
+			</table>
+			<?php endif; ?>
+		</div>
+		<?php
+	}
+
 	// ── UA parser ─────────────────────────────────────────────────────────
 
 	private function parse_user_agent( $ua ) {
@@ -2631,6 +2805,161 @@ class AM_Admin {
 
 				<?php submit_button( __( 'Save Traffic Settings', 'activity-monitor' ), 'secondary' ); ?>
 			</form>
+		</div>
+
+		<?php $this->render_hub_settings_section(); ?>
+		<?php
+	}
+
+	// ── Multi-Site Monitoring settings (Active Installs hub feature) ───────
+
+	private function render_hub_settings_section() {
+		$hub_enabled = (bool) get_option( 'am_hub_enabled' );
+		$hub_secret  = (string) get_option( 'am_hub_secret', '' );
+		$hub_url     = rest_url( AM_Hub_Receiver::REST_NAMESPACE . AM_Hub_Receiver::REST_ROUTE );
+
+		$report_enabled = (bool) get_option( 'am_report_enabled' );
+		$report_hub_url = (string) get_option( 'am_report_hub_url', '' );
+		$report_secret  = (string) get_option( 'am_report_secret', '' );
+		$last_status    = (string) get_option( 'am_report_last_status', '' );
+		$last_message   = (string) get_option( 'am_report_last_message', '' );
+		$last_attempt   = (string) get_option( 'am_report_last_attempt', '' );
+		?>
+		<h2 class="am-settings-group-title"><?php esc_html_e( 'Multi-Site Monitoring', 'activity-monitor' ); ?></h2>
+
+		<div class="am-settings-section">
+			<h2 class="am-section-title">
+				<span class="dashicons dashicons-networking"></span>
+				<?php esc_html_e( 'Act as Hub', 'activity-monitor' ); ?>
+			</h2>
+			<p class="am-description">
+				<?php esc_html_e( 'Lets other sites running Activity Monitor check in here, so this site can show them all in its Active Installs tab. Give each of those sites the URL and secret below in their own "Report to a Hub" settings.', 'activity-monitor' ); ?>
+			</p>
+
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+				<?php wp_nonce_field( 'am_save_hub_settings' ); ?>
+				<input type="hidden" name="action" value="am_save_hub_settings">
+
+				<table class="form-table">
+					<tr>
+						<th scope="row">
+							<?php esc_html_e( 'Enable', 'activity-monitor' ); ?>
+						</th>
+						<td>
+							<label>
+								<input type="checkbox" name="am_hub_enabled" value="1" <?php checked( $hub_enabled ); ?>>
+								<?php esc_html_e( 'Accept check-ins from other installs', 'activity-monitor' ); ?>
+							</label>
+						</td>
+					</tr>
+					<?php if ( $hub_enabled ) : ?>
+					<tr>
+						<th scope="row">
+							<label for="am_hub_url_display"><?php esc_html_e( 'Hub URL', 'activity-monitor' ); ?></label>
+						</th>
+						<td>
+							<input type="text" id="am_hub_url_display" readonly onclick="this.select();"
+							       value="<?php echo esc_attr( $hub_url ); ?>" class="regular-text code">
+						</td>
+					</tr>
+					<tr>
+						<th scope="row">
+							<label for="am_hub_secret_display"><?php esc_html_e( 'Shared secret', 'activity-monitor' ); ?></label>
+						</th>
+						<td>
+							<input type="text" id="am_hub_secret_display" readonly onclick="this.select();"
+							       value="<?php echo esc_attr( $hub_secret ); ?>" class="regular-text code">
+							<p class="description">
+								<?php esc_html_e( 'Paste both values into the reporting site\'s "Report to a Hub" settings.', 'activity-monitor' ); ?>
+							</p>
+						</td>
+					</tr>
+					<?php endif; ?>
+				</table>
+
+				<?php submit_button( __( 'Save Hub Settings', 'activity-monitor' ), 'secondary' ); ?>
+			</form>
+
+			<?php if ( $hub_enabled ) : ?>
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>"
+			      onsubmit="return confirm('<?php esc_attr_e( 'Regenerate the shared secret? Every site currently reporting to this hub will need the new secret before it can check in again.', 'activity-monitor' ); ?>')"
+			      style="display:inline;">
+				<?php wp_nonce_field( 'am_regenerate_hub_secret' ); ?>
+				<input type="hidden" name="action" value="am_regenerate_hub_secret">
+				<button type="submit" class="button am-btn-danger">
+					<?php esc_html_e( 'Regenerate Secret', 'activity-monitor' ); ?>
+				</button>
+			</form>
+			<?php endif; ?>
+		</div>
+
+		<div class="am-settings-section">
+			<h2 class="am-section-title">
+				<span class="dashicons dashicons-share"></span>
+				<?php esc_html_e( 'Report to a Hub', 'activity-monitor' ); ?>
+			</h2>
+			<p class="am-description">
+				<?php esc_html_e( 'Check in with another site\'s Activity Monitor hub once an hour, so this site shows up in that hub\'s Active Installs tab.', 'activity-monitor' ); ?>
+			</p>
+
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+				<?php wp_nonce_field( 'am_save_report_settings' ); ?>
+				<input type="hidden" name="action" value="am_save_report_settings">
+
+				<table class="form-table">
+					<tr>
+						<th scope="row">
+							<?php esc_html_e( 'Enable', 'activity-monitor' ); ?>
+						</th>
+						<td>
+							<label>
+								<input type="checkbox" name="am_report_enabled" value="1" <?php checked( $report_enabled ); ?>>
+								<?php esc_html_e( 'Report this site\'s check-in to a hub', 'activity-monitor' ); ?>
+							</label>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row">
+							<label for="am_report_hub_url"><?php esc_html_e( 'Hub URL', 'activity-monitor' ); ?></label>
+						</th>
+						<td>
+							<input type="url" id="am_report_hub_url" name="am_report_hub_url"
+							       value="<?php echo esc_attr( $report_hub_url ); ?>" class="regular-text code">
+						</td>
+					</tr>
+					<tr>
+						<th scope="row">
+							<label for="am_report_secret"><?php esc_html_e( 'Shared secret', 'activity-monitor' ); ?></label>
+						</th>
+						<td>
+							<input type="text" id="am_report_secret" name="am_report_secret"
+							       value="<?php echo esc_attr( $report_secret ); ?>" class="regular-text code">
+						</td>
+					</tr>
+				</table>
+
+				<?php submit_button( __( 'Save Report Settings', 'activity-monitor' ), 'secondary' ); ?>
+			</form>
+
+			<?php if ( '' !== $last_status ) :
+				$status_text = 'success' === $last_status
+					? __( 'Last check-in succeeded.', 'activity-monitor' )
+					/* translators: %s: error reason returned by the hub or the HTTP request */
+					: sprintf( __( 'Last check-in failed: %s', 'activity-monitor' ), $last_message );
+				$attempt_time = $last_attempt ? wp_date( AM_Date_Format::combined(), strtotime( $last_attempt . ' UTC' ) ) : '';
+			?>
+				<p class="am-description">
+					<span class="am-badge <?php echo 'success' === $last_status ? 'am-info' : 'am-warning'; ?>">
+						<?php echo esc_html( $status_text ); ?>
+					</span>
+					<?php if ( $attempt_time ) : ?>
+						<?php
+						/* translators: %s: date/time of the last check-in attempt */
+						echo esc_html( sprintf( __( '(%s)', 'activity-monitor' ), $attempt_time ) );
+						?>
+					<?php endif; ?>
+				</p>
+			<?php endif; ?>
 		</div>
 		<?php
 	}
