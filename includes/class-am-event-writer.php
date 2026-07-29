@@ -120,6 +120,7 @@ class AM_Event_Writer {
 					'user_login'  => $row['user_login'],
 					'ip_address'  => $row['ip_address'],
 					'object_name' => $row['object_name'],
+					'event_id'    => $event_id,
 				)
 			);
 		}

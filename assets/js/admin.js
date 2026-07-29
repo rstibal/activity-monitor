@@ -12,14 +12,28 @@
 	   as-is (not renamed to drop the "v2") to avoid an unnecessary
 	   JS/PHP action-name rename with no functional benefit, now that the
 	   old v1.x AM_DB-backed handler and its am-view-detail button/action
-	   have been removed entirely. */
-	$(document).on('click', '.am-view-detail-v2', function () {
-		var id = $(this).data('id');
+	   have been removed entirely. Shared by the log table's row click
+	   and the am_event_id deep-link below. */
+	function loadEventDetail(id) {
 		openModal('Event Details');
 		$.post(amData.ajaxUrl, { action: 'am_get_v2_event_detail', entry_id: id, nonce: amData.nonce })
 		.done(function (r) { $('#am-modal-body').html(r.success ? r.data.html : '<p>Error.</p>'); })
 		.fail(function () { $('#am-modal-body').html('<p>Request failed.</p>'); });
+	}
+
+	$(document).on('click', '.am-view-detail-v2', function () {
+		loadEventDetail($(this).data('id'));
 	});
+
+	/* Deep link from a Slack alert: admin.php?page=activity-monitor&
+	   am_tab=log&am_event_id=123 lands on the Activity Log tab (plain
+	   server-side tab routing, already handles am_tab) and this opens
+	   that event's Details modal immediately, so the link takes the
+	   reader straight to the event instead of just the tab. */
+	var amDeepLinkEventId = new URLSearchParams(window.location.search).get('am_event_id');
+	if (amDeepLinkEventId) {
+		loadEventDetail(amDeepLinkEventId);
+	}
 
 	/* FIX #2: Only pass user_id + token_hash to the session detail handler.
 	   All other data is now re-fetched server-side from session_tokens. */

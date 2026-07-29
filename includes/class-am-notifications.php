@@ -51,7 +51,7 @@ class AM_Notifications {
 
 			$type = $channel['type'] ?? 'email';
 			if ( 'slack' === $type ) {
-				self::send_slack( $channel, $message, $args['user_login'] ?? '' );
+				self::send_slack( $channel, $message, $args['user_login'] ?? '', (int) ( $args['event_id'] ?? 0 ) );
 			} else {
 				self::send_email( $channel, $level, $event_type, $action, $message, $args );
 			}
@@ -124,12 +124,19 @@ class AM_Notifications {
 	}
 
 	/**
-	 * Posts a formatted alert to a Slack incoming webhook: just the
-	 * event message with "View full log" linked inline after its
-	 * trailing period, plus 'text' set as the required plain-text
-	 * fallback (Slack rejects a payload with blocks but no text, and
-	 * 'text' is what shows in notifications/previews where blocks
-	 * don't render).
+	 * Posts a formatted alert to a Slack incoming webhook: the event
+	 * message read as one sentence, with the site's domain itself
+	 * linked to that specific event -- deep-linking straight to the
+	 * Activity Log tab with an am_event_id query arg that admin.js
+	 * picks up on page load to auto-open the Details modal for that
+	 * event (see the am_event_id handling next to the
+	 * .am-view-detail-v2 click handler), rather than just landing on
+	 * the log tab and leaving the reader to find the row themselves.
+	 * 'text' is also set as the required plain-text fallback (Slack
+	 * rejects a payload with blocks but no text, and 'text' is what
+	 * shows in notifications/previews where blocks don't render) --
+	 * it carries the same sentence without the link, since plain text
+	 * can't express one.
 	 *
 	 * Unlike wp_mail(), a webhook POST gets an immediate, checkable
 	 * result: HTTP 200 means Slack accepted and posted the message;
@@ -146,7 +153,7 @@ class AM_Notifications {
 	 * events with no logged-in user (WP-Cron, WP-CLI, core, failed logins)
 	 * drop the "by" clause and read '... on injurylawyers.com.' instead.
 	 */
-	private static function send_slack( array $channel, string $message, string $user_login ) {
+	private static function send_slack( array $channel, string $message, string $user_login, int $event_id ) {
 		$webhook_url = trim( $channel['webhook_url'] ?? '' );
 		if ( '' === $webhook_url ) {
 			return;
@@ -154,17 +161,21 @@ class AM_Notifications {
 
 		$domain = wp_strip_all_tags( (string) wp_parse_url( home_url(), PHP_URL_HOST ) );
 		$user   = wp_strip_all_tags( $user_login );
-		$suffix = ( '' !== $user )
-			? " by {$user} on {$domain}."
-			: " on {$domain}.";
+		$base   = rtrim( wp_strip_all_tags( (string) $message ), '.' );
 
-		$msg     = rtrim( wp_strip_all_tags( (string) $message ), '.' ) . $suffix;
-		$log_url = admin_url( 'admin.php?page=activity-monitor' );
+		$log_url = add_query_arg(
+			array( 'page' => 'activity-monitor', 'am_tab' => 'log', 'am_event_id' => $event_id ),
+			admin_url( 'admin.php' )
+		);
+		$domain_link = "<{$log_url}|{$domain}>";
+
+		$mrkdwn_msg = $base . ( ( '' !== $user ) ? " by {$user} on {$domain_link}." : " on {$domain_link}." );
+		$plain_msg  = $base . ( ( '' !== $user ) ? " by {$user} on {$domain}." : " on {$domain}." );
 
 		$blocks = array(
 			array(
 				'type' => 'section',
-				'text' => array( 'type' => 'mrkdwn', 'text' => "{$msg} <{$log_url}|View full log>" ),
+				'text' => array( 'type' => 'mrkdwn', 'text' => $mrkdwn_msg ),
 			),
 		);
 
@@ -176,7 +187,7 @@ class AM_Notifications {
 				// payload with no top-level 'text', and this is also
 				// what appears in notification previews where blocks
 				// don't render.
-				'text'   => "{$msg} View full log: {$log_url}",
+				'text'   => $plain_msg,
 				'blocks' => $blocks,
 			) ),
 		) );

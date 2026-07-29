@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, page traffic
 Requires at least: 5.3
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.0.81
+Stable tag: 2.0.82
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -76,6 +76,9 @@ Yes, retention is configurable and old entries are pruned automatically on a dai
 4. Active Sessions, with per-session revoke and site-wide emergency lockdown.
 
 == Changelog ==
+
+= 2.0.82 =
+* Changed: Slack alert notifications now link the site's domain itself straight to that event's row on the Activity Log tab, which opens its Details modal automatically. Removed the separate "View full log" link.
 
 = 2.0.81 =
 * Removed: Multi-Site Monitoring settings and the Active Installs tab (the hub/reporter check-in feature added in 2.0.77). Existing installs have their am_installs table and related options cleaned up automatically on full uninstall. Being rethought for a future release.
