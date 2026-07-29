@@ -313,6 +313,13 @@
 .am-row-am-info      td:first-child { border-left: 3px solid #2ecc71; }
 .am-row-am-debug     td:first-child { border-left: 3px solid #8c8f94; }
 
+/* Marks the row a Slack alert's am_event_id deep-link points at (see
+   admin.js), so it's still easy to spot after the Details modal that
+   opened automatically on page load is closed. A background tint
+   rather than the severity border-left above so the two don't compete
+   for the same visual slot. */
+.am-row-highlighted td { background: #fff8c5 !important; }
+
 .am-badge { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap; }
 .am-debug     { background: #f0f0f1; color: #50575e; }
 .am-info      { background: #d5f5e3; color: #1e8449; }

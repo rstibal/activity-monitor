@@ -29,10 +29,16 @@
 	   am_tab=log&am_event_id=123 lands on the Activity Log tab (plain
 	   server-side tab routing, already handles am_tab) and this opens
 	   that event's Details modal immediately, so the link takes the
-	   reader straight to the event instead of just the tab. */
+	   reader straight to the event instead of just the tab. The row
+	   itself also gets highlighted (am-row-highlighted, see admin.css)
+	   so it's still easy to spot in the table after the modal is
+	   closed -- the highlight is looked up by the same data-id the
+	   Details button carries, so it only applies if that event's row
+	   is actually rendered on the current (first, unfiltered) page. */
 	var amDeepLinkEventId = new URLSearchParams(window.location.search).get('am_event_id');
 	if (amDeepLinkEventId) {
 		loadEventDetail(amDeepLinkEventId);
+		$('.am-view-detail-v2[data-id="' + amDeepLinkEventId + '"]').closest('tr').addClass('am-row-highlighted');
 	}
 
 	/* FIX #2: Only pass user_id + token_hash to the session detail handler.
@@ -344,8 +350,6 @@
 			$.post(amData.ajaxUrl, { action: 'am_get_live_traffic', nonce: amData.nonce, after_id: lastSeenId })
 			.done(function (r) {
 				if (!r.success) return;
-
-				$('#am-traffic-today-count').text(r.data.today_total);
 
 				var hits = r.data.hits || [];
 				if (hits.length) {

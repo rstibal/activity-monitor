@@ -18,10 +18,9 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  * AM_Event_Query so the Traffic tab can reuse the same chart/card
  * rendering conventions as the Stats tab.
  *
- * get_today_total() and get_recent_hits() remain simpler special
- * cases: they read am_traffic_log directly and don't touch the rollup
- * at all, since "today" needs individual hits (the live feed) or a
- * single running count (the "Views today" card), not a merge.
+ * get_recent_hits() remains a simpler special case: it reads
+ * am_traffic_log directly and doesn't touch the rollup at all, since
+ * the live feed needs individual hits, not a merge.
  */
 class AM_Traffic_Query {
 
@@ -371,24 +370,6 @@ class AM_Traffic_Query {
 			}
 		}
 		return $path;
-	}
-
-	/**
-	 * Total page views so far today (UTC), read directly from the raw
-	 * log rather than the daily rollup -- this is the one query in this
-	 * class that intentionally trades rollup-speed for freshness, since
-	 * "today" by definition hasn't been rolled up yet (the cron runs
-	 * once, the following day). Cheap enough for a single COUNT even at
-	 * meaningful traffic volumes; if that ever stops being true, this is
-	 * the query to revisit first.
-	 */
-	public static function get_today_total(): int {
-		global $wpdb;
-		$table = $wpdb->prefix . AM_Traffic_Schema::LOG_TABLE;
-
-		return (int) $wpdb->get_var(
-			"SELECT COUNT(*) FROM `{$table}` WHERE DATE(date) = CURDATE()"
-		);
 	}
 
 	/**

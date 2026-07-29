@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, page traffic
 Requires at least: 5.3
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.0.82
+Stable tag: 2.0.84
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -76,6 +76,12 @@ Yes, retention is configurable and old entries are pruned automatically on a dai
 4. Active Sessions, with per-session revoke and site-wide emergency lockdown.
 
 == Changelog ==
+
+= 2.0.84 =
+* Removed: The Period selector and stats grid (Total page views / Views today) from the Traffic tab. The Live traffic feed is unchanged.
+
+= 2.0.83 =
+* Changed: A Slack alert's deep link now also highlights the event's row on the Activity Log tab, so it's still easy to spot after the Details modal it opens automatically is closed.
 
 = 2.0.82 =
 * Changed: Slack alert notifications now link the site's domain itself straight to that event's row on the Activity Log tab, which opens its Details modal automatically. Removed the separate "View full log" link.

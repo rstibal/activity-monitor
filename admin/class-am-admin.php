@@ -804,8 +804,7 @@ class AM_Admin {
 		}
 
 		wp_send_json_success( array(
-			'hits'        => $formatted,
-			'today_total' => AM_Traffic_Query::get_today_total(),
+			'hits' => $formatted,
 		) );
 	}
 
@@ -2106,14 +2105,6 @@ class AM_Admin {
 	// ── Tab: Traffic ────────────────────────────────────────────────────
 
 	private function render_tab_traffic() {
-		$days = absint( $_GET['am_days'] ?? 7 );
-		$days = in_array( $days, array( 7, 14, 30 ), true ) ? $days : 7;
-		$base = add_query_arg( array( 'page' => 'activity-monitor', self::TAB_PARAM => 'traffic' ), admin_url( 'admin.php' ) );
-
-		$totals = AM_Traffic_Query::get_totals_for_period( $days );
-
-		$delta     = $totals['current'] - $totals['previous'];
-		$delta_str = $delta >= 0 ? "+{$delta}" : (string) $delta;
 		?>
 
 		<?php if ( '1' !== get_option( 'am_traffic_enabled', '1' ) ) : ?>
@@ -2126,31 +2117,6 @@ class AM_Admin {
 				</p>
 			</div>
 		<?php endif; ?>
-
-		<div class="am-filter-bar">
-			<div class="am-filter-group">
-				<span class="am-filter-label"><?php esc_html_e( 'Period:', 'activity-monitor' ); ?></span>
-				<?php foreach ( array( 7, 14, 30 ) as $option ) : ?>
-					<a href="<?php echo esc_url( add_query_arg( 'am_days', $option, $base ) ); ?>"
-					   class="am-pill <?php echo $option === $days ? 'active' : ''; ?>">
-						<?php printf( esc_html( _n( 'Last %d day', 'Last %d days', $option, 'activity-monitor' ) ), $option ); ?>
-					</a>
-				<?php endforeach; ?>
-			</div>
-		</div>
-
-		<div class="am-stats-grid">
-			<div class="am-stats-card">
-				<div class="am-stats-card-value"><?php echo esc_html( number_format_i18n( $totals['current'] ) ); ?></div>
-				<div class="am-stats-card-label"><?php esc_html_e( 'Total page views', 'activity-monitor' ); ?></div>
-				<div class="am-stats-card-delta"><?php echo esc_html( $delta_str ); ?> <?php esc_html_e( 'vs. previous period', 'activity-monitor' ); ?></div>
-			</div>
-			<div class="am-stats-card">
-				<div class="am-stats-card-value" id="am-traffic-today-count"><?php echo esc_html( number_format_i18n( AM_Traffic_Query::get_today_total() ) ); ?></div>
-				<div class="am-stats-card-label"><?php esc_html_e( 'Views today', 'activity-monitor' ); ?></div>
-				<div class="am-stats-card-delta"><?php esc_html_e( 'Live — updates automatically', 'activity-monitor' ); ?></div>
-			</div>
-		</div>
 
 		<h2 class="am-section-title">
 			<span class="am-live-dot"></span>
