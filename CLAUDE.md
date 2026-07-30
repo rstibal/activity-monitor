@@ -20,11 +20,17 @@ workflow disappears.
 - **`<code>` is only for actual code** (HTML, JS, SQL). Never for data values —
   IPs, URLs, slugs, IDs, hashes all render as plain text. There is deliberately
   no CSS override of core's grey `<code>` background; real code wants it.
-- **Anywhere a WordPress user is shown, display only `display_name` and
-  `user_login`** — stacked as `display_name` bold with `user_login` beneath in
-  a `small.am-role`, or `"display_name (user_login)"` inline in single-line
-  contexts (Slack/email). Never first/last name (`AM_Admin::real_name()` was
-  removed — those fields are frequently blank). `display_name` is read live
+- **Anywhere a WordPress user is shown, use only `display_name` and
+  `user_login`** — never first/last name (`AM_Admin::real_name()` was removed
+  — those fields are frequently blank). Which of the two to show depends on
+  the context, and as of 2.4.2 they are no longer always stacked together:
+  the Activity Log's **User column shows `display_name` alone**, linking to the
+  profile modal, where `user_login` is its own **Username** row under User ID —
+  the login was repeated on every row and earned none of that width. The event
+  detail modal still stacks both (`display_name` bold over `user_login` in a
+  `small.am-role`), since there it's the row's own stored snapshot of who acted
+  rather than a live lookup. Single-line contexts (Slack/email) stay
+  `"display_name (user_login)"`. `display_name` is read live
   via `get_userdata()`/`WP_User` where the user still exists, or from the
   `am_events.user_display_name` snapshot column otherwise (populated
   alongside `user_login` at write time in `AM_Event_Writer::log()`, and

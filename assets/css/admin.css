@@ -97,10 +97,33 @@
 	font-size: 13px; color: #1d2327;
 }
 
+/* Core sets .tablenav { height: 30px }, sized for the single short row
+   its own screens put there. This toolbar carries two selects, two date
+   inputs, a Filter button and a Reset link, which is taller than that
+   and wraps on a narrow window -- so the floated .alignleft.actions
+   inside it overflowed the fixed-height box and hung below the tablenav,
+   where the table then had to flow around it. Height auto lets the box
+   grow to fit its own contents, which is what the <br class="clear">
+   already in the markup expects. */
+.am-wrap .tablenav {
+	height: auto;
+	min-height: 30px;
+}
+
 /* Horizontal scroll for the wider tables (the log has eight columns).
    Purely a scroll container -- no border or background of its own, so
-   the .wp-list-table inside keeps core's own framing. */
-.am-table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+   the .wp-list-table inside keeps core's own framing.
+
+   clear: both is load-bearing, not decoration. overflow-x makes this a
+   block formatting context, and a BFC root shrinks to avoid any float
+   still open above it rather than flowing under it -- so a stray float
+   from .subsubsub, .search-box or the toolbar above left the table
+   narrower than the page instead of full width. */
+.am-table-scroll {
+	clear: both;
+	overflow-x: auto;
+	-webkit-overflow-scrolling: touch;
+}
 
 /* The log/session tables are plain core .wp-list-table.striped. Only
    two behaviours differ from core's default: auto layout, because these
@@ -247,7 +270,6 @@
 .am-user-profile-head { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
 .am-user-profile-head img { border-radius: 50%; flex-shrink: 0; }
 .am-user-profile-name { display: block; font-size: 15px; color: #1d2327; }
-.am-user-profile-login { display: block; color: #646970; font-size: 12px; margin-top: 2px; }
 
 .am-detail-table { width: 100%; border-collapse: collapse; }
 .am-detail-table th, .am-detail-table td { padding: 8px 10px; border: 1px solid #dcdcde; font-size: 13px; vertical-align: top; }

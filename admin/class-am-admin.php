@@ -601,13 +601,14 @@ class AM_Admin {
 			<div class="am-user-profile-head">
 				<?php echo get_avatar( $user->ID, 64 ); ?>
 				<div>
+					<?php // Name only here -- the username has its own row below. ?>
 					<strong class="am-user-profile-name"><?php echo esc_html( $user->display_name ); ?></strong>
-					<span class="am-user-profile-login"><?php echo esc_html( $user->user_login ); ?></span>
 				</div>
 			</div>
 
 			<table class="am-detail-table">
 				<tr><th><?php esc_html_e( 'User ID', 'activity-monitor' ); ?></th><td><?php echo esc_html( $user->ID ); ?></td></tr>
+				<tr><th><?php esc_html_e( 'Username', 'activity-monitor' ); ?></th><td><?php echo esc_html( $user->user_login ); ?></td></tr>
 				<tr><th><?php esc_html_e( 'Email', 'activity-monitor' ); ?></th><td><a href="<?php echo esc_url( 'mailto:' . $user->user_email ); ?>"><?php echo esc_html( $user->user_email ); ?></a></td></tr>
 				<tr>
 					<th><?php esc_html_e( 'Role', 'activity-monitor' ); ?></th>
@@ -1250,8 +1251,8 @@ class AM_Admin {
 						<td><span class="am-badge am-init-<?php echo esc_attr( $row->initiator ); ?>"><?php echo esc_html( AM_Initiator_Detector::label( $row->initiator ) ); ?></span></td>
 						<td>
 							<?php if ( (int) $row->user_id > 0 && '' !== $row->user_login ) : ?>
+								<?php // Display name only -- the username is a row in the profile modal this links to. ?>
 								<a href="#" class="am-user-profile-link" data-user-id="<?php echo esc_attr( (int) $row->user_id ); ?>"><strong><?php echo esc_html( '' !== $row->user_display_name ? $row->user_display_name : $row->user_login ); ?></strong></a>
-								<br><small class="am-role"><?php echo esc_html( $row->user_login ); ?></small>
 							<?php else : ?>
 								<?php echo esc_html( '' !== $row->user_login ? $row->user_login : '—' ); ?>
 							<?php endif; ?>

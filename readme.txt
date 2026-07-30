@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, event log
 Requires at least: 5.3
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.4.1
+Stable tag: 2.4.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -60,6 +60,10 @@ Yes, retention is configurable and old entries are pruned automatically on a dai
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
 
 == Changelog ==
+
+= 2.4.2 =
+* Fixed: the Activity Log table stopped short of the full page width, because the filter toolbar above it was taller than the height WordPress reserves for one and the table was flowing around it.
+* Changed: the User column now shows just the display name. The username moved into the profile popup as its own Username row, under User ID — it was repeating on every row and taking width from the message.
 
 = 2.4.1 =
 * Fixed: the Details popup on the Activity Log opened and then immediately closed again, making event details impossible to read. Introduced in 2.3.0, when the table moved inside the filter form and the Details button began submitting it.
