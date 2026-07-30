@@ -1172,33 +1172,31 @@ class AM_Admin {
 	}
 
 	/**
-	 * Opens the shared page chrome. $title names the specific screen; the
-	 * plugin name stays in the heading ahead of it so the <h1> reads the
-	 * same way the left-hand menu does ("Activity Monitor" > "Settings"),
-	 * rather than a bare "Settings" that says nothing about whose it is.
+	 * Opens the shared page chrome, following wp-admin's own page header
+	 * convention: an .wp-heading-inline <h1> naming just this screen (the
+	 * menu already says which plugin it belongs to), then .wp-header-end,
+	 * which is the marker WordPress relocates admin notices to. Without
+	 * that marker notices land wherever they were echoed, which on a
+	 * plugin screen usually means above the heading.
+	 *
+	 * There is deliberately no wrapper panel around the content. Core
+	 * admin screens put their tables and form sections straight onto the
+	 * gray body background; boxing the whole screen in white made every
+	 * inner container lose its own contrast against the page.
 	 */
 	private function render_screen_open( string $title ) {
 		?>
 		<div class="wrap am-wrap">
 
-			<div class="am-header">
-				<h1 class="am-title">
-					<span class="dashicons dashicons-shield-alt"></span>
-					<?php esc_html_e( 'Activity Monitor', 'activity-monitor' ); ?>
-					<span class="am-screen-title"><?php echo esc_html( $title ); ?></span>
-					<span class="am-version">v<?php echo esc_html( AM_VERSION ); ?></span>
-				</h1>
-			</div>
-
-			<div class="am-screen-content">
+			<h1 class="wp-heading-inline"><?php echo esc_html( $title ); ?></h1>
+			<span class="am-version">v<?php echo esc_html( AM_VERSION ); ?></span>
+			<hr class="wp-header-end">
 		<?php
 	}
 
 	/** Closes the chrome opened above and emits the shared modal overlay. */
 	private function render_screen_close() {
 		?>
-			</div>
-
 		</div><!-- .am-wrap -->
 
 		<!-- Shared modal overlay: one per screen, reused by every modal. -->
@@ -1333,52 +1331,69 @@ class AM_Admin {
 			</div>
 		<?php endif; ?>
 
-		<div class="am-filter-bar">
-			<form method="get" action="" id="am-filter-form">
-				<input type="hidden" name="page" value="<?php echo esc_attr( self::PAGE_LOG ); ?>">
-				<?php if ( '' !== $user ) : ?>
-					<?php // The visible User box was removed, but the filter itself still
-					      // works and is set from elsewhere -- the "View this user's
-					      // activity" button in the user profile modal links with
-					      // am_user. Without carrying it here, changing any other filter
-					      // would submit this form without it and silently drop it. The
-					      // chip rendered below the form is what makes it visible; this
-					      // input only keeps it alive across submissions. ?>
-					<input type="hidden" name="am_user" value="<?php echo esc_attr( $user ); ?>">
-				<?php endif; ?>
-
-				<div class="am-filter-group">
-					<span class="am-filter-label"><?php esc_html_e( 'Level:', 'activity-monitor' ); ?></span>
-					<a href="<?php echo esc_url( remove_query_arg( 'am_level', $base_url ) ); ?>"
-					   class="am-pill <?php echo '' === $level ? 'active' : ''; ?>">
-						<?php esc_html_e( 'All', 'activity-monitor' ); ?>
-					</a>
-					<?php foreach ( $level_options as $lvl_val => $lvl_label ) :
-						$url = add_query_arg( 'am_level', $lvl_val, $base_url );
-					?>
-					<a href="<?php echo esc_url( $url ); ?>"
-					   class="am-pill am-pill-am-<?php echo esc_attr( $lvl_val ); ?> <?php echo ( $lvl_val === $level ) ? 'active' : ''; ?>">
+		<?php
+		// Level filter as core's own status-link list -- the same control
+		// the Plugins screen uses for All / Active / Inactive. Was a row of
+		// colored pills; the severity colors still carry meaning in the
+		// table's own Level badges, where they mark actual rows rather than
+		// filter buttons.
+		?>
+		<ul class="subsubsub">
+			<li>
+				<a href="<?php echo esc_url( remove_query_arg( 'am_level', $base_url ) ); ?>"
+				   class="<?php echo '' === $level ? 'current' : ''; ?>">
+					<?php esc_html_e( 'All', 'activity-monitor' ); ?>
+				</a>
+			</li>
+			<?php foreach ( $level_options as $lvl_val => $lvl_label ) : ?>
+				<li>
+					| <a href="<?php echo esc_url( add_query_arg( 'am_level', $lvl_val, $base_url ) ); ?>"
+					     class="<?php echo ( $lvl_val === $level ) ? 'current' : ''; ?>">
 						<?php echo esc_html( $lvl_label ); ?>
 					</a>
-					<?php endforeach; ?>
-				</div>
+				</li>
+			<?php endforeach; ?>
+		</ul>
 
-				<div class="am-filter-group">
-					<span class="am-filter-label"><?php esc_html_e( 'Initiator:', 'activity-monitor' ); ?></span>
-					<select name="am_initiator" onchange="this.form.submit()">
-						<option value=""><?php esc_html_e( '— All Initiators —', 'activity-monitor' ); ?></option>
+		<form method="get" action="" id="am-filter-form">
+			<input type="hidden" name="page" value="<?php echo esc_attr( self::PAGE_LOG ); ?>">
+			<?php if ( '' !== $level ) : ?>
+				<?php // Set by the status links above, not by any control in this
+				      // form -- carried so changing a dropdown doesn't drop it. ?>
+				<input type="hidden" name="am_level" value="<?php echo esc_attr( $level ); ?>">
+			<?php endif; ?>
+			<?php if ( '' !== $user ) : ?>
+				<?php // The visible User box was removed, but the filter itself still
+				      // works and is set from elsewhere -- the "View this user's
+				      // activity" button in the user profile modal links with
+				      // am_user. Without carrying it here, changing any other filter
+				      // would submit this form without it and silently drop it. The
+				      // chip rendered below is what makes it visible; this input
+				      // only keeps it alive across submissions. ?>
+				<input type="hidden" name="am_user" value="<?php echo esc_attr( $user ); ?>">
+			<?php endif; ?>
+
+			<p class="search-box">
+				<label class="screen-reader-text" for="am-search-input"><?php esc_html_e( 'Search log:', 'activity-monitor' ); ?></label>
+				<input type="search" id="am-search-input" name="am_search" value="<?php echo esc_attr( $search ); ?>">
+				<?php submit_button( __( 'Search Log', 'activity-monitor' ), '', '', false, array( 'id' => 'search-submit' ) ); ?>
+			</p>
+
+			<div class="tablenav top">
+				<div class="alignleft actions">
+					<label class="screen-reader-text" for="am-filter-initiator"><?php esc_html_e( 'Filter by initiator', 'activity-monitor' ); ?></label>
+					<select name="am_initiator" id="am-filter-initiator">
+						<option value=""><?php esc_html_e( 'All initiators', 'activity-monitor' ); ?></option>
 						<?php foreach ( $initiator_options as $init_val => $init_label ) : ?>
 							<option value="<?php echo esc_attr( $init_val ); ?>" <?php selected( $init_val, $initiator ); ?>>
 								<?php echo esc_html( $init_label ); ?>
 							</option>
 						<?php endforeach; ?>
 					</select>
-				</div>
 
-				<div class="am-filter-group">
-					<span class="am-filter-label"><?php esc_html_e( 'Type:', 'activity-monitor' ); ?></span>
-					<select name="am_type" onchange="this.form.submit()">
-						<option value=""><?php esc_html_e( '— All Types —', 'activity-monitor' ); ?></option>
+					<label class="screen-reader-text" for="am-filter-type"><?php esc_html_e( 'Filter by event type', 'activity-monitor' ); ?></label>
+					<select name="am_type" id="am-filter-type">
+						<option value=""><?php esc_html_e( 'All types', 'activity-monitor' ); ?></option>
 						<?php foreach ( $type_groups as $group ) : ?>
 							<?php if ( 1 === count( $group['options'] ) ) : ?>
 								<?php $only = $group['options'][0]; ?>
@@ -1402,23 +1417,39 @@ class AM_Admin {
 							<?php endif; ?>
 						<?php endforeach; ?>
 					</select>
+
+					<label class="screen-reader-text" for="am-filter-from"><?php esc_html_e( 'From date', 'activity-monitor' ); ?></label>
+					<input type="date" id="am-filter-from" name="am_from" value="<?php echo esc_attr( $date_from ); ?>">
+					<label class="screen-reader-text" for="am-filter-to"><?php esc_html_e( 'To date', 'activity-monitor' ); ?></label>
+					<input type="date" id="am-filter-to" name="am_to" value="<?php echo esc_attr( $date_to ); ?>">
+
+					<?php
+					// Empty $name, explicit id -- the same call shape
+					// WP_List_Table::search_box() uses, which keeps the button
+					// out of the resulting query string.
+					submit_button( __( 'Filter', 'activity-monitor' ), '', '', false, array( 'id' => 'am-filter-submit' ) );
+					?>
+
+					<?php if ( $level || $initiator || $type_filter || $action || $user || $date_from || $date_to || $search ) : ?>
+						<a href="<?php echo esc_url( $base_url ); ?>" class="button"><?php esc_html_e( 'Reset', 'activity-monitor' ); ?></a>
+					<?php endif; ?>
 				</div>
 
-				<div class="am-filter-group">
-					<span class="am-filter-label"><?php esc_html_e( 'From:', 'activity-monitor' ); ?></span>
-					<input type="date" name="am_from" value="<?php echo esc_attr( $date_from ); ?>">
-					<span class="am-filter-label"><?php esc_html_e( 'To:', 'activity-monitor' ); ?></span>
-					<input type="date" name="am_to" value="<?php echo esc_attr( $date_to ); ?>">
+				<div class="tablenav-pages<?php echo $num_pages > 1 ? '' : ' one-page'; ?>">
+					<span class="displaying-num"><?php echo $displaying_num_html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- built via esc_html() above. ?></span>
+					<?php if ( $num_pages > 1 ) : ?>
+						<span class="pagination-links"><?php echo $pagination_html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- already wp_kses_post()'d above. ?></span>
+					<?php endif; ?>
 				</div>
-			</form>
+				<br class="clear">
+			</div>
 
 			<?php
 			// The user filter has no visible control of its own -- it's set
 			// from the profile modal's "View this user's activity" link, not
 			// from this bar -- so without this chip the log silently shows a
-			// single user's rows with nothing on screen saying so. Rendered
-			// outside the form (it's a link, not an input) and only when the
-			// filter is actually on.
+			// single user's rows with nothing on screen saying so. Only
+			// rendered when the filter is actually on.
 			if ( '' !== $user ) :
 				$filtered_user  = get_user_by( 'login', $user );
 				$filtered_label = $filtered_user
@@ -1440,9 +1471,11 @@ class AM_Admin {
 				);
 			?>
 			<div class="am-active-filter">
-				<span class="am-filter-label"><?php esc_html_e( 'Showing activity for:', 'activity-monitor' ); ?></span>
 				<span class="am-filter-chip">
-					<?php echo esc_html( $filtered_label ); ?>
+					<?php
+					/* translators: %s: a user, shown as "Display Name (login)" */
+					printf( esc_html__( 'Showing activity for %s', 'activity-monitor' ), esc_html( $filtered_label ) );
+					?>
 					<a href="<?php echo esc_url( $clear_user_url ); ?>"
 					   class="am-filter-chip-remove"
 					   aria-label="<?php esc_attr_e( 'Remove the user filter', 'activity-monitor' ); ?>">&times;</a>
@@ -1450,65 +1483,8 @@ class AM_Admin {
 			</div>
 			<?php endif; ?>
 
-			<div class="am-export-bar">
-				<span class="am-filter-label"><?php esc_html_e( 'Export filtered results:', 'activity-monitor' ); ?></span>
-				<?php
-				// Note: the event 'action' filter (e.g. 'created', 'deleted')
-				// is passed as am_export_action here, not 'action' -- that key
-				// is reserved by admin-post.php for its own dispatch routing
-				// (action=am_export_log) and would collide otherwise.
-				$export_filter_args = array(
-					'am_level'      => $level,
-					'am_initiator'  => $initiator,
-					'am_type'       => $type_filter,
-					'am_export_action' => $action,
-					'am_user'       => $user,
-					'am_from'       => $date_from,
-					'am_to'         => $date_to,
-					'am_search'     => $search,
-				);
-				foreach ( array( 'csv' => 'CSV', 'json' => 'JSON', 'html' => 'HTML', 'txt' => 'TXT' ) as $fmt => $label ) :
-					$export_url = wp_nonce_url(
-						add_query_arg(
-							array_merge( $export_filter_args, array( 'action' => 'am_export_log', 'am_format' => $fmt ) ),
-							admin_url( 'admin-post.php' )
-						),
-						AM_Export::NONCE_ACTION
-					);
-					?>
-					<a href="<?php echo esc_url( $export_url ); ?>" class="button button-secondary button-small"><?php echo esc_html( $label ); ?></a>
-				<?php endforeach; ?>
-			</div>
-		</div>
-
-		<div class="am-table-wrap am-table-scroll">
-			<div class="tablenav top">
-				<div class="am-filter-group am-filter-search">
-					<input type="search" name="am_search" form="am-filter-form"
-					       value="<?php echo esc_attr( $search ); ?>"
-					       placeholder="<?php esc_attr_e( 'Search message, user, object…', 'activity-monitor' ); ?>">
-					<button type="submit" form="am-filter-form" class="button"><?php esc_html_e( 'Search', 'activity-monitor' ); ?></button>
-					<?php if ( $level || $initiator || $type_filter || $action || $user || $date_from || $date_to || $search ) : ?>
-						<a href="<?php echo esc_url( $base_url ); ?>" class="button button-secondary">
-							<?php esc_html_e( 'Reset', 'activity-monitor' ); ?>
-						</a>
-					<?php endif; ?>
-				</div>
-				<?php if ( $num_pages > 1 ) : ?>
-				<div class="tablenav-pages">
-					<span class="displaying-num"><?php echo $displaying_num_html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- built via esc_html() above. ?></span>
-					<?php echo $pagination_html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- already wp_kses_post()'d above. ?>
-				</div>
-				<?php endif; ?>
-			</div>
-
-			<?php if ( empty( $items ) ) : ?>
-				<div class="am-empty">
-					<span class="dashicons dashicons-info-outline"></span>
-					<p><?php esc_html_e( 'No activity recorded yet.', 'activity-monitor' ); ?></p>
-				</div>
-			<?php else : ?>
-			<table class="wp-list-table widefat am-log-table">
+			<div class="am-table-scroll">
+			<table class="wp-list-table widefat striped am-log-table">
 				<thead>
 					<tr>
 						<th><?php esc_html_e( 'Level',      'activity-monitor' ); ?></th>
@@ -1522,6 +1498,11 @@ class AM_Admin {
 					</tr>
 				</thead>
 				<tbody>
+					<?php if ( empty( $items ) ) : ?>
+						<tr class="no-items">
+							<td class="colspanchange" colspan="8"><?php esc_html_e( 'No activity found.', 'activity-monitor' ); ?></td>
+						</tr>
+					<?php endif; ?>
 					<?php foreach ( $items as $row ) : ?>
 					<tr class="am-row am-row-am-<?php echo esc_attr( $row->level ); ?>">
 						<td><span class="am-badge am-<?php echo esc_attr( $row->level ); ?>"><?php echo esc_html( AM_Log_Levels::label( $row->level ) ); ?></span></td>
@@ -1550,17 +1531,48 @@ class AM_Admin {
 					<?php endforeach; ?>
 				</tbody>
 			</table>
+			</div><!-- .am-table-scroll -->
 
-			<?php if ( $num_pages > 1 ) : ?>
 			<div class="tablenav bottom">
-				<div class="tablenav-pages">
-					<span class="displaying-num"><?php echo $displaying_num_html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- built via esc_html() above. ?></span>
-					<?php echo $pagination_html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- already wp_kses_post()'d above. ?>
+				<div class="alignleft actions">
+					<span class="am-export-label"><?php esc_html_e( 'Export these results:', 'activity-monitor' ); ?></span>
+					<?php
+					// Note: the event 'action' filter (e.g. 'created', 'deleted')
+					// is passed as am_export_action here, not 'action' -- that key
+					// is reserved by admin-post.php for its own dispatch routing
+					// (action=am_export_log) and would collide otherwise.
+					$export_filter_args = array(
+						'am_level'      => $level,
+						'am_initiator'  => $initiator,
+						'am_type'       => $type_filter,
+						'am_export_action' => $action,
+						'am_user'       => $user,
+						'am_from'       => $date_from,
+						'am_to'         => $date_to,
+						'am_search'     => $search,
+					);
+					foreach ( array( 'csv' => 'CSV', 'json' => 'JSON', 'html' => 'HTML', 'txt' => 'TXT' ) as $fmt => $label ) :
+						$export_url = wp_nonce_url(
+							add_query_arg(
+								array_merge( $export_filter_args, array( 'action' => 'am_export_log', 'am_format' => $fmt ) ),
+								admin_url( 'admin-post.php' )
+							),
+							AM_Export::NONCE_ACTION
+						);
+						?>
+						<a href="<?php echo esc_url( $export_url ); ?>" class="button"><?php echo esc_html( $label ); ?></a>
+					<?php endforeach; ?>
 				</div>
+
+				<div class="tablenav-pages<?php echo $num_pages > 1 ? '' : ' one-page'; ?>">
+					<span class="displaying-num"><?php echo $displaying_num_html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- built via esc_html() above. ?></span>
+					<?php if ( $num_pages > 1 ) : ?>
+						<span class="pagination-links"><?php echo $pagination_html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- already wp_kses_post()'d above. ?></span>
+					<?php endif; ?>
+				</div>
+				<br class="clear">
 			</div>
-			<?php endif; ?>
-			<?php endif; ?>
-		</div>
+		</form>
 		<?php
 	}
 
@@ -1613,14 +1625,8 @@ class AM_Admin {
 		$current_token_hash = hash( 'sha256', wp_get_session_token() );
 		$now                = time();
 		?>
-		<div class="am-table-wrap am-table-scroll">
-			<?php if ( empty( $sessions_data ) ) : ?>
-				<div class="am-empty">
-					<span class="dashicons dashicons-groups"></span>
-					<p><?php esc_html_e( 'No active sessions found.', 'activity-monitor' ); ?></p>
-				</div>
-			<?php else : ?>
-			<table class="wp-list-table widefat am-log-table">
+		<div class="am-table-scroll">
+			<table class="wp-list-table widefat striped am-log-table">
 				<thead>
 					<tr>
 						<th><?php esc_html_e( 'User',        'activity-monitor' ); ?></th>
@@ -1632,6 +1638,11 @@ class AM_Admin {
 					</tr>
 				</thead>
 				<tbody>
+					<?php if ( empty( $sessions_data ) ) : ?>
+						<tr class="no-items">
+							<td class="colspanchange" colspan="6"><?php esc_html_e( 'No active sessions found.', 'activity-monitor' ); ?></td>
+						</tr>
+					<?php endif; ?>
 					<?php foreach ( $sessions_data as $s ) :
 						$is_expired  = ( $s['expiration'] > 0 && $s['expiration'] < $now );
 						$is_current  = ( (int) $s['user_id'] === (int) get_current_user_id() && hash_equals( $current_token_hash, $s['token_hash'] ) );
@@ -1695,15 +1706,16 @@ class AM_Admin {
 					<?php endforeach; ?>
 				</tbody>
 			</table>
-			<p class="am-sessions-note">
-				<?php printf(
-					esc_html__( '%d active session(s) across %d user(s).', 'activity-monitor' ),
-					count( $sessions_data ),
-					count( $users )
-				); ?>
-			</p>
-			<?php endif; ?>
-		</div>
+		</div><!-- .am-table-scroll -->
+
+		<p class="am-sessions-note">
+			<?php printf(
+				/* translators: 1: number of active sessions, 2: number of users on the site */
+				esc_html__( '%1$d active session(s) across %2$d user(s).', 'activity-monitor' ),
+				count( $sessions_data ),
+				count( $users )
+			); ?>
+		</p>
 		<?php
 	}
 
@@ -1764,8 +1776,8 @@ class AM_Admin {
 					</button>
 				</div>
 			<?php else : ?>
-				<div class="am-table-wrap am-table-scroll">
-					<table class="wp-list-table widefat am-log-table">
+				<div class="am-table-scroll">
+					<table class="wp-list-table widefat striped am-log-table">
 						<thead>
 							<tr>
 								<th><?php esc_html_e( 'Type', 'activity-monitor' ); ?></th>
@@ -2003,8 +2015,8 @@ class AM_Admin {
 					</button>
 				</div>
 			<?php else : ?>
-				<div class="am-table-wrap am-table-scroll">
-					<table class="wp-list-table widefat am-log-table">
+				<div class="am-table-scroll">
+					<table class="wp-list-table widefat striped am-log-table">
 						<thead>
 							<tr>
 								<th><?php esc_html_e( 'Frequency', 'activity-monitor' ); ?></th>

@@ -33,6 +33,17 @@ workflow disappears.
   to `user_login` when it's empty.
 - **Timestamps** go through `AM_Date_Format::combined()`. CSV/JSON export
   deliberately bypasses it, keeping raw UTC to stay machine-readable.
+- **Build on wp-admin's own furniture, don't restyle it.** Screens use core's
+  `.wrap` + `.wp-heading-inline` + `.wp-header-end`, `.subsubsub` for status
+  filters, `.search-box`, `.tablenav` (`.alignleft.actions` left,
+  `.tablenav-pages` right, `<br class="clear">`), `.wp-list-table widefat
+  striped`, and core's `.postbox` framing for settings sections. `admin.css`
+  should only define what core has no equivalent for — severity/initiator
+  badges, the modal, column widths, and `.page-numbers` (which core's list
+  tables don't emit, so core ships no styling for it). Before 2.3.0 this file
+  restyled buttons, inputs, form-tables, table headers and wrapped every
+  screen in a white panel; the result read as a separate product embedded in
+  wp-admin. Don't reintroduce that.
 - **Dead code gets deleted, not commented out or marked unused.**
 
 ## Architecture

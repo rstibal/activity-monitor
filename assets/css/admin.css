@@ -1,8 +1,24 @@
 /* ── Activity Monitor — Admin Styles v1.1.0 ───────────────────────────── */
 
 /* ── Layout ────────────────────────────────────────────────────────────── */
+/*
+ * Deliberately thin. These screens are built on wp-admin's own furniture
+ * -- .wrap, .wp-heading-inline, .subsubsub, .search-box, .tablenav,
+ * .wp-list-table.striped -- and core already styles every one of them.
+ * What's left in this file is only what core has no equivalent for:
+ * severity/initiator badges, the modal, and a handful of column-width
+ * rules.
+ *
+ * Before adding a rule that restyles a core component (buttons, inputs,
+ * form-table, pagination, table headers), consider that an earlier
+ * version of this file did exactly that -- custom blue buttons, rounded
+ * inputs, uppercase table headers, a white panel wrapping the whole
+ * screen -- and the result read as a different product bolted into
+ * wp-admin rather than part of it. That was removed on purpose in 2.3.0.
+ */
 .am-wrap {
-	max-width: 1400px;
+	/* No max-width: core admin screens fill the available width, and a
+	   cap here left an odd gutter next to every other admin page. */
 }
 
 /* No <code> styling override here on purpose. This plugin used to wrap
@@ -13,38 +29,13 @@
    actual code (HTML, JS, and so on), and code genuinely does want
    core's default treatment, so overriding it here would be backwards. */
 
-.am-header {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	margin: 20px 0 0;
-	flex-wrap: wrap;
-	gap: 12px;
-}
-
-.am-title {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-	font-size: 22px !important;
-	font-weight: 600;
-	color: #1d2327;
-	margin: 0 !important;
-}
-
-.am-title .dashicons {
-	font-size: 26px;
-	width: 26px;
-	height: 26px;
-	color: #2271b1;
-}
-
+/* Version, beside the .wp-heading-inline <h1>. Muted and small so it
+   annotates the heading rather than competing with it -- the same role
+   core's own inline heading extras play. */
 .am-version {
+	color: #646970;
 	font-size: 12px;
-	font-weight: 400;
-	color: #8c8f94;
-	align-self: flex-end;
-	margin-bottom: 3px;
+	vertical-align: super;
 }
 
 .am-description {
@@ -53,75 +44,43 @@
 	font-size: 14px;
 }
 
-/* Names the specific screen after the plugin name in the heading, so
-   the <h1> matches the path the left-hand menu just took to get here.
-   Lighter and lower-contrast than the plugin name it follows -- it's
-   the qualifier, not the title. */
-.am-screen-title {
-	font-size: 15px;
-	font-weight: 400;
+/* Label ahead of the export buttons in the bottom tablenav, aligned to
+   core's own .tablenav .actions line-height so it sits on the same
+   baseline as the buttons beside it. */
+.am-export-label {
+	display: inline-block;
+	margin-right: 6px;
 	color: #646970;
-	align-self: flex-end;
-	margin-bottom: 3px;
-}
-.am-screen-title::before {
-	content: '/';
-	margin-right: 8px;
-	color: #c3c4c7;
+	line-height: 30px;
+	vertical-align: top;
 }
 
-/* The content panel. Was .am-tab-content, shaped to sit seamlessly
-   under a tab strip (no top border, bottom-only radius); with each
-   screen now its own submenu page there's no strip above it, so it
-   closes on all four sides. */
-.am-screen-content {
-	background: #fff;
-	border: 1px solid #c3c4c7;
-	margin-top: 12px;
-	padding: 24px;
-	border-radius: 4px;
-}
-
-.am-filter-bar {
-	background: #f6f7f7;
-	border: 1px solid #dcdcde;
-	border-radius: 4px;
-	padding: 10px 14px;
-	margin-bottom: 16px;
-}
-
-.am-filter-bar form { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; }
-.am-filter-group { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.am-filter-label { font-size: 12px; font-weight: 600; color: #646970; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
-.am-filter-search input[type="search"] { min-width: 240px; }
-
-.am-export-bar {
-	display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-	margin-top: 10px; padding-top: 10px; border-top: 1px solid #dcdcde;
-}
-
-/* Active user-filter chip. Deliberately blue-on-white rather than the
-   neutral gray the rest of this bar uses: the point of it is to be
-   noticed, since nothing else on screen indicates the log is showing
-   one user's rows. Sits in its own row between the filter form and the
-   export bar. */
+/* Active user-filter chip. Borrows core's notice look (white, left
+   accent bar) rather than inventing a shape: it is a piece of state the
+   reader needs to notice, which is exactly what a notice is for. Sits
+   between the tablenav and the table. */
 .am-active-filter {
-	display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-	margin-top: 10px; padding-top: 10px; border-top: 1px solid #dcdcde;
+	margin: 0 0 8px;
 }
 .am-filter-chip {
-	display: inline-flex; align-items: center; gap: 8px;
-	padding: 3px 6px 3px 12px; border-radius: 20px; font-size: 12px;
-	font-weight: 500; border: 1.5px solid #2271b1; background: #f0f6fc;
-	color: #2271b1;
+	display: inline-flex;
+	align-items: center;
+	gap: 10px;
+	padding: 6px 10px;
+	background: #fff;
+	border: 1px solid #c3c4c7;
+	border-left: 4px solid #72aee6;
+	box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
 }
 .am-filter-chip-remove {
-	display: inline-flex; align-items: center; justify-content: center;
-	width: 18px; height: 18px; border-radius: 50%;
-	color: #2271b1; text-decoration: none; font-size: 15px; line-height: 1;
+	color: #646970;
+	text-decoration: none;
+	font-size: 16px;
+	line-height: 1;
 }
 .am-filter-chip-remove:hover, .am-filter-chip-remove:focus {
-	background: #2271b1; color: #fff; text-decoration: none;
+	color: #d63638;
+	text-decoration: none;
 }
 
 /* Event-source toggles. Auto-fitting columns rather than a fixed count
@@ -138,60 +97,19 @@
 	font-size: 13px; color: #1d2327;
 }
 
-.am-pill {
-	display: inline-flex; align-items: center; padding: 3px 10px;
-	border-radius: 20px; font-size: 12px; font-weight: 500;
-	border: 1.5px solid #c3c4c7; background: #f6f7f7; color: #50575e;
-	text-decoration: none; transition: all 0.15s; cursor: pointer;
-}
-.am-pill:hover, .am-pill.active { border-color: #2271b1; color: #2271b1; background: #f0f6fc; text-decoration: none; }
-
-/* Level pills — same 8-level ramp as the row accents/badges above, so a
-   filter button and the rows it filters to read as the same color.
-   These come after the generic :hover/.active rule and repeat the class
-   twice so specificity wins even when a level pill is also .active. */
-.am-pill-am-debug.am-pill-am-debug         { border-color: #8c8f94; color: #50575e; background: #f0f0f1; }
-.am-pill-am-info.am-pill-am-info           { border-color: #229954; color: #1e8449; background: #eafaf1; }
-.am-pill-am-notice.am-pill-am-notice       { border-color: #2471a3; color: #154360; background: #eaf4fc; }
-.am-pill-am-warning.am-pill-am-warning     { border-color: #d68910; color: #7d4e00; background: #fef9e7; }
-.am-pill-am-error.am-pill-am-error         { border-color: #c9660a; color: #8a3a00; background: #fdf1e6; }
-.am-pill-am-critical.am-pill-am-critical   { border-color: #c0392b; color: #7b241c; background: #fdedec; }
-.am-pill-am-alert.am-pill-am-alert         { border-color: #a5281b; color: #641e14; background: #fbe4e1; }
-.am-pill-am-emergency.am-pill-am-emergency { border-color: #7b1113; color: #4a0e0f; background: #f8dcda; }
-.am-pill-am-debug.am-pill-am-debug:hover, .am-pill-am-debug.am-pill-am-debug.active { background: #e2e2e3; }
-.am-pill-am-info.am-pill-am-info:hover, .am-pill-am-info.am-pill-am-info.active { background: #d5f5e3; }
-.am-pill-am-notice.am-pill-am-notice:hover, .am-pill-am-notice.am-pill-am-notice.active { background: #d6eaf8; }
-.am-pill-am-warning.am-pill-am-warning:hover, .am-pill-am-warning.am-pill-am-warning.active { background: #fdebd0; }
-.am-pill-am-error.am-pill-am-error:hover, .am-pill-am-error.am-pill-am-error.active { background: #fce3cf; }
-.am-pill-am-critical.am-pill-am-critical:hover, .am-pill-am-critical.am-pill-am-critical.active { background: #fadbd8; }
-.am-pill-am-alert.am-pill-am-alert:hover, .am-pill-am-alert.am-pill-am-alert.active { background: #f5d0cc; }
-.am-pill-am-emergency.am-pill-am-emergency:hover, .am-pill-am-emergency.am-pill-am-emergency.active { background: #f0c4c1; }
-
-.am-table-wrap { border: 1px solid #c3c4c7; border-radius: 4px; overflow: hidden; margin-bottom: 24px; }
+/* Horizontal scroll for the wider tables (the log has eight columns).
+   Purely a scroll container -- no border or background of its own, so
+   the .wp-list-table inside keeps core's own framing. */
 .am-table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
-.am-log-table { border: none !important; margin: 0 !important; table-layout: auto !important; }
-.am-log-table th { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #646970; background: #f6f7f7 !important; padding: 10px 12px !important; border-bottom: 1px solid #dcdcde; white-space: nowrap; }
-.am-log-table td { padding: 10px 12px !important; vertical-align: middle; border-bottom: 1px solid #f0f0f1; font-size: 13px; line-height: 1.5; white-space: nowrap; }
-
-/* Plain wp-list-table instances in this plugin that don't use the
-   fuller am-log-table styling -- scoped to .am-settings-section so
-   this doesn't affect wp-list-table elsewhere in wp-admin. Matches
-   am-log-table's border-bottom row separator so both table styles
-   look consistent with each other, replacing WP core's own striped
-   (alternating background) look, which was removed from every
-   table's class list in this plugin. */
-.am-settings-section table.wp-list-table:not(.am-log-table) tr {
-	background: none;
-}
-.am-settings-section table.wp-list-table:not(.am-log-table) td,
-.am-settings-section table.wp-list-table:not(.am-log-table) th {
-	border-bottom: 1px solid #f0f0f1;
-}
-.am-settings-section table.wp-list-table:not(.am-log-table) tr:last-child td {
-	border-bottom: none;
-}
-.am-log-table tr:last-child td { border-bottom: none; }
+/* The log/session tables are plain core .wp-list-table.striped. Only
+   two behaviours differ from core's default: auto layout, because these
+   columns vary far more in natural width than a fixed layout handles
+   well, and nowrap cells, because a wrapped timestamp or IP is harder
+   to scan than a truncated one. Everything else -- header weight,
+   padding, borders, row striping -- is core's. */
+.am-log-table { table-layout: auto; }
+.am-log-table td { vertical-align: middle; white-space: nowrap; }
 
 /* Date column (Activity Log) -- date and time on separate lines rather
    than one long inline string, so the column reads at a glance instead
@@ -306,14 +224,14 @@
 
 .am-session-expired td { opacity: 0.6; }
 .am-session-current td { background-color: #f0f6fc !important; }
-.am-sessions-note { padding: 10px 14px; color: #646970; font-size: 12px; margin: 0; border-top: 1px solid #dcdcde; }
+.am-sessions-note { color: #646970; margin: 8px 0 0; }
 
-.am-empty { text-align: center; padding: 60px 20px; color: #646970; }
-.am-empty .dashicons { font-size: 48px; width: 48px; height: 48px; color: #c3c4c7; display: block; margin: 0 auto 12px; }
-.am-empty p { font-size: 16px; }
-
-.am-btn-danger { color: #d63638 !important; border-color: #d63638 !important; border-width: 1.5px !important; border-radius: 4px !important; font-weight: 600 !important; box-shadow: none !important; }
-.am-btn-danger:hover { background: #d63638 !important; color: #fff !important; }
+/* Destructive actions. Core has no "danger button", so this is one of
+   the few genuinely additive rules here -- kept to a red label and
+   border on core's own .button shape rather than a differently-shaped
+   control. */
+.am-btn-danger { color: #b32d2e; border-color: #b32d2e; }
+.am-btn-danger:hover, .am-btn-danger:focus { background: #b32d2e; color: #fff; border-color: #b32d2e; }
 
 .am-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 100000; display: flex; align-items: center; justify-content: center; }
 .am-modal { background: #fff; border-radius: 6px; box-shadow: 0 8px 40px rgba(0,0,0,0.25); width: 660px; max-width: 95vw; max-height: 85vh; display: flex; flex-direction: column; }
@@ -346,123 +264,35 @@
 .am-diff-before { color: #b32d2e; text-decoration: line-through; }
 .am-diff-after { color: #2271b1; }
 
+/* Settings sections use core's .postbox framing -- white on the gray
+   page, 1px #c3c4c7, no radius or shadow. That's what gives each
+   section its contrast now that the screen itself is no longer boxed.
+   Note there is deliberately no styling below for inputs, checkboxes,
+   buttons, or .form-table: those were all restyled here once (rounded
+   blue-ringed fields, custom blue save buttons) and it was the single
+   biggest reason Settings didn't look like wp-admin. Core styles them. */
 .am-settings-section {
 	background: #fff;
-	border: 1px solid #dcdcde;
-	border-radius: 6px;
-	padding: 20px 24px;
+	border: 1px solid #c3c4c7;
+	padding: 4px 20px 16px;
 	margin-bottom: 20px;
-	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
 }
 
-.am-section-title { display: flex; align-items: center; gap: 8px; font-size: 15px !important; font-weight: 600; color: #1d2327; margin: 0 0 6px !important; }
-.am-section-title .dashicons { color: #2271b1; }
-.am-settings-section > .am-description { margin-top: 0; margin-bottom: 18px; }
+.am-section-title { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.am-section-title .dashicons { color: #646970; }
+.am-settings-section > .am-description { margin-top: 0; margin-bottom: 12px; }
 
-/* Settings form styling -- brings every <table class="form-table">
-   block in this plugin's Settings tab (Notifications, Digest, Session
-   Management, Date &amp; Time Display) in line with the visual language used
-   elsewhere (Activity Log's badges, the pagination buttons) rather
-   than leaving raw wp-admin defaults, which was the main visual gap
-   between Settings and every other tab. */
-.am-settings-section .form-table { margin: 0; border-collapse: separate; border-spacing: 0; }
-.am-settings-section .form-table tr:not(:last-child) th,
-.am-settings-section .form-table tr:not(:last-child) td { border-bottom: 1px solid #f0f0f1; }
-.am-settings-section .form-table th {
-	width: 240px;
-	padding: 18px 16px 18px 0;
-	font-size: 13px;
-	font-weight: 600;
-	color: #1d2327;
-	vertical-align: top;
-}
-.am-settings-section .form-table td { padding: 16px 0; vertical-align: middle; }
-.am-settings-section .form-table .description { color: #646970; margin-top: 8px; font-size: 12px; }
+.am-section-divider { border: none; border-top: 1px solid #dcdcde; margin: 24px 0; }
 
-/* Inputs -- consistent border/radius/focus-ring language with the
-   rest of the plugin (same blue used for active tabs, section icons,
-   pagination hover) instead of the browser/WP-core default focus
-   outline, so a focused field visually belongs to this plugin too. */
-.am-settings-section input[type="number"],
-.am-settings-section input[type="text"],
-.am-settings-section input[type="email"],
-.am-settings-section select {
-	border: 1.5px solid #c3c4c7;
-	border-radius: 4px;
-	padding: 6px 10px;
-	font-size: 13px;
-	transition: border-color 0.15s, box-shadow 0.15s;
-}
-.am-settings-section input[type="number"]:focus,
-.am-settings-section input[type="text"]:focus,
-.am-settings-section input[type="email"]:focus,
-.am-settings-section select:focus {
-	border-color: #2271b1;
-	box-shadow: 0 0 0 1px #2271b1;
-	outline: none;
-}
-
-/* Checkboxes -- sized up slightly from the browser default (which
-   reads as an afterthought next to this plugin's otherwise bolder
-   visual weight) and given the same blue as everything else here. */
-.am-settings-section input[type="checkbox"] {
-	width: 18px;
-	height: 18px;
-	border: 1.5px solid #c3c4c7;
-	border-radius: 3px;
-}
-.am-settings-section input[type="checkbox"]:checked {
-	border-color: #2271b1;
-	background: #2271b1;
-}
-
-/* Save buttons -- WP core's submit_button() outputs plain
-   button/button-primary with no plugin-specific styling; restyled to
-   the same blue used for active tabs/section icons/pagination
-   (#2271b1) so "Save X Settings" reads as this plugin's own action,
-   not a generic wp-admin button that happens to be on this page. */
-.am-settings-section .button-primary {
-	background: #2271b1;
-	border-color: #2271b1;
-	box-shadow: none;
-	text-shadow: none;
-	border-radius: 4px;
-	font-weight: 600;
-}
-.am-settings-section .button-primary:hover,
-.am-settings-section .button-primary:focus {
-	background: #195a8c;
-	border-color: #195a8c;
-}
-.am-settings-section .button-secondary {
-	border: 1.5px solid #2271b1;
-	color: #2271b1;
-	background: #fff;
-	border-radius: 4px;
-	font-weight: 600;
-	box-shadow: none;
-}
-.am-settings-section .button-secondary:hover,
-.am-settings-section .button-secondary:focus {
-	background: #f0f6fc;
-	color: #195a8c;
-	border-color: #195a8c;
-}
-.am-settings-section .submit { margin-top: 8px !important; }
-
-.am-section-divider { border: none; border-top: 1px solid #dcdcde; margin: 28px 0; }
-
+/* Group heading above a run of related sections. Core's closest
+   equivalent is the small-caps label above a settings block. */
 .am-settings-group-title {
-	font-size: 11px;
-	font-weight: 700;
-	text-transform: uppercase;
-	letter-spacing: 0.8px;
-	color: #8c8f94;
-	margin: 0 0 16px !important;
+	font-size: 13px;
+	color: #646970;
+	margin: 0 0 12px !important;
 }
 .am-danger-zone {
-	background: #fef7f6;
-	border-color: #f4c7c3;
+	border-left: 4px solid #d63638;
 }
 .am-danger-zone .am-danger-title .dashicons { color: #d63638; }
 
@@ -473,67 +303,40 @@
 .am-field-row .description { font-size: 11px !important; color: #646970; margin: 2px 0 0 !important; }
 .am-channel-add-buttons { display: flex; gap: 10px; margin: 14px 0; }
 
-.am-table-wrap .tablenav { padding: 10px 12px; border-top: 1px solid #dcdcde; }
-
-/* Top tablenav (search box + pagination): mirrors the bottom
-   tablenav's padding exactly ("same look and spacing"), just divides
-   from the table below it rather than above, and lays its two
-   children out at opposite ends of the row. */
-.am-table-wrap .tablenav.top {
-	border-top: none;
-	border-bottom: 1px solid #dcdcde;
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	flex-wrap: wrap;
-	gap: 12px;
-}
-
-/* Stacks the search box under the pagination on narrow screens rather
-   than squeezing both onto one row -- same 782px breakpoint where the
-   admin sidebar itself collapses. */
-@media (max-width: 782px) {
-	.am-table-wrap .tablenav.top { flex-direction: column; align-items: stretch; }
-}
-
-/* Pagination -- paginate_links() is WP core's own function; every link
-   and the current-page indicator get class="page-numbers" (confirmed
-   via WP core source), so no PHP change is needed here, only CSS.
-   Sized and styled as buttons rather than the small underlined-text
-   links WP core outputs by default, since those are a difficult click
-   target -- same border/hover language as .am-pill elsewhere in this
-   plugin, but square corners (standard for numbered pagination, vs.
-   pill's fully-rounded shape which suits filter tags). */
+/* Pagination. paginate_links() emits .page-numbers, which core's list
+   tables don't use (they build their own prev/next markup), so core
+   ships no styling for it and something has to be defined here.
+   Matched to core's .tablenav-pages buttons -- small, square, gray,
+   blue link text, the current page a plain dark box. Was previously a
+   row of 32px filled-blue rounded buttons, which was the loudest thing
+   on the screen and looked nothing like wp-admin. */
 .tablenav-pages .page-numbers {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	min-width: 32px;
-	height: 32px;
-	padding: 0 10px;
+	display: inline-block;
+	min-width: 17px;
+	padding: 3px 6px;
 	margin: 0 2px;
-	border: 1.5px solid #c3c4c7;
-	border-radius: 4px;
+	border: 1px solid #dcdcde;
 	background: #f6f7f7;
-	color: #50575e;
-	font-size: 13px;
-	font-weight: 500;
-	text-decoration: none;
-	transition: all 0.15s;
-}
-.tablenav-pages a.page-numbers:hover {
-	border-color: #2271b1;
 	color: #2271b1;
-	background: #f0f6fc;
+	font-size: 13px;
+	line-height: 1.6;
+	text-align: center;
+	text-decoration: none;
+}
+.tablenav-pages a.page-numbers:hover,
+.tablenav-pages a.page-numbers:focus {
+	border-color: #8c8f94;
+	background: #f0f0f1;
+	color: #135e96;
 	text-decoration: none;
 }
 .tablenav-pages .page-numbers.current {
-	border-color: #2271b1;
-	background: #2271b1;
-	color: #fff;
-	font-weight: 600;
+	border-color: #8c8f94;
+	background: #dcdcde;
+	color: #1d2327;
 }
 .tablenav-pages .page-numbers.dots {
 	border-color: transparent;
 	background: transparent;
+	color: #646970;
 }

@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, session management
 Requires at least: 5.3
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.2.2
+Stable tag: 2.3.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -69,6 +69,13 @@ Yes, retention is configurable and old entries are pruned automatically on a dai
 2. Active Sessions, with per-session revoke and site-wide emergency lockdown.
 
 == Changelog ==
+
+= 2.3.0 =
+* Changed: the admin screens now use WordPress's own styling instead of a custom look. The white panel that wrapped each screen is gone, so sections and tables sit on the standard gray background and read the same way the Plugins and Posts screens do.
+* Changed: the log and session tables are now standard WordPress list tables, with the same fonts, spacing, row striping, and headings used elsewhere in the admin.
+* Changed: the search box and filter dropdowns moved to their standard positions — search above the table on the right, filters in the toolbar on the left with a Filter button, matching the Plugins screen.
+* Changed: the severity filter is now a row of status links above the table, the same control the Plugins screen uses for All / Active / Inactive. Severity colours are unchanged in the table's own Level column.
+* Changed: pagination is simplified to WordPress's standard style.
 
 = 2.2.2 =
 * Fixed: upgrading now clears leftover settings rows belonging to features that have been removed, instead of leaving them in the database until the plugin is deleted. Nothing you can see or configure changes.
