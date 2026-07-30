@@ -157,12 +157,12 @@ class AM_Event_Query {
 		return (int) $wpdb->get_var( "SELECT COUNT(*) FROM `{$table}`" );
 	}
 
-	// ── Dashboard (formerly "Stats & Insights", spec §4) ──────────────────
+	// ── Period-summary queries (email digest) ──────────────────────────────
 	//
-	// All stats methods take $days (7/14/30 typical) and query only
-	// am_events -- none of this needs am_event_context. Each returns plain
-	// arrays/counts ready for the admin screen or the digest email to
-	// render directly, no further processing needed by the caller.
+	// These take $days (7/14/30 typical) and query only am_events -- none
+	// of this needs am_event_context. Each returns plain arrays/counts
+	// ready for AM_Digest::build_html() to render directly. The Dashboard
+	// admin tab that used to be their other consumer was removed in 2.1.0.
 
 	/**
 	 * Total event count within the last $days, and the count for the
@@ -228,49 +228,6 @@ class AM_Event_Query {
 	}
 
 	/**
-	 * Same window and zero-filling as get_daily_trend() above, but split
-	 * by level so the Dashboard's Daily activity chart can render each
-	 * day as a stacked column instead of a single-value bar.
-	 *
-	 * Every day is filled with every level (including zeros), so callers
-	 * can iterate AM_Log_Levels::ORDER without existence checks and the
-	 * stack segments stay in a consistent order across days. The daily
-	 * total is just array_sum() of a day's row, so callers needing both
-	 * the stack and the total only need this one query.
-	 *
-	 * @return array<string, array<string, int>> 'Y-m-d' => level => count
-	 */
-	public static function get_daily_trend_by_level( int $days ): array {
-		global $wpdb;
-		$table = $wpdb->prefix . AM_Schema::EVENTS_TABLE;
-
-		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant.
-		$rows = $wpdb->get_results( $wpdb->prepare(
-			"SELECT DATE(date) AS day, level, COUNT(*) AS total
-			 FROM `{$table}`
-			 WHERE date >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL %d DAY)
-			 GROUP BY DATE(date), level
-			 ORDER BY day ASC",
-			$days
-		), ARRAY_A );
-
-		$by_day = array();
-		foreach ( $rows as $row ) {
-			$by_day[ $row['day'] ][ $row['level'] ] = (int) $row['total'];
-		}
-
-		$trend = array();
-		for ( $i = $days - 1; $i >= 0; $i-- ) {
-			$date            = gmdate( 'Y-m-d', strtotime( "-{$i} days" ) );
-			$trend[ $date ]  = array();
-			foreach ( AM_Log_Levels::ORDER as $level ) {
-				$trend[ $date ][ $level ] = $by_day[ $date ][ $level ] ?? 0;
-			}
-		}
-		return $trend;
-	}
-
-	/**
 	 * Event counts grouped by event_type, descending, for the last $days.
 	 *
 	 * @return array<string, int> event_type => count
@@ -299,43 +256,10 @@ class AM_Event_Query {
 	}
 
 	/**
-	 * Event counts grouped by level for the last $days. Zero-filled for
-	 * every AM_Log_Levels::ORDER value (not just ones that occurred) so
-	 * a chart built from this always shows the same complete set of
-	 * bars/segments in a consistent order, rather than the set shifting
-	 * around depending on what happened to log in the period.
-	 *
-	 * @return array<string, int> level => count, in AM_Log_Levels::ORDER
-	 */
-	public static function get_breakdown_by_level( int $days ): array {
-		global $wpdb;
-		$table = $wpdb->prefix . AM_Schema::EVENTS_TABLE;
-
-		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant.
-		$rows = $wpdb->get_results( $wpdb->prepare(
-			"SELECT level, COUNT(*) AS total
-			 FROM `{$table}`
-			 WHERE date >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL %d DAY)
-			 GROUP BY level",
-			$days
-		), ARRAY_A );
-
-		$counts = array();
-		foreach ( $rows as $row ) {
-			$counts[ $row['level'] ] = (int) $row['total'];
-		}
-
-		$out = array();
-		foreach ( AM_Log_Levels::ORDER as $level ) {
-			$out[ $level ] = $counts[ $level ] ?? 0;
-		}
-		return $out;
-	}
-
-	/**
 	 * Event counts grouped by initiator for the last $days. Zero-filled
-	 * for every AM_Initiator_Detector::all() value, same reasoning as
-	 * get_breakdown_by_level() above.
+	 * for every AM_Initiator_Detector::all() value so the result always
+	 * has a consistent, complete set of keys regardless of what actually
+	 * occurred in the window.
 	 *
 	 * @return array<string, int> initiator => count
 	 */
@@ -362,46 +286,6 @@ class AM_Event_Query {
 			$out[ $initiator ] = $counts[ $initiator ] ?? 0;
 		}
 		return $out;
-	}
-
-	/**
-	 * Peak activity: busiest day-of-week and busiest hour-of-day within
-	 * the window, each with its count. Hour is in the site's configured
-	 * timezone (matches how the log table itself displays times), not UTC.
-	 *
-	 * @return array{busiest_day: array{name:string,count:int}|null, busiest_hour: array{hour:int,count:int}|null}
-	 */
-	public static function get_peak_activity( int $days ): array {
-		global $wpdb;
-		$table  = $wpdb->prefix . AM_Schema::EVENTS_TABLE;
-		$offset = self::get_gmt_offset_sql();
-
-		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table/offset are plugin-controlled.
-		$day_row = $wpdb->get_row( $wpdb->prepare(
-			"SELECT DAYNAME(DATE_ADD(date, INTERVAL {$offset} SECOND)) AS day_name, COUNT(*) AS total
-			 FROM `{$table}`
-			 WHERE date >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL %d DAY)
-			 GROUP BY day_name
-			 ORDER BY total DESC
-			 LIMIT 1",
-			$days
-		), ARRAY_A );
-
-		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table/offset are plugin-controlled.
-		$hour_row = $wpdb->get_row( $wpdb->prepare(
-			"SELECT HOUR(DATE_ADD(date, INTERVAL {$offset} SECOND)) AS hour, COUNT(*) AS total
-			 FROM `{$table}`
-			 WHERE date >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL %d DAY)
-			 GROUP BY hour
-			 ORDER BY total DESC
-			 LIMIT 1",
-			$days
-		), ARRAY_A );
-
-		return array(
-			'busiest_day'  => $day_row ? array( 'name' => $day_row['day_name'], 'count' => (int) $day_row['total'] ) : null,
-			'busiest_hour' => $hour_row ? array( 'hour' => (int) $hour_row['hour'], 'count' => (int) $hour_row['total'] ) : null,
-		);
 	}
 
 	/**
@@ -464,15 +348,5 @@ class AM_Event_Query {
 			 LIMIT %d",
 			$query_args
 		) );
-	}
-
-	/**
-	 * SQL fragment for converting a UTC datetime to the site's configured
-	 * timezone offset, in seconds. WordPress stores gmt_offset as a
-	 * (possibly fractional, e.g. 5.5 for India) number of hours.
-	 */
-	private static function get_gmt_offset_sql(): string {
-		$hours = (float) get_option( 'gmt_offset', 0 );
-		return (string) (int) round( $hours * HOUR_IN_SECONDS );
 	}
 }

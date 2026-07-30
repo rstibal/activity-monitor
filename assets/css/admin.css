@@ -3,62 +3,6 @@
 /* ── Layout ────────────────────────────────────────────────────────────── */
 .am-wrap {
 	max-width: 1400px;
-	/* Slice-fill colors for the Dashboard's Events by level pie chart.
-	   Each level's filter pill (.am-pill-am-* below) defines three
-	   colors -- a pale background, a dark text color, and a mid-tone
-	   border. These vars use the *border* tier, which is the one
-	   built to hold up as a solid block of color rather than as text
-	   on a light field or as a background wash.
-
-	   Both other tiers were tried here first and reverted: the pale
-	   backgrounds in 2.0.52 (too washed out to read as data, and the
-	   five warm levels were near-identical peaches), and the dark
-	   text colors through 2.0.57 (the hot end collapsed into muddy
-	   browns and the whole chart read as a dark blob at this size).
-
-	   Worth knowing if this is revisited: this palette is a severity
-	   *ramp*, deliberately shaded so adjacent levels resemble each
-	   other -- which is right for badges, where the text carries the
-	   identity and color only sets the mood, but works against a pie,
-	   where color is the sole identifier. The border tier separates
-	   best of the three (warning is a true orange rather than brown,
-	   and the reds step apart in lightness), and critical/alert/
-	   emergency reading as one red mass is acceptable: at a glance
-	   the chart should answer "how much of this is bad," and the
-	   legend plus per-slice hover tooltips handle exact identification.
-	   A chart with a positional axis -- e.g. a 100% stacked severity
-	   strip -- would suit an ordinal scale like this better than a pie
-	   does, since order would be carried by position instead of color.
-
-	   The legend shows these same colors as a small swatch next to
-	   each label, rather than the badge pill it originally paired with. */
-	--am-pie-debug: #8c8f94;
-	--am-pie-info: #229954;
-	--am-pie-notice: #2471a3;
-	--am-pie-warning: #d68910;
-	--am-pie-error: #c9660a;
-	--am-pie-critical: #c0392b;
-	--am-pie-alert: #a5281b;
-	--am-pie-emergency: #7b1113;
-
-	/* Slice-fill colors for the Dashboard's Traffic source pie. These
-	   are picked on the opposite principle from the severity palette
-	   above, and deliberately so: traffic sources are *nominal* --
-	   "search" isn't more or less than "social" -- so what they need is
-	   maximum hue separation, not a ramp. That's also exactly what a pie
-	   wants, which is why this data suits one and levels didn't.
-
-	   Hues are kept clear of the severity palette's greens, oranges and
-	   reds so the two charts on the same screen don't imply a
-	   relationship that isn't there, and clear of red specifically so no
-	   traffic source reads as an error. Direct is the neutral gray
-	   because it genuinely is the absence of information -- an
-	   unattributed visit, not a positive signal. */
-	--am-pie-src-direct: #646970;
-	--am-pie-src-search: #00796b;
-	--am-pie-src-social: #6a3fa0;
-	--am-pie-src-referral: #b26a00;
-	--am-pie-src-internal: #4d7ea8;
 }
 
 /* No <code> styling override here on purpose. This plugin used to wrap
@@ -187,13 +131,13 @@
 .am-log-table th { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #646970; background: #f6f7f7 !important; padding: 10px 12px !important; border-bottom: 1px solid #dcdcde; white-space: nowrap; }
 .am-log-table td { padding: 10px 12px !important; vertical-align: middle; border-bottom: 1px solid #f0f0f1; font-size: 13px; line-height: 1.5; white-space: nowrap; }
 
-/* Plain wp-list-table instances in this plugin (Dashboard's small
-   summary tables) that don't use the fuller am-log-table styling --
-   scoped to .am-settings-section so this doesn't affect wp-list-table
-   elsewhere in wp-admin. Matches am-log-table's border-bottom row
-   separator so both table styles look consistent with each other,
-   replacing WP core's own striped (alternating background) look,
-   which was removed from every table's class list in this plugin. */
+/* Plain wp-list-table instances in this plugin that don't use the
+   fuller am-log-table styling -- scoped to .am-settings-section so
+   this doesn't affect wp-list-table elsewhere in wp-admin. Matches
+   am-log-table's border-bottom row separator so both table styles
+   look consistent with each other, replacing WP core's own striped
+   (alternating background) look, which was removed from every
+   table's class list in this plugin. */
 .am-settings-section table.wp-list-table:not(.am-log-table) tr {
 	background: none;
 }
@@ -275,8 +219,8 @@
 	white-space: nowrap;
 }
 
-/* Page column (Traffic tab's live feed + Dashboard's Top pages table)
-   -- same single-line truncation approach, sized in px since page
+/* Page column (Traffic tab's live feed) -- same single-line
+   truncation approach, sized in px since page
    titles/URL paths don't have a natural character-count ceiling the
    way IPv4/IPv6 do. Full path available via the title attribute and
    (live feed only) the Details modal. */
@@ -319,59 +263,13 @@
 /* Initiator badges — deliberately a cooler, more muted palette than the
    severity levels above, so "who/what did this" never gets visually
    confused with "how bad was this" at a glance. */
-.am-init-wp_user  { background: #e8eaf6; color: #2c3e91; } /* logged-in human */
-.am-init-web_user { background: #ede7f6; color: #512e8a; } /* anonymous visitor */
-.am-init-wp_cron  { background: #e0f2f1; color: #1a6b64; } /* scheduled/automated */
-.am-init-wp_cli   { background: #eceff1; color: #37474f; } /* command line */
-.am-init-system   { background: #f5f5f5; color: #616161; } /* internal/unattributed */
-
-.am-pie-note { margin: 12px 0 0; }
-
-/* NOTE: this was briefly dead in 2.0.59, when Events by level was
-   removed from the Dashboard, and came back in 2.0.60 rendering the
-   Traffic source breakdown instead. Worth knowing why the second use
-   works where the first didn't: traffic sources are nominal, few, and
-   a genuine whole, which is what a pie is for -- log levels were an
-   ordinal ramp, which is what it isn't. The palette lives in
-   --am-pie-src-* at the top of this file; see the note there.
-
-   Pie + legend — SVG wedges rendered server-side in PHP, no JS or
-   chart library.
-   Slice fills use the --am-pie-* variables at the top of this file --
-   see there for which tier of each level's filter-pill palette they
-   take and why. Several of the level colors (warning/error especially,
-   and the critical/alert/emergency cluster) are close enough to
-   blend together without a boundary, hence the white stroke below on
-   every wedge, including its outer edge. (A darker gray outer ring was
-   also tried and reverted -- looked worse than uniform white; a
-   drop-shadow was tried and dropped too, back to a flat pie with no
-   shadow.) The legend pairs each slice with a small solid-color swatch
-   in that same color rather than the actual badge pill -- a legend
-   only needs "this color = this label", not the full badge treatment,
-   and these fills wouldn't fit the badge's own pastel-background
-   styling anyway. (Initiator had its own matching pie here too until it
-   was removed for being ~all one slice in practice -- not informative
-   as a chart. Initiator itself is still tracked/shown in the Activity
-   Log, its filter, the detail modal, and CSV export -- just not as a
-   Dashboard chart.) */
-.am-pie-row { display: flex; align-items: center; gap: 16px; }
-.am-pie-svg { width: 50%; height: auto; aspect-ratio: 1 / 1; flex-shrink: 0; }
-.am-pie-slice { stroke: #ffffff; stroke-width: 1; }
-.am-pie-legend { flex: 1; min-width: 0; list-style: none; margin: 0; padding: 0; }
-.am-pie-legend-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 3px 0; border-bottom: 1px solid #f0f0f1; font-size: 12px; }
-.am-pie-legend-row:last-child { border-bottom: none; }
-.am-pie-legend-count { flex-shrink: 0; font-size: 11px; color: #646970; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.am-pie-legend-pct { color: #a7aaad; }
-/* Legend label -- a color swatch (matching that slice's own --am-pie-*
-   fill) plus plain text, replacing the pastel badge pill this used to
-   show: this is a chart legend, not a place the full badge treatment
-   needs to appear a second time. */
-.am-pie-legend-label { display: inline-flex; align-items: center; gap: 6px; color: #1d2327; }
-.am-pie-swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
-@media (max-width: 782px) {
-	.am-pie-row { flex-direction: column; align-items: stretch; }
-	.am-pie-svg { align-self: center; }
-}
+.am-init-wp_user        { background: #e8eaf6; color: #2c3e91; } /* logged-in human */
+.am-init-web_user       { background: #ede7f6; color: #512e8a; } /* anonymous visitor */
+.am-init-wp_cron        { background: #e0f2f1; color: #1a6b64; } /* scheduled/automated */
+.am-init-wp_cli         { background: #eceff1; color: #37474f; } /* command line */
+.am-init-wp_auto_update { background: #fff3e0; color: #8a5300; } /* unattended background update */
+.am-init-rest_api       { background: #e0f7fa; color: #00595e; } /* REST call with no logged-in browser session */
+.am-init-system         { background: #f5f5f5; color: #616161; } /* internal/unattributed */
 
 .am-event-type { background: #f0f6fc; color: #0073aa; border-radius: 3px; padding: 1px 5px; font-size: 11px; white-space: nowrap; }
 .am-role { display: block; color: #646970; font-size: 11px; }
@@ -428,23 +326,6 @@
 	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
 }
 
-/* Side-by-side widget cards on the Dashboard -- reused by every row of
-   related widgets there (currently Daily activity + Top pages), so
-   widgets of the same kind always get the same paired layout instead
-   of some rows being side-by-side and others
-   stacked full-width for no reason. Flex's default align-items: stretch makes
-   every .am-chart-row-item child the same height automatically -- no
-   fixed height needed, so a taller card (e.g. one with an extra
-   description line) still keeps its siblings matched to it rather than
-   all being pinned to an arbitrary shared number. Falls back to
-   stacked at WP admin's own 782px breakpoint (where the admin sidebar
-   itself collapses), rather than an arbitrary new breakpoint. */
-.am-chart-row { display: flex; gap: 20px; margin-bottom: 20px; }
-.am-chart-row .am-chart-row-item { flex: 1; min-width: 0; margin-bottom: 0; }
-@media (max-width: 782px) {
-	.am-chart-row { flex-direction: column; }
-}
-
 .am-section-title { display: flex; align-items: center; gap: 8px; font-size: 15px !important; font-weight: 600; color: #1d2327; margin: 0 0 6px !important; }
 .am-section-title .dashicons { color: #2271b1; }
 .am-settings-section > .am-description { margin-top: 0; margin-bottom: 18px; }
@@ -452,9 +333,9 @@
 /* Settings form styling -- brings every <table class="form-table">
    block in this plugin's Settings tab (Notifications, Digest, Session
    Management, Traffic) in line with the visual language used
-   elsewhere (Dashboard's colored bar-lists, Activity Log's badges,
-   the pagination buttons) rather than leaving raw wp-admin defaults,
-   which was the main visual gap between Settings and every other tab. */
+   elsewhere (Activity Log's badges, the pagination buttons) rather
+   than leaving raw wp-admin defaults, which was the main visual gap
+   between Settings and every other tab. */
 .am-settings-section .form-table { margin: 0; border-collapse: separate; border-spacing: 0; }
 .am-settings-section .form-table tr:not(:last-child) th,
 .am-settings-section .form-table tr:not(:last-child) td { border-bottom: 1px solid #f0f0f1; }
@@ -540,18 +421,6 @@
 }
 .am-settings-section .submit { margin-top: 8px !important; }
 
-.am-live-dot {
-	display: inline-block;
-	width: 8px;
-	height: 8px;
-	border-radius: 50%;
-	background: #2ecc71;
-	animation: am-live-pulse 2s ease-in-out infinite;
-}
-@keyframes am-live-pulse {
-	0%, 100% { opacity: 1; }
-	50% { opacity: 0.35; }
-}
 .am-section-divider { border: none; border-top: 1px solid #dcdcde; margin: 28px 0; }
 
 .am-settings-group-title {
@@ -597,9 +466,8 @@
 }
 
 /* Stacks the search box under the pagination on narrow screens rather
-   than squeezing both onto one row -- same 782px breakpoint (where the
-   admin sidebar itself collapses) used by .am-chart-row/.am-pie-row
-   elsewhere in this file. */
+   than squeezing both onto one row -- same 782px breakpoint where the
+   admin sidebar itself collapses. */
 @media (max-width: 782px) {
 	.am-table-wrap .tablenav.top { flex-direction: column; align-items: stretch; }
 }
@@ -645,92 +513,3 @@
 	border-color: transparent;
 	background: transparent;
 }
-
-/* Stats & Insights tab (spec §4) */
-.am-stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin: 16px 0 24px; }
-.am-stats-card { background: #f6f7f7; border: 1px solid #c3c4c7; border-radius: 6px; padding: 14px 16px; }
-.am-stats-card-value { font-size: 24px; font-weight: 600; color: #1d2327; line-height: 1.2; }
-.am-stats-card-label { font-size: 12px; color: #646970; margin-top: 2px; }
-.am-stats-card-delta { font-size: 11px; color: #646970; margin-top: 6px; }
-/* Stacked column chart — the Dashboard's Daily activity widget. One
-   column per day, each segmented by level using the --am-pie-*
-   severity palette (see top of file). Taller than .am-trend-chart
-   below because it's paired with Top pages in an .am-chart-row, and
-   8 ranked rows come to roughly 300px; at the old 140px this card was
-   the short one and its sibling stretched it out with dead space.
-
-   Segments are emitted most-severe-first in PHP, so within this
-   column flex the severe levels land at the top of the stack.
-   .am-stack-col-area is a separate bottom-anchored box from the wrap
-   so the day labels stay on a shared baseline no matter how tall the
-   column is. It takes an explicit calc() height rather than flex: 1
-   because a flex-sized item's auto height doesn't reliably resolve
-   percentage heights on its children, and both the column height and
-   its segment heights are percentages. The 18px subtracted is
-   .am-stack-label's own pinned height, so the two must stay in sync. Segment min-height keeps a 1-event day from rendering
-   sub-pixel and vanishing; it can push a column a couple of px over
-   its true height, which is a fair trade for never silently hiding an
-   emergency, and there's no overflow:hidden here precisely so that
-   overshoot shows rather than clipping the bottom of the stack. */
-.am-stack-chart { display: flex; align-items: flex-end; gap: 4px; height: 240px; padding: 10px 0 0; }
-.am-stack-col-wrap { flex: 1; min-width: 0; display: flex; flex-direction: column; height: 100%; }
-.am-stack-col-area { height: calc(100% - 18px); display: flex; flex-direction: column; justify-content: flex-end; }
-.am-stack-col { display: flex; flex-direction: column; width: 100%; border-radius: 2px 2px 0 0; overflow: hidden; min-height: 2px; }
-.am-stack-seg { width: 100%; min-height: 2px; }
-.am-stack-label { height: 18px; line-height: 14px; font-size: 10px; color: #646970; margin-top: 4px; white-space: nowrap; text-align: center; }
-
-/* Horizontal legend under the columns — a wrapping inline strip rather
-   than the pie's vertical list, since it now sits beneath a full-width
-   chart instead of beside a circle. Only levels present in the window
-   are listed (see render_stacked_trend_chart()). */
-.am-stack-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; list-style: none; margin: 12px 0 0; padding: 10px 0 0; border-top: 1px solid #f0f0f1; }
-.am-stack-legend-item { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #1d2327; white-space: nowrap; }
-.am-stack-legend-count { color: #646970; font-size: 11px; font-variant-numeric: tabular-nums; }
-
-/* Now paired with Traffic source in an .am-chart-row rather than
-   running full width. Height is set to sit roughly level with that
-   card: the pie is 50% of its card's width at a 1:1 ratio, so at the
-   1400px .am-wrap cap each card has ~650px of content and the pie
-   lands near 325px, shrinking with the viewport from there. A fixed
-   px height can't track a fluid one exactly, so 300px is chosen to be
-   close across common admin widths; .am-chart-row's align-items:
-   stretch keeps the cards themselves equal regardless, so any residual
-   difference shows as a little slack inside the shorter one rather
-   than as a ragged row. This is the only remaining user of
-   .am-trend-chart; Daily activity moved to .am-stack-chart above in
-   2.0.59. */
-.am-trend-chart { display: flex; align-items: flex-end; gap: 4px; height: 300px; padding: 10px 0; }
-.am-trend-bar-wrap { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end; }
-.am-trend-bar { width: 100%; background: #2271b1; border-radius: 2px 2px 0 0; min-height: 2px; }
-.am-trend-bar-label { font-size: 10px; color: #646970; margin-top: 4px; white-space: nowrap; }
-
-/* "Needs attention" KPI card -- reuses the same warning color already
-   used for the warning badge/bar-fill elsewhere, so a nonzero count
-   reads as a signal rather than introducing a new alert color. Stays
-   the default number color at zero so an empty dashboard doesn't look
-   alarming. */
-.am-stats-card-value.am-attention { color: #7d4e00; }
-
-/* Ranked horizontal bar list -- currently only used by the Dashboard's
-   Top pages widget (Top event types and Most active users, its former
-   co-users, were removed). Unlike the pie chart above (a share of one
-   whole, hence a per-category palette), every row here is a magnitude
-   ranking within one series, so every bar shares a single accent color
-   instead. */
-.am-rank-list { display: flex; flex-direction: column; gap: 11px; }
-.am-rank-row-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; font-size: 13px; margin-bottom: 4px; }
-.am-rank-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.am-rank-label a { color: inherit; text-decoration: none; }
-.am-rank-label a:hover { color: #2271b1; text-decoration: underline; }
-.am-rank-count { flex-shrink: 0; color: #646970; font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.am-rank-sublabel { color: #a7aaad; margin-left: 4px; }
-.am-rank-track { background: #f0f0f1; border-radius: 3px; height: 6px; overflow: hidden; }
-.am-rank-fill { display: block; height: 100%; border-radius: 3px; min-width: 2px; background: #2271b1; }
-
-/* Recent notable events' link out to the full Activity Log tab --
-   this widget is deliberately the smallest/last thing on the
-   Dashboard now (see am-attention above for its headline count), so
-   the link is de-emphasized text rather than a button. */
-.am-recent-events-link { margin: 12px 0 0; font-size: 13px; }
-.am-recent-events-link a { text-decoration: none; }
-.am-recent-events-link a:hover { text-decoration: underline; }

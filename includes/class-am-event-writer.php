@@ -47,6 +47,13 @@ class AM_Event_Writer {
 			'object_name' => '',
 			'context'     => array(),
 			'group'       => true,
+			// Explicit override for the rare case where the caller knows
+			// something ambient detection can't -- currently only the
+			// plugin/theme/core update loggers, which alone can see
+			// whether an upgrader run was unattended (see
+			// AM_Initiator_Detector::AUTO_UPDATE). Null means "detect as
+			// usual"; every other caller leaves this at the default.
+			'initiator'   => null,
 			// Set true only when logging a notification-delivery failure
 			// itself (see AM_Notifications::log_slack_failure and
 			// AM_Logger_Mail_Failures) -- without this, a failing
@@ -64,7 +71,9 @@ class AM_Event_Writer {
 			$args['level'] = AM_Log_Levels::INFO;
 		}
 
-		$initiator = AM_Initiator_Detector::detect();
+		$initiator = ( null !== $args['initiator'] && in_array( $args['initiator'], AM_Initiator_Detector::all(), true ) )
+			? $args['initiator']
+			: AM_Initiator_Detector::detect();
 		$user      = wp_get_current_user();
 		$events_table = $wpdb->prefix . AM_Schema::EVENTS_TABLE;
 

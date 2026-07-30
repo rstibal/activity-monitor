@@ -13,7 +13,9 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  *
  * Behavior change from v1.x: background/cron-triggered theme updates are
  * no longer silently dropped via is_automated_context() — tagged
- * initiator=wp_cron and stay visible/filterable.
+ * initiator=wp_cron (or, as of 2.1.0, initiator=wp_auto_update
+ * specifically for an unattended background update — see
+ * on_upgrader_complete() below) and stay visible/filterable.
  *
  * See class-am-logger-posts.php for the template this follows.
  */
@@ -80,6 +82,11 @@ class AM_Logger_Themes extends AM_Logger_Base {
 			return;
 		}
 
+		// See AM_Logger_Plugins::on_upgrader_complete() for why this skin
+		// check is what distinguishes an unattended auto-update from any
+		// other WP_CRON-context update.
+		$is_auto_update = $upgrader->skin instanceof Automatic_Upgrader_Skin;
+
 		foreach ( (array) $data['themes'] as $theme ) {
 			$this->log(
 				'theme',
@@ -93,6 +100,7 @@ class AM_Logger_Themes extends AM_Logger_Base {
 					'level'       => AM_Log_Levels::NOTICE,
 					'object_type' => 'theme',
 					'object_name' => $theme,
+					'initiator'   => $is_auto_update ? AM_Initiator_Detector::AUTO_UPDATE : null,
 				)
 			);
 		}

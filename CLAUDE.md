@@ -40,7 +40,7 @@ raw + `am_traffic_daily` rollup), `AM_Traffic` (capture at `template_redirect`,
 bot-filtered), `AM_Traffic_Rollup` (cron, only ever processes *yesterday*, at
 3am UTC), `AM_Traffic_Query`.
 
-Admin tabs: Dashboard, Activity Log, Traffic, Active Sessions, Settings.
+Admin tabs: Activity Log (first/default), Traffic, Active Sessions, Settings.
 All modals share one overlay, the `openModal()` JS helper, and the `am_ajax`
 nonce.
 
@@ -50,18 +50,6 @@ object id (file-editor, fatal-errors) pass `'group' => false`.
 
 ## Decisions worth not re-litigating
 
-- **Log levels are an ordinal severity *ramp*** — adjacent levels deliberately
-  resemble each other. That suits badges, where text carries identity and colour
-  only sets mood. It fights a pie chart, where colour is the sole identifier.
-  Hence Daily activity is stacked columns: the x-axis carries time and the stack
-  carries severity order, so the ramp reinforces position instead of competing
-  with it. Three palette tiers were tried as pie fills before this was
-  understood.
-- **Pie charts need nominal, low-cardinality, reasonably balanced data.**
-  Traffic source qualifies, so `--am-pie-src-*` is deliberately *categorical* —
-  maximum hue separation, kept clear of the severity palette's greens, oranges
-  and reds so the two charts on one screen don't imply a relationship, and clear
-  of red so no traffic source reads as an error.
 - **`AM_Date_Format` presets store separate date and time halves**, not one
   combined string, because the live traffic feed needs time-only. A combined
   string can't be split back reliably, so the pair is the source of truth and
@@ -73,10 +61,6 @@ object id (file-editor, fatal-errors) pass `'group' => false`.
   `AM_Admin::sanitize_type_filter()`.
 - **The user profile modal keys on `user_id`, not the stored login** — logins
   can be renamed and reused, so a login lookup could show the wrong person.
-- **CSS gotcha, hit twice:** a flex-sized item's auto height does not reliably
-  resolve percentage heights on its children. `.am-stack-col-area` therefore
-  uses an explicit `height: calc(100% - 18px)`, where 18px is
-  `.am-stack-label`'s pinned height — keep the two in sync.
 
 ## Legacy v1.x data (a recurring source of surprises)
 
@@ -101,15 +85,10 @@ list of distinct `event_type` values in the database.
 
 ## Known issues
 
-1. Stacked chart day labels are `nowrap` and centred under ~6px columns, so at
-   30 days on a phone they overlap into a smear. Usual fix is thinning labels at
-   narrow widths.
-2. No on-screen indicator when the user filter is active — the visible User
+1. No on-screen indicator when the user filter is active — the visible User
    search box was removed, but `am_user` still filters (the profile modal links
    with it) and only the Clear filters button hints that it's on.
-3. `--am-pie-*` is a misleading name now that the severity palette feeds a
-   stacked column chart rather than a pie. `--am-level-*` would be honest.
-4. No admin UI to toggle individual loggers, though `AM_Logger_Manager` supports
+2. No admin UI to toggle individual loggers, though `AM_Logger_Manager` supports
    it via the `am_disabled_loggers` option.
 
 ## Verifying changes

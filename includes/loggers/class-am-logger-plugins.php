@@ -18,7 +18,9 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  * or theme/core updates will silently stop being logged entirely.
  *
  * Behavior change from v1.x: background/cron-triggered plugin updates are
- * no longer dropped — tagged initiator=wp_cron and stay visible/filterable.
+ * no longer dropped -- tagged initiator=wp_cron (or, as of 2.1.0,
+ * initiator=wp_auto_update specifically for an unattended background
+ * update -- see on_upgrader_complete() below) and stay visible/filterable.
  *
  * See class-am-logger-posts.php for the template this follows.
  */
@@ -135,6 +137,14 @@ class AM_Logger_Plugins extends AM_Logger_Base {
 			return;
 		}
 
+		// Automatic_Upgrader_Skin is the skin WP core's own
+		// wp_maybe_auto_update() uses -- present only for an unattended
+		// background update, never a manual "Update now" click -- so its
+		// presence is the one signal available here that distinguishes
+		// AUTO_UPDATE from the generic WP_CRON a manual update triggered
+		// via WP-CLI or another cron-context caller would still get.
+		$is_auto_update = $upgrader->skin instanceof Automatic_Upgrader_Skin;
+
 		foreach ( (array) $data['plugins'] as $plugin ) {
 			$this->log(
 				'plugin',
@@ -148,6 +158,7 @@ class AM_Logger_Plugins extends AM_Logger_Base {
 					'level'       => AM_Log_Levels::NOTICE,
 					'object_type' => 'plugin',
 					'object_name' => $plugin,
+					'initiator'   => $is_auto_update ? AM_Initiator_Detector::AUTO_UPDATE : null,
 				)
 			);
 		}

@@ -14,10 +14,11 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  *
  * Behavior change from v1.x: background/cron-triggered core auto-updates
  * (WordPress's own security auto-update mechanism runs via wp-cron) are
- * no longer silently dropped — tagged initiator=wp_cron and stay
- * visible/filterable. This is arguably more useful than v1.x's behavior:
- * knowing exactly when an automatic security update landed is valuable
- * audit information, not noise.
+ * no longer silently dropped — tagged initiator=wp_auto_update as of
+ * 2.1.0 (previously the generic wp_cron) and stay visible/filterable.
+ * This is arguably more useful than v1.x's behavior: knowing exactly when
+ * an automatic security update landed is valuable audit information, not
+ * noise.
  */
 class AM_Logger_Core extends AM_Logger_Base {
 
@@ -40,6 +41,11 @@ class AM_Logger_Core extends AM_Logger_Base {
 
 		global $wp_version;
 
+		// See AM_Logger_Plugins::on_upgrader_complete() for why this skin
+		// check is what distinguishes an unattended auto-update from any
+		// other WP_CRON-context update.
+		$is_auto_update = $upgrader->skin instanceof Automatic_Upgrader_Skin;
+
 		$this->log(
 			'core',
 			'updated',
@@ -52,6 +58,7 @@ class AM_Logger_Core extends AM_Logger_Base {
 				'level'       => AM_Log_Levels::NOTICE,
 				'object_type' => 'core',
 				'object_name' => 'WordPress',
+				'initiator'   => $is_auto_update ? AM_Initiator_Detector::AUTO_UPDATE : null,
 			)
 		);
 	}

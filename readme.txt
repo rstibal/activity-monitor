@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, page traffic
 Requires at least: 5.3
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.0.88
+Stable tag: 2.1.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -24,7 +24,7 @@ Activity Monitor is a WordPress audit log plugin that records what happens on yo
 
 = Noise control, not noise =
 
-Repeated events (a burst of failed logins, rapid comment status churn) are automatically grouped into a single log entry with a repeat count, instead of flooding your log with duplicates. Every event is tagged with a severity level and an initiator (was this a logged-in user, an anonymous visitor, WP-Cron, WP-CLI, or WordPress itself?) so you can filter down to exactly what you're looking for.
+Repeated events (a burst of failed logins, rapid comment status churn) are automatically grouped into a single log entry with a repeat count, instead of flooding your log with duplicates. Every event is tagged with a severity level and an initiator (was this a logged-in user, an anonymous visitor, WP-Cron, WP-CLI, an unattended auto-update, a REST API call, or WordPress itself?) so you can filter down to exactly what you're looking for.
 
 = Session management =
 
@@ -34,9 +34,8 @@ See every active login session across your site, revoke individual sessions, set
 
 Optional, self-hosted page-view tracking with no third-party service and no cookies: per-page views and unique visitors, a live feed of hits as they arrive, top pages, and a traffic-source breakdown (direct, search, social, referral, internal). Raw hits are rolled up daily and pruned on a retention schedule you set, so the tables stay small on busy sites.
 
-= Dashboard, digests, and exports =
+= Digests and exports =
 
-* A Dashboard shows totals and trends at a glance: daily activity stacked by severity, peak activity, pages needing attention, top pages, and where your traffic came from
 * An optional scheduled email digest (daily, weekly, or monthly) summarizes recent activity and flags anything at warning level or above. Multiple digests can be configured independently, each with its own schedule and recipients
 * Export the log — filtered by date range, user, event type, or action — as CSV, JSON, HTML, or plain text
 
@@ -70,12 +69,16 @@ Yes, retention is configurable and old entries are pruned automatically on a dai
 
 == Screenshots ==
 
-1. The Dashboard: daily activity by severity, peak activity, top pages, and traffic sources.
-2. The Activity Log screen, with filtering by level, initiator, event type, and date range.
-3. Page traffic, with a live feed of incoming hits.
-4. Active Sessions, with per-session revoke and site-wide emergency lockdown.
+1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
+2. Page traffic, with a live feed of incoming hits.
+3. Active Sessions, with per-session revoke and site-wide emergency lockdown.
 
 == Changelog ==
+
+= 2.1.0 =
+* Removed: the Dashboard tab. The Activity Log is now the first/default tab.
+* Added: two new initiator categories on the Activity Log — Auto-Update (an unattended background plugin/theme/core update, distinct from other WP-Cron activity) and REST API (a REST request with no logged-in browser session behind it, e.g. an external integration or application password client; a REST call from your own logged-in session, such as the block editor, still reads as User).
+* Changed: Traffic tab — removed the "Live traffic" section heading above the live feed table.
 
 = 2.0.88 =
 * Build: No plugin code changes. Hardens the release pipeline to fail the build if the packaged zip ever contains backslash-separated paths, which WordPress's uploader can extract as corrupted flat filenames instead of nested files.
