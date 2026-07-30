@@ -53,28 +53,33 @@
 	font-size: 14px;
 }
 
-.am-tab-nav {
-	margin-top: 12px;
-	border-bottom: 1px solid #c3c4c7;
+/* Names the specific screen after the plugin name in the heading, so
+   the <h1> matches the path the left-hand menu just took to get here.
+   Lighter and lower-contrast than the plugin name it follows -- it's
+   the qualifier, not the title. */
+.am-screen-title {
+	font-size: 15px;
+	font-weight: 400;
+	color: #646970;
+	align-self: flex-end;
+	margin-bottom: 3px;
 }
-/* WP core's own nav-tab-active styling uses a light gray background by
-   default, which doesn't match .am-tab-content's white background
-   directly below it -- overridden here so the active tab and the
-   panel it opens read as one continuous surface rather than two
-   different shades meeting at a seam. */
-.am-tab-nav .nav-tab-active,
-.am-tab-nav .nav-tab-active:focus,
-.am-tab-nav .nav-tab-active:hover {
-	background: #fff;
-	border-bottom: 1px solid #fff;
+.am-screen-title::before {
+	content: '/';
+	margin-right: 8px;
+	color: #c3c4c7;
 }
 
-.am-tab-content {
+/* The content panel. Was .am-tab-content, shaped to sit seamlessly
+   under a tab strip (no top border, bottom-only radius); with each
+   screen now its own submenu page there's no strip above it, so it
+   closes on all four sides. */
+.am-screen-content {
 	background: #fff;
 	border: 1px solid #c3c4c7;
-	border-top: none;
+	margin-top: 12px;
 	padding: 24px;
-	border-radius: 0 0 4px 4px;
+	border-radius: 4px;
 }
 
 .am-filter-bar {
@@ -93,6 +98,44 @@
 .am-export-bar {
 	display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
 	margin-top: 10px; padding-top: 10px; border-top: 1px solid #dcdcde;
+}
+
+/* Active user-filter chip. Deliberately blue-on-white rather than the
+   neutral gray the rest of this bar uses: the point of it is to be
+   noticed, since nothing else on screen indicates the log is showing
+   one user's rows. Sits in its own row between the filter form and the
+   export bar. */
+.am-active-filter {
+	display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+	margin-top: 10px; padding-top: 10px; border-top: 1px solid #dcdcde;
+}
+.am-filter-chip {
+	display: inline-flex; align-items: center; gap: 8px;
+	padding: 3px 6px 3px 12px; border-radius: 20px; font-size: 12px;
+	font-weight: 500; border: 1.5px solid #2271b1; background: #f0f6fc;
+	color: #2271b1;
+}
+.am-filter-chip-remove {
+	display: inline-flex; align-items: center; justify-content: center;
+	width: 18px; height: 18px; border-radius: 50%;
+	color: #2271b1; text-decoration: none; font-size: 15px; line-height: 1;
+}
+.am-filter-chip-remove:hover, .am-filter-chip-remove:focus {
+	background: #2271b1; color: #fff; text-decoration: none;
+}
+
+/* Event-source toggles. Auto-fitting columns rather than a fixed count
+   so the list reflows sensibly as loggers are added, and stays readable
+   on a narrow screen where a fixed grid would squash the labels. */
+.am-logger-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+	gap: 8px 20px;
+	margin-bottom: 4px;
+}
+.am-logger-toggle {
+	display: flex; align-items: center; gap: 8px;
+	font-size: 13px; color: #1d2327;
 }
 
 .am-pill {
@@ -259,9 +302,7 @@
 .am-init-rest_api       { background: #e0f7fa; color: #00595e; } /* REST call with no logged-in browser session */
 .am-init-system         { background: #f5f5f5; color: #616161; } /* internal/unattributed */
 
-.am-event-type { background: #f0f6fc; color: #0073aa; border-radius: 3px; padding: 1px 5px; font-size: 11px; white-space: nowrap; }
 .am-role { display: block; color: #646970; font-size: 11px; }
-.am-object-type { display: block; color: #646970; font-size: 11px; text-transform: uppercase; letter-spacing: 0.3px; }
 
 .am-session-expired td { opacity: 0.6; }
 .am-session-current td { background-color: #f0f6fc !important; }
@@ -425,11 +466,6 @@
 }
 .am-danger-zone .am-danger-title .dashicons { color: #d63638; }
 
-.am-channel-card { background: #f6f7f7; border: 1px solid #c3c4c7; border-radius: 6px; margin-bottom: 14px; }
-.am-channel-card-header { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: #fff; border-bottom: 1px solid #dcdcde; border-radius: 6px 6px 0 0; }
-.am-channel-icon { color: #2271b1; font-size: 18px; width: 18px; height: 18px; }
-.am-channel-type-label { font-size: 13px; color: #1d2327; }
-.am-remove-channel { margin-left: auto; color: #d63638 !important; text-decoration: none; font-size: 12px; }
 .am-channel-fields { padding: 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .am-field-row { display: flex; flex-direction: column; }
 .am-field-full { grid-column: 1 / -1; }

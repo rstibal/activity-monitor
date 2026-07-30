@@ -161,8 +161,12 @@ class AM_Event_Query {
 	//
 	// These take $days (7/14/30 typical) and query only am_events -- none
 	// of this needs am_event_context. Each returns plain arrays/counts
-	// ready for AM_Digest::build_html() to render directly. The Dashboard
-	// admin tab that used to be their other consumer was removed in 2.1.0.
+	// ready for AM_Digest::build_html() to render directly, and the digest
+	// is now their only consumer: the Dashboard admin tab went in 2.1.0,
+	// and the three queries only it had used (daily trend, breakdown by
+	// initiator, most active users) were deleted in 2.2.1 once nothing
+	// called them. Anything added here needs a caller, or it is dead on
+	// arrival.
 
 	/**
 	 * Total event count within the last $days, and the count for the
@@ -193,41 +197,6 @@ class AM_Event_Query {
 	}
 
 	/**
-	 * Daily event counts for the last $days, oldest first, with every day
-	 * present (zero-filled) even if no events occurred -- so a chart
-	 * doesn't have gaps.
-	 *
-	 * @return array<string, int> date (Y-m-d) => count
-	 */
-	public static function get_daily_trend( int $days ): array {
-		global $wpdb;
-		$table = $wpdb->prefix . AM_Schema::EVENTS_TABLE;
-
-		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant.
-		$rows = $wpdb->get_results( $wpdb->prepare(
-			"SELECT DATE(date) AS day, COUNT(*) AS total
-			 FROM `{$table}`
-			 WHERE date >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL %d DAY)
-			 GROUP BY DATE(date)
-			 ORDER BY day ASC",
-			$days
-		), ARRAY_A );
-
-		$by_day = array();
-		foreach ( $rows as $row ) {
-			$by_day[ $row['day'] ] = (int) $row['total'];
-		}
-
-		// Zero-fill every day in the window so the chart has no gaps.
-		$trend = array();
-		for ( $i = $days - 1; $i >= 0; $i-- ) {
-			$date = gmdate( 'Y-m-d', strtotime( "-{$i} days" ) );
-			$trend[ $date ] = $by_day[ $date ] ?? 0;
-		}
-		return $trend;
-	}
-
-	/**
 	 * Event counts grouped by event_type, descending, for the last $days.
 	 *
 	 * @return array<string, int> event_type => count
@@ -251,72 +220,6 @@ class AM_Event_Query {
 		$out = array();
 		foreach ( $rows as $row ) {
 			$out[ $row['event_type'] ] = (int) $row['total'];
-		}
-		return $out;
-	}
-
-	/**
-	 * Event counts grouped by initiator for the last $days. Zero-filled
-	 * for every AM_Initiator_Detector::all() value so the result always
-	 * has a consistent, complete set of keys regardless of what actually
-	 * occurred in the window.
-	 *
-	 * @return array<string, int> initiator => count
-	 */
-	public static function get_breakdown_by_initiator( int $days ): array {
-		global $wpdb;
-		$table = $wpdb->prefix . AM_Schema::EVENTS_TABLE;
-
-		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant.
-		$rows = $wpdb->get_results( $wpdb->prepare(
-			"SELECT initiator, COUNT(*) AS total
-			 FROM `{$table}`
-			 WHERE date >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL %d DAY)
-			 GROUP BY initiator",
-			$days
-		), ARRAY_A );
-
-		$counts = array();
-		foreach ( $rows as $row ) {
-			$counts[ $row['initiator'] ] = (int) $row['total'];
-		}
-
-		$out = array();
-		foreach ( AM_Initiator_Detector::all() as $initiator ) {
-			$out[ $initiator ] = $counts[ $initiator ] ?? 0;
-		}
-		return $out;
-	}
-
-	/**
-	 * Most active users by event count within the window. Excludes
-	 * non-authenticated initiators (web_user/wp_cron/wp_cli/system) since
-	 * "most active user" is only meaningful for actual logged-in users.
-	 *
-	 * @return array<array{user_login:string, count:int}>
-	 */
-	public static function get_most_active_users( int $days, int $limit = 5 ): array {
-		global $wpdb;
-		$table = $wpdb->prefix . AM_Schema::EVENTS_TABLE;
-
-		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant.
-		$rows = $wpdb->get_results( $wpdb->prepare(
-			"SELECT user_login, COUNT(*) AS total
-			 FROM `{$table}`
-			 WHERE date >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL %d DAY)
-			   AND initiator = %s
-			   AND user_login != ''
-			 GROUP BY user_login
-			 ORDER BY total DESC
-			 LIMIT %d",
-			$days,
-			AM_Initiator_Detector::WP_USER,
-			$limit
-		), ARRAY_A );
-
-		$out = array();
-		foreach ( $rows as $row ) {
-			$out[] = array( 'user_login' => $row['user_login'], 'count' => (int) $row['total'] );
 		}
 		return $out;
 	}

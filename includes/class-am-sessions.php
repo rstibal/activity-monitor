@@ -6,8 +6,8 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  *
  * IMPORTANT ARCHITECTURAL NOTE: WordPress already tracks logged-in
  * sessions natively via WP_Session_Tokens, stored in the `session_tokens`
- * user meta key. v1.x's Active Sessions tab (AM_Admin::render_tab_sessions
- * et al.) already reads/writes this directly -- there was never a
+ * user meta key. The Active Sessions screen (AM_Admin::render_sessions_screen
+ * et al.) reads/writes this directly -- there was never a
  * separate am_sessions table, and this class does not introduce one. A
  * parallel table would just drift out of sync with the session state
  * WordPress itself enforces on every request. This class is a v2.0 LAYER
@@ -17,23 +17,27 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  * activity-monitor-v2-spec.md §5, GitHub issue #5):
  *   - Concurrent-session limit enforcement (benchmarked against Activity
  *     Log Pro in the competitive audit)
- *   - Active-threshold setting (a session idle longer than N minutes is
- *     treated as inactive for limit-counting purposes, though WordPress
- *     itself still honors it until actual expiration)
  *   - Emergency lockdown (terminate every session except the caller's own)
  *   - Session events logged through AM_Event_Writer onto the new
  *     am_events schema instead of the legacy AM_Logger::log() calls in
  *     AM_Admin
  *
- * Settings (all under the 'sessions' logger toggle in the noise-control
- * settings, once that UI exists):
+ * Settings:
  *   am_session_concurrent_limit  (int, 0 = disabled, default 0)
- *   am_session_active_threshold_minutes (int, default 30)
+ *
+ * There was also an am_session_active_threshold_minutes setting, removed
+ * in 2.2.1: it was rendered and saved but never read anywhere, since the
+ * Active Sessions table derives its state from each token's real
+ * expiration. Don't reintroduce it without a consumer -- and note the
+ * concept it described isn't actually available: WP_Session_Tokens
+ * stores only login and expiration times, no last-activity field, so
+ * "active in the last N minutes" could only ever have meant "logged in
+ * within the last N minutes", which is a different and much less useful
+ * thing than it sounds.
  */
 class AM_Sessions {
 
-	const OPTION_CONCURRENT_LIMIT   = 'am_session_concurrent_limit';
-	const OPTION_ACTIVE_THRESHOLD   = 'am_session_active_threshold_minutes';
+	const OPTION_CONCURRENT_LIMIT = 'am_session_concurrent_limit';
 
 	/**
 	 * Enforce the concurrent-session limit for one user by revoking their
@@ -147,24 +151,6 @@ class AM_Sessions {
 		}
 
 		return $total_revoked;
-	}
-
-	/**
-	 * Whether a session counts as "active" under the configured threshold,
-	 * based on last-activity time falling within the window. WordPress
-	 * itself still honors the session until its actual expiration
-	 * regardless of this setting -- this is a display/reporting concept
-	 * only (e.g. "N of your M sessions are currently active"), not an
-	 * enforcement mechanism, since WP_Session_Tokens has no last-activity
-	 * field, only login time and expiration.
-	 */
-	public static function is_within_active_threshold( array $session ): bool {
-		$threshold_minutes = absint( get_option( self::OPTION_ACTIVE_THRESHOLD, 30 ) );
-		$login             = (int) ( $session['login'] ?? 0 );
-		if ( ! $login ) {
-			return false;
-		}
-		return ( time() - $login ) <= ( $threshold_minutes * MINUTE_IN_SECONDS );
 	}
 
 	private static function get_raw_sessions( int $user_id ): array {

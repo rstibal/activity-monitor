@@ -17,7 +17,27 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class AM_Admin {
 
-	const TAB_PARAM = 'am_tab';
+	/** Page slugs. The log keeps the bare plugin slug so existing links
+	 *  into it -- the digest email, the plain-text alert, any bookmark --
+	 *  keep working unchanged. */
+	const PAGE_LOG      = 'activity-monitor';
+	const PAGE_SESSIONS = 'activity-monitor-sessions';
+	const PAGE_SETTINGS = 'activity-monitor-settings';
+
+	/**
+	 * Hook suffixes returned by add_menu_page()/add_submenu_page(), used
+	 * by enqueue_assets() and show_notices() to recognize this plugin's
+	 * screens.
+	 *
+	 * Collected from the return values rather than written out as literals
+	 * ('toplevel_page_activity-monitor' and friends): WordPress builds a
+	 * submenu's hook from the *sanitized parent menu slug*, so the literal
+	 * form is easy to get subtly wrong and fails silently -- assets simply
+	 * never enqueue on that screen, with no error to notice.
+	 *
+	 * @var string[]
+	 */
+	private static $screen_hooks = array();
 
 	// ── Bootstrap ──────────────────────────────────────────────────────
 
@@ -32,6 +52,7 @@ class AM_Admin {
 		add_action( 'admin_post_am_revoke_expired',           array( $instance, 'handle_revoke_expired' ) );
 		add_action( 'admin_post_am_emergency_lockdown',       array( $instance, 'handle_emergency_lockdown' ) );
 		add_action( 'admin_post_am_save_session_settings',    array( $instance, 'handle_save_session_settings' ) );
+		add_action( 'admin_post_am_save_logger_settings',     array( $instance, 'handle_save_logger_settings' ) );
 		add_action( 'admin_post_am_save_display_settings',    array( $instance, 'handle_save_display_settings' ) );
 		add_action( 'admin_post_am_export_log',               array( $instance, 'handle_export' ) );
 		add_action( 'admin_notices',                          array( $instance, 'show_notices' ) );
@@ -52,29 +73,55 @@ class AM_Admin {
 	// ── Menu ───────────────────────────────────────────────────────────
 
 	public function register_menu() {
-		add_menu_page(
+		self::$screen_hooks[] = add_menu_page(
 			__( 'Activity Monitor', 'activity-monitor' ),
 			__( 'Activity Monitor', 'activity-monitor' ),
 			'manage_options',
-			'activity-monitor',
-			array( $this, 'render_page' ),
+			self::PAGE_LOG,
+			array( $this, 'render_page_log' ),
 			'dashicons-shield-alt',
 			2
 		);
-		add_submenu_page(
-			'activity-monitor',
-			__( 'Activity Monitor', 'activity-monitor' ),
-			__( 'Activity Monitor', 'activity-monitor' ),
+
+		// Registering a child with the same slug as the parent renames the
+		// item WordPress auto-creates for the top-level page, which would
+		// otherwise repeat the menu title. "Activity Log" rather than
+		// "Activity Monitor" so the child names what the screen is instead
+		// of echoing its parent.
+		self::$screen_hooks[] = add_submenu_page(
+			self::PAGE_LOG,
+			__( 'Activity Log', 'activity-monitor' ),
+			__( 'Activity Log', 'activity-monitor' ),
 			'manage_options',
-			'activity-monitor',
-			array( $this, 'render_page' )
+			self::PAGE_LOG,
+			array( $this, 'render_page_log' )
 		);
+
+		self::$screen_hooks[] = add_submenu_page(
+			self::PAGE_LOG,
+			__( 'Active Sessions', 'activity-monitor' ),
+			__( 'Active Sessions', 'activity-monitor' ),
+			'manage_options',
+			self::PAGE_SESSIONS,
+			array( $this, 'render_page_sessions' )
+		);
+
+		self::$screen_hooks[] = add_submenu_page(
+			self::PAGE_LOG,
+			__( 'Settings', 'activity-monitor' ),
+			__( 'Settings', 'activity-monitor' ),
+			'manage_options',
+			self::PAGE_SETTINGS,
+			array( $this, 'render_page_settings' )
+		);
+
+		self::$screen_hooks = array_filter( self::$screen_hooks );
 	}
 
 	// ── Assets ─────────────────────────────────────────────────────────
 
 	public function enqueue_assets( $hook ) {
-		if ( 'toplevel_page_activity-monitor' !== $hook ) {
+		if ( ! in_array( $hook, self::$screen_hooks, true ) ) {
 			return;
 		}
 		wp_enqueue_style( 'am-admin', AM_URL . 'assets/css/admin.css', array(), AM_VERSION );
@@ -165,7 +212,7 @@ class AM_Admin {
 
 	public function show_notices() {
 		$screen = get_current_screen();
-		if ( ! $screen || 'toplevel_page_activity-monitor' !== $screen->id ) {
+		if ( ! $screen || ! in_array( $screen->id, self::$screen_hooks, true ) ) {
 			return;
 		}
 		if ( isset( $_GET['am_cleared'] ) ) {
@@ -193,6 +240,9 @@ class AM_Admin {
 		}
 		if ( isset( $_GET['am_display_settings_saved'] ) ) {
 			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Display settings saved.', 'activity-monitor' ) . '</p></div>';
+		}
+		if ( isset( $_GET['am_logger_settings_saved'] ) ) {
+			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Event sources saved.', 'activity-monitor' ) . '</p></div>';
 		}
 	}
 
@@ -224,7 +274,7 @@ class AM_Admin {
 		);
 
 		wp_safe_redirect( add_query_arg(
-			array( 'page' => 'activity-monitor', self::TAB_PARAM => 'settings', 'am_cleared' => '1' ),
+			array( 'page' => self::PAGE_SETTINGS, 'am_cleared' => '1' ),
 			admin_url( 'admin.php' )
 		) );
 		exit;
@@ -272,7 +322,7 @@ class AM_Admin {
 		}
 
 		wp_safe_redirect( add_query_arg(
-			array( 'page' => 'activity-monitor', self::TAB_PARAM => 'sessions', 'am_revoked' => '1' ),
+			array( 'page' => self::PAGE_SESSIONS, 'am_revoked' => '1' ),
 			admin_url( 'admin.php' )
 		) );
 		exit;
@@ -327,7 +377,7 @@ class AM_Admin {
 		}
 
 		wp_safe_redirect( add_query_arg(
-			array( 'page' => 'activity-monitor', self::TAB_PARAM => 'settings', 'am_expired_revoked' => $count ),
+			array( 'page' => self::PAGE_SETTINGS, 'am_expired_revoked' => $count ),
 			admin_url( 'admin.php' )
 		) );
 		exit;
@@ -336,7 +386,7 @@ class AM_Admin {
 	/**
 	 * v2.0 (spec §5, issue #5): terminate every session except the
 	 * caller's own. Confirmation happens client-side (the onsubmit
-	 * confirm() dialog in render_tab_settings) before this ever runs --
+	 * confirm() dialog in render_settings_screen) before this ever runs --
 	 * this handler does not prompt again, it acts immediately once called.
 	 */
 	public function handle_emergency_lockdown() {
@@ -348,7 +398,7 @@ class AM_Admin {
 		$count = AM_Sessions::emergency_lockdown();
 
 		wp_safe_redirect( add_query_arg(
-			array( 'page' => 'activity-monitor', self::TAB_PARAM => 'settings', 'am_lockdown' => $count ),
+			array( 'page' => self::PAGE_SETTINGS, 'am_lockdown' => $count ),
 			admin_url( 'admin.php' )
 		) );
 		exit;
@@ -361,10 +411,41 @@ class AM_Admin {
 		}
 
 		update_option( 'am_session_concurrent_limit', absint( $_POST['am_session_concurrent_limit'] ?? 0 ) );
-		update_option( 'am_session_active_threshold_minutes', max( 1, absint( $_POST['am_session_active_threshold_minutes'] ?? 30 ) ) );
 
 		wp_safe_redirect( add_query_arg(
-			array( 'page' => 'activity-monitor', self::TAB_PARAM => 'settings', 'am_session_settings_saved' => '1' ),
+			array( 'page' => self::PAGE_SETTINGS, 'am_session_settings_saved' => '1' ),
+			admin_url( 'admin.php' )
+		) );
+		exit;
+	}
+
+	/**
+	 * Saves the per-logger noise-control toggles.
+	 *
+	 * The form posts the *enabled* slugs (checked boxes) but the option
+	 * stores the *disabled* ones, so the two are inverted here. That's
+	 * deliberate: storing disabled slugs means a logger added in a later
+	 * version is enabled by default on every existing site without a
+	 * migration, which is what AM_Logger_Base::is_enabled() assumes.
+	 *
+	 * Only slugs that actually correspond to a registered logger are kept,
+	 * so a stale or hand-crafted slug can't accumulate in the option.
+	 */
+	public function handle_save_logger_settings() {
+		check_admin_referer( 'am_save_logger_settings' );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Unauthorized.', 'activity-monitor' ) );
+		}
+
+		$known   = array_keys( AM_Logger_Manager::all() );
+		$enabled = isset( $_POST['am_enabled_loggers'] ) && is_array( $_POST['am_enabled_loggers'] )
+			? array_map( 'sanitize_key', wp_unslash( $_POST['am_enabled_loggers'] ) )
+			: array();
+
+		update_option( 'am_disabled_loggers', array_values( array_diff( $known, $enabled ) ) );
+
+		wp_safe_redirect( add_query_arg(
+			array( 'page' => self::PAGE_SETTINGS, 'am_logger_settings_saved' => '1' ),
 			admin_url( 'admin.php' )
 		) );
 		exit;
@@ -387,7 +468,7 @@ class AM_Admin {
 		update_option( AM_Date_Format::OPTION, $format );
 
 		wp_safe_redirect( add_query_arg(
-			array( 'page' => 'activity-monitor', self::TAB_PARAM => 'settings', 'am_display_settings_saved' => '1' ),
+			array( 'page' => self::PAGE_SETTINGS, 'am_display_settings_saved' => '1' ),
 			admin_url( 'admin.php' )
 		) );
 		exit;
@@ -475,7 +556,7 @@ class AM_Admin {
 
 	/**
 	 * Streams a file download -- reads the same am_* filter params the log
-	 * tab's filter form uses (see render_tab_v2_log()) so export always
+	 * screen's filter form uses (see render_log_screen()) so export always
 	 * matches what's currently on screen. am_export_action maps to
 	 * AM_Event_Query's 'action' filter key; 'action' itself is reserved by
 	 * admin-post.php for dispatch routing (action=am_export_log) and can't
@@ -810,7 +891,7 @@ class AM_Admin {
 				<tr>
 					<td colspan="2" style="text-align:right;">
 						<a href="<?php echo esc_url( add_query_arg(
-							array( 'page' => 'activity-monitor', self::TAB_PARAM => 'log', 'am_user' => $user->user_login ),
+							array( 'page' => self::PAGE_LOG, 'am_user' => $user->user_login ),
 							admin_url( 'admin.php' )
 						) ); ?>" class="button button-small">
 							<?php esc_html_e( 'View this user’s activity', 'activity-monitor' ); ?>
@@ -1054,27 +1135,49 @@ class AM_Admin {
 		) );
 	}
 
-	// ── Master page renderer ─────────────────────────────────────────────
+	// ── Screen renderers ─────────────────────────────────────────────────
+	//
+	// One public callback per registered submenu page. Each wraps its
+	// screen body in the shared chrome: the .wrap/header opener, and the
+	// modal overlay closer. The overlay markup has to be emitted on every
+	// screen, not just the log -- Sessions and Settings both open modals
+	// into it (session detail, IP lookup, digest and channel forms), and
+	// without it in the DOM those clicks do nothing.
 
-	public function render_page() {
+	public function render_page_log() {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			return;
 		}
+		$this->render_screen_open( __( 'Activity Log', 'activity-monitor' ) );
+		$this->render_log_screen();
+		$this->render_screen_close();
+	}
 
-		$tabs = array(
-			'log'      => __( 'Activity Log',    'activity-monitor' ),
-			'sessions' => __( 'Active Sessions', 'activity-monitor' ),
-		);
-
-		$tabs['settings'] = __( 'Settings', 'activity-monitor' );
-
-		$default_tab = array_key_first( $tabs );
-		$active_tab  = sanitize_key( $_GET[ self::TAB_PARAM ] ?? $default_tab );
-		if ( ! array_key_exists( $active_tab, $tabs ) ) {
-			$active_tab = $default_tab;
+	public function render_page_sessions() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
 		}
+		$this->render_screen_open( __( 'Active Sessions', 'activity-monitor' ) );
+		$this->render_sessions_screen();
+		$this->render_screen_close();
+	}
 
-		$base_url = admin_url( 'admin.php?page=activity-monitor' );
+	public function render_page_settings() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+		$this->render_screen_open( __( 'Settings', 'activity-monitor' ) );
+		$this->render_settings_screen();
+		$this->render_screen_close();
+	}
+
+	/**
+	 * Opens the shared page chrome. $title names the specific screen; the
+	 * plugin name stays in the heading ahead of it so the <h1> reads the
+	 * same way the left-hand menu does ("Activity Monitor" > "Settings"),
+	 * rather than a bare "Settings" that says nothing about whose it is.
+	 */
+	private function render_screen_open( string $title ) {
 		?>
 		<div class="wrap am-wrap">
 
@@ -1082,45 +1185,23 @@ class AM_Admin {
 				<h1 class="am-title">
 					<span class="dashicons dashicons-shield-alt"></span>
 					<?php esc_html_e( 'Activity Monitor', 'activity-monitor' ); ?>
+					<span class="am-screen-title"><?php echo esc_html( $title ); ?></span>
 					<span class="am-version">v<?php echo esc_html( AM_VERSION ); ?></span>
 				</h1>
 			</div>
 
-			<nav class="am-tab-nav nav-tab-wrapper wp-clearfix">
-				<?php foreach ( $tabs as $slug => $label ) :
-					$url       = add_query_arg( self::TAB_PARAM, $slug, $base_url );
-					$is_active = ( $slug === $active_tab );
-				?>
-					<a href="<?php echo esc_url( $url ); ?>"
-					   class="nav-tab<?php echo $is_active ? ' nav-tab-active' : ''; ?>">
-						<?php echo esc_html( $label ); ?>
-					</a>
-				<?php endforeach; ?>
-			</nav>
+			<div class="am-screen-content">
+		<?php
+	}
 
-			<div class="am-tab-content">
-				<?php
-				switch ( $active_tab ) {
-					case 'log':
-						// Retired the old AM_DB-backed renderer in favor of the
-						// v2.0 schema renderer, now that column parity is
-						// complete (IP Address added) and every event source is
-						// ported. See activity-monitor-v2-spec.md §9.
-						$this->render_tab_v2_log();
-						break;
-					case 'sessions':
-						$this->render_tab_sessions();
-						break;
-					case 'settings':
-						$this->render_tab_settings();
-						break;
-				}
-				?>
+	/** Closes the chrome opened above and emits the shared modal overlay. */
+	private function render_screen_close() {
+		?>
 			</div>
 
 		</div><!-- .am-wrap -->
 
-		<!-- Event Detail Modal -->
+		<!-- Shared modal overlay: one per screen, reused by every modal. -->
 		<div id="am-modal-overlay" class="am-modal-overlay" style="display:none;">
 			<div class="am-modal">
 				<div class="am-modal-header">
@@ -1135,19 +1216,18 @@ class AM_Admin {
 		<?php
 	}
 
-	// ── Tab: Activity Log ─────────────────────────────────────────────────
+	// ── Screen: Activity Log ──────────────────────────────────────────────
 	//
 	// Reads from the am_events / am_event_context schema. This was
 	// originally a "v2.0 preview" tab running alongside the legacy
 	// AM_DB-backed "Activity Log" tab while loggers were ported one at a
-	// time; that legacy tab (and its render_tab_log() method) has been
-	// removed now that all 13 v1.x event sources are ported and this tab
+	// time; that legacy tab (and its render_tab_log() method) is long gone,
+	// removed now that all 13 v1.x event sources are ported and this screen
 	// has full column parity (including IP Address, added when the old
-	// tab was retired). Method name (render_tab_v2_log) kept as-is to
-	// avoid an unnecessary rename churn across this file.
+	// tab was retired).
 	// See activity-monitor-v2-spec.md §9 and GitHub issue #4.
 
-	private function render_tab_v2_log() {
+	private function render_log_screen() {
 		$per_page   = 50;
 		$page       = max( 1, absint( $_GET['paged'] ?? 1 ) );
 		$level      = sanitize_key( $_GET['am_level'] ?? '' );
@@ -1212,7 +1292,7 @@ class AM_Admin {
 		unset( $group );
 
 		$base_url = add_query_arg(
-			array( 'page' => 'activity-monitor', self::TAB_PARAM => 'log' ),
+			array( 'page' => self::PAGE_LOG ),
 			admin_url( 'admin.php' )
 		);
 
@@ -1255,14 +1335,15 @@ class AM_Admin {
 
 		<div class="am-filter-bar">
 			<form method="get" action="" id="am-filter-form">
-				<input type="hidden" name="page" value="activity-monitor">
-				<input type="hidden" name="<?php echo esc_attr( self::TAB_PARAM ); ?>" value="log">
+				<input type="hidden" name="page" value="<?php echo esc_attr( self::PAGE_LOG ); ?>">
 				<?php if ( '' !== $user ) : ?>
 					<?php // The visible User box was removed, but the filter itself still
 					      // works and is set from elsewhere -- the "View this user's
 					      // activity" button in the user profile modal links with
 					      // am_user. Without carrying it here, changing any other filter
-					      // would submit this form without it and silently drop it. ?>
+					      // would submit this form without it and silently drop it. The
+					      // chip rendered below the form is what makes it visible; this
+					      // input only keeps it alive across submissions. ?>
 					<input type="hidden" name="am_user" value="<?php echo esc_attr( $user ); ?>">
 				<?php endif; ?>
 
@@ -1330,6 +1411,44 @@ class AM_Admin {
 					<input type="date" name="am_to" value="<?php echo esc_attr( $date_to ); ?>">
 				</div>
 			</form>
+
+			<?php
+			// The user filter has no visible control of its own -- it's set
+			// from the profile modal's "View this user's activity" link, not
+			// from this bar -- so without this chip the log silently shows a
+			// single user's rows with nothing on screen saying so. Rendered
+			// outside the form (it's a link, not an input) and only when the
+			// filter is actually on.
+			if ( '' !== $user ) :
+				$filtered_user  = get_user_by( 'login', $user );
+				$filtered_label = $filtered_user
+					? sprintf( '%s (%s)', $filtered_user->display_name, $filtered_user->user_login )
+					: $user;
+				// Built explicitly from the other filters rather than via
+				// remove_query_arg() on the current URI, matching how every
+				// other URL on this screen is composed.
+				$clear_user_url = add_query_arg(
+					array_filter( array(
+						'am_level'     => $level,
+						'am_initiator' => $initiator,
+						'am_type'      => $type_filter,
+						'am_from'      => $date_from,
+						'am_to'        => $date_to,
+						'am_search'    => $search,
+					) ),
+					$base_url
+				);
+			?>
+			<div class="am-active-filter">
+				<span class="am-filter-label"><?php esc_html_e( 'Showing activity for:', 'activity-monitor' ); ?></span>
+				<span class="am-filter-chip">
+					<?php echo esc_html( $filtered_label ); ?>
+					<a href="<?php echo esc_url( $clear_user_url ); ?>"
+					   class="am-filter-chip-remove"
+					   aria-label="<?php esc_attr_e( 'Remove the user filter', 'activity-monitor' ); ?>">&times;</a>
+				</span>
+			</div>
+			<?php endif; ?>
 
 			<div class="am-export-bar">
 				<span class="am-filter-label"><?php esc_html_e( 'Export filtered results:', 'activity-monitor' ); ?></span>
@@ -1458,9 +1577,9 @@ class AM_Admin {
 		return preg_replace( '/[^a-z0-9_.|\-]/', '', strtolower( (string) $raw ) );
 	}
 
-	// ── Tab: Active Sessions ──────────────────────────────────────────────
+	// ── Screen: Active Sessions ───────────────────────────────────────────
 
-	private function render_tab_sessions() {
+	private function render_sessions_screen() {
 		$users = get_users( array( 'fields' => array( 'ID', 'user_login', 'display_name' ) ) );
 
 		$sessions_data = array();
@@ -1615,9 +1734,9 @@ class AM_Admin {
 		return $os ? $browser . ' / ' . $os : $browser;
 	}
 
-	// ── Tab: Settings ─────────────────────────────────────────────────────
+	// ── Screen: Settings ──────────────────────────────────────────────────
 
-	private function render_tab_settings() {
+	private function render_settings_screen() {
 		$channels = get_option( 'am_notification_channels', array() );
 		?>
 
@@ -1684,6 +1803,45 @@ class AM_Admin {
 
 		<h2 class="am-settings-group-title"><?php esc_html_e( 'Activity Log', 'activity-monitor' ); ?></h2>
 
+		<?php
+		// Noise control: one checkbox per registered logger. The option
+		// stores the *disabled* slugs rather than the enabled ones, so a
+		// logger added in a future version is on by default without needing
+		// a migration to opt every existing site into it -- matching how
+		// AM_Logger_Base::is_enabled() reads it.
+		$all_loggers      = AM_Logger_Manager::all();
+		$disabled_loggers = (array) get_option( 'am_disabled_loggers', array() );
+		if ( ! empty( $all_loggers ) ) :
+		?>
+		<div class="am-settings-section">
+			<h2 class="am-section-title">
+				<span class="dashicons dashicons-filter"></span>
+				<?php esc_html_e( 'Event Sources', 'activity-monitor' ); ?>
+			</h2>
+			<p class="am-description">
+				<?php esc_html_e( 'Which categories of event get recorded. Turning one off stops it logging from that point on — entries already in the log are kept, and stay visible and exportable.', 'activity-monitor' ); ?>
+			</p>
+
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+				<?php wp_nonce_field( 'am_save_logger_settings' ); ?>
+				<input type="hidden" name="action" value="am_save_logger_settings">
+
+				<div class="am-logger-grid">
+					<?php foreach ( $all_loggers as $logger_slug => $logger ) : ?>
+						<label class="am-logger-toggle">
+							<input type="checkbox" name="am_enabled_loggers[]"
+							       value="<?php echo esc_attr( $logger_slug ); ?>"
+							       <?php checked( ! in_array( $logger_slug, $disabled_loggers, true ) ); ?>>
+							<?php echo esc_html( $logger->label() ); ?>
+						</label>
+					<?php endforeach; ?>
+				</div>
+
+				<?php submit_button( __( 'Save Event Sources', 'activity-monitor' ), 'secondary' ); ?>
+			</form>
+		</div>
+		<?php endif; ?>
+
 		<div class="am-settings-section am-danger-zone">
 			<h2 class="am-section-title am-danger-title">
 				<span class="dashicons dashicons-trash"></span>
@@ -1731,19 +1889,6 @@ class AM_Admin {
 							       class="small-text">
 							<p class="description">
 								<?php esc_html_e( '0 = disabled. When a user logs in past this limit, their oldest sessions are revoked automatically (the new login always survives).', 'activity-monitor' ); ?>
-							</p>
-						</td>
-					</tr>
-					<tr>
-						<th scope="row">
-							<label for="am_session_active_threshold_minutes"><?php esc_html_e( 'Active session threshold', 'activity-monitor' ); ?></label>
-						</th>
-						<td>
-							<input type="number" min="1" id="am_session_active_threshold_minutes" name="am_session_active_threshold_minutes"
-							       value="<?php echo esc_attr( absint( get_option( 'am_session_active_threshold_minutes', 30 ) ) ); ?>"
-							       class="small-text"> <?php esc_html_e( 'minutes', 'activity-monitor' ); ?>
-							<p class="description">
-								<?php esc_html_e( 'Display-only: sessions logged in within this window are shown as "active". Does not affect WordPress\'s own session expiration.', 'activity-monitor' ); ?>
 							</p>
 						</td>
 					</tr>

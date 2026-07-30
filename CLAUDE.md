@@ -41,9 +41,29 @@ Core: `AM_Schema`, `AM_Event_Writer`, `AM_Event_Query`, `AM_Log_Levels`
 (8 PSR-3 levels), `AM_Initiator_Detector`, `AM_Logger_Manager` plus one
 `AM_Logger_*` per domain, `AM_Sessions`, `AM_Event_Labels`, `AM_Date_Format`.
 
-Admin tabs: Activity Log (first/default), Active Sessions, Settings.
-All modals share one overlay, the `openModal()` JS helper, and the `am_ajax`
-nonce.
+Admin screens: three separate submenu pages under one top-level menu —
+Activity Log (`activity-monitor`, the default), Active Sessions
+(`activity-monitor-sessions`), Settings (`activity-monitor-settings`). The
+tabbed single page they replaced went in 2.2.1; `am_tab` no longer means
+anything and old links carrying it just land on the log.
+
+**The log keeps the bare `activity-monitor` slug** because the digest email and
+plain-text alert both link to it. Don't rename it.
+
+`AM_Admin::$screen_hooks` collects the return values of `add_menu_page()` /
+`add_submenu_page()`, and both `enqueue_assets()` and `show_notices()` test
+membership against it. Never hardcode a hook string like
+`toplevel_page_activity-monitor` — WordPress builds a submenu's hook from the
+sanitized *parent menu slug*, so a hand-written literal can be wrong in a way
+that fails silently: assets simply never enqueue on that screen.
+
+Each screen renders through `render_page_*()` → `render_screen_open()` → its
+`render_*_screen()` body → `render_screen_close()`. The close helper emits the
+shared modal overlay, which every screen needs — Sessions and Settings open
+modals into it too.
+
+All modals share that one overlay, the `openModal()` JS helper, and the
+`am_ajax` nonce.
 
 Page traffic was removed in 2.2.0 — `AM_Traffic*`, the Traffic tab, and the
 `am_traffic_log`/`am_traffic_daily` tables are all gone. `am_maybe_cleanup_traffic()`
@@ -98,11 +118,13 @@ list of distinct `event_type` values in the database.
 
 ## Known issues
 
-1. No on-screen indicator when the user filter is active — the visible User
-   search box was removed, but `am_user` still filters (the profile modal links
-   with it) and only the Clear filters button hints that it's on.
-2. No admin UI to toggle individual loggers, though `AM_Logger_Manager` supports
-   it via the `am_disabled_loggers` option.
+None currently tracked. Both long-standing entries were resolved in 2.2.1: the
+user filter now renders a removable chip in the filter bar (it's still set only
+from the profile modal, never from a visible input, which is why the chip
+matters), and Settings → Activity Log → Event Sources writes the
+`am_disabled_loggers` option that `AM_Logger_Base::is_enabled()` has always
+read. That option stores the *disabled* slugs, not the enabled ones, so a
+logger added later is on by default without a migration — keep it that way.
 
 ## Verifying changes
 

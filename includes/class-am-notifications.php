@@ -142,11 +142,11 @@ class AM_Notifications {
 	 * Posts a formatted alert to a Slack incoming webhook: the event
 	 * message read as one sentence, with the site's domain itself
 	 * linked to that specific event -- deep-linking straight to the
-	 * Activity Log tab with an am_event_id query arg that admin.js
+	 * Activity Log screen with an am_event_id query arg that admin.js
 	 * picks up on page load to auto-open the Details modal for that
 	 * event (see the am_event_id handling next to the
 	 * .am-view-detail-v2 click handler), rather than just landing on
-	 * the log tab and leaving the reader to find the row themselves.
+	 * the log and leaving the reader to find the row themselves.
 	 * 'text' is also set as the required plain-text fallback (Slack
 	 * rejects a payload with blocks but no text, and 'text' is what
 	 * shows in notifications/previews where blocks don't render) --
@@ -180,7 +180,7 @@ class AM_Notifications {
 		$base   = rtrim( wp_strip_all_tags( (string) $message ), '.' );
 
 		$log_url = add_query_arg(
-			array( 'page' => 'activity-monitor', 'am_tab' => 'log', 'am_event_id' => $event_id ),
+			array( 'page' => AM_Admin::PAGE_LOG, 'am_event_id' => $event_id ),
 			admin_url( 'admin.php' )
 		);
 		$domain_link = "<{$log_url}|{$domain}>";

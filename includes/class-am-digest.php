@@ -296,7 +296,7 @@ class AM_Digest {
 
 	/**
 	 * Build the digest HTML. Shared by send(), send_test(), and the
-	 * in-browser preview (AM_Admin::render_tab_settings) so all three
+	 * in-browser preview (AM_Admin::render_settings_screen) so all three
 	 * show identical content for a given frequency.
 	 */
 	public static function build_html( string $frequency, bool $is_test = false ): string {

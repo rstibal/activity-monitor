@@ -26,10 +26,10 @@
 	});
 
 	/* Deep link from a Slack alert: admin.php?page=activity-monitor&
-	   am_tab=log&am_event_id=123 lands on the Activity Log tab (plain
-	   server-side tab routing, already handles am_tab) and this opens
-	   that event's Details modal immediately, so the link takes the
-	   reader straight to the event instead of just the tab. The row
+	   am_event_id=123 lands on the Activity Log screen (that slug is the
+	   screen, no routing needed) and this opens that event's Details
+	   modal immediately, so the link takes the reader straight to the
+	   event instead of just the screen. The row
 	   itself also gets highlighted (am-row-highlighted, see admin.css)
 	   so it's still easy to spot in the table after the modal is
 	   closed -- the highlight is looked up by the same data-id the

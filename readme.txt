@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, session management
 Requires at least: 5.3
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.2.0
+Stable tag: 2.2.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -69,6 +69,13 @@ Yes, retention is configurable and old entries are pruned automatically on a dai
 2. Active Sessions, with per-session revoke and site-wide emergency lockdown.
 
 == Changelog ==
+
+= 2.2.1 =
+* Changed: Activity Log, Active Sessions, and Settings are now three separate screens listed under Activity Monitor in the admin menu, instead of tabs on a single page. Each has its own address, so any of them can be bookmarked or linked to directly. Links into the Activity Log — including the ones in digest emails and Slack alerts — are unchanged.
+* Added: Event Sources in Settings — a checkbox per event category (posts, users, plugins, and so on) to stop that category being recorded. Existing entries are kept and stay visible and exportable; only future logging is affected. The underlying setting has been supported since 2.0 but had no admin screen until now.
+* Added: the Activity Log now shows a removable chip when it's filtered to a single user. That filter is set by the "View this user's activity" button in the profile popup, and previously nothing on screen indicated it was on.
+* Removed: the "Active session threshold" setting, which had no effect. It was saved but never read — the Active Sessions tab has always derived a session's state from its real expiration time. WordPress's session tokens record only login and expiry, with no last-activity time, so the setting could not have worked as described.
+* Removed: three unused internal report queries left over from the Dashboard tab, plus dead CSS.
 
 = 2.2.0 =
 * Removed: page traffic tracking, in full — the Traffic tab, its live feed and page-view detail popup, and the Page Traffic settings block. Activity Monitor is now focused solely on the audit log and session management.
