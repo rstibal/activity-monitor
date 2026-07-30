@@ -1,7 +1,7 @@
 # Activity Monitor — project notes
 
-Custom WordPress plugin: audit logging, session management, and self-hosted
-page traffic. Being built toward a wordpress.org release.
+Custom WordPress plugin: audit logging and session management. Being built
+toward a wordpress.org release.
 
 **The repo root is the plugin root.** `.github/workflows/claude.yml` and
 `.gitignore` also live here and are *not* part of the distributable plugin —
@@ -31,10 +31,8 @@ workflow disappears.
   backfilled for migrated v1.x rows in `AM_Schema::migrate_legacy_row()`).
   Rows written before that column existed default to `''`; always fall back
   to `user_login` when it's empty.
-- **Timestamps** go through `AM_Date_Format::combined()` or `time_format()`.
-  Chart axis labels (`'M j'`), the peak-hour KPI (`'g A'`), and CSV/JSON export
-  deliberately bypass it — the first two are sized to their axis, the third
-  keeps raw UTC to stay machine-readable.
+- **Timestamps** go through `AM_Date_Format::combined()`. CSV/JSON export
+  deliberately bypasses it, keeping raw UTC to stay machine-readable.
 - **Dead code gets deleted, not commented out or marked unused.**
 
 ## Architecture
@@ -43,14 +41,19 @@ Core: `AM_Schema`, `AM_Event_Writer`, `AM_Event_Query`, `AM_Log_Levels`
 (8 PSR-3 levels), `AM_Initiator_Detector`, `AM_Logger_Manager` plus one
 `AM_Logger_*` per domain, `AM_Sessions`, `AM_Event_Labels`, `AM_Date_Format`.
 
-Traffic (separate schema and retention): `AM_Traffic_Schema` (`am_traffic_log`
-raw + `am_traffic_daily` rollup), `AM_Traffic` (capture at `template_redirect`,
-bot-filtered), `AM_Traffic_Rollup` (cron, only ever processes *yesterday*, at
-3am UTC), `AM_Traffic_Query`.
-
-Admin tabs: Activity Log (first/default), Traffic, Active Sessions, Settings.
+Admin tabs: Activity Log (first/default), Active Sessions, Settings.
 All modals share one overlay, the `openModal()` JS helper, and the `am_ajax`
 nonce.
+
+Page traffic was removed in 2.2.0 — `AM_Traffic*`, the Traffic tab, and the
+`am_traffic_log`/`am_traffic_daily` tables are all gone. `am_maybe_cleanup_traffic()`
+in `activity-monitor.php` drops the tables, options, and rollup cron once on
+upgrade, guarded by the `am_traffic_cleanup_done` flag; `uninstall.php` repeats
+the drops defensively. Don't reintroduce page-view capture as a parallel
+subsystem — if the forensic value is ever wanted back, the audit-relevant
+subset (404 storms, `wp-login.php`/`xmlrpc.php` probing, anonymous hits on
+restricted paths) belongs in a logger writing through `AM_Event_Writer`, where
+it inherits the existing filters, grouping, export, and digest.
 
 `AM_Event_Writer` collapses repeat events within a 5-minute window keyed on
 `event_type` + `action` + `object_id` + `initiator`. Loggers with no meaningful
@@ -59,9 +62,11 @@ object id (file-editor, fatal-errors) pass `'group' => false`.
 ## Decisions worth not re-litigating
 
 - **`AM_Date_Format` presets store separate date and time halves**, not one
-  combined string, because the live traffic feed needs time-only. A combined
-  string can't be split back reliably, so the pair is the source of truth and
-  `combined()` joins them.
+  combined string, and `combined()` joins them rather than the reverse. Both
+  callers that needed a half on its own are gone (the two-line Date column in
+  2.0.70, the live traffic feed in 2.2.0), so nothing splits them today — but a
+  combined string can't be split back reliably, so the pair stays the source of
+  truth. Don't "simplify" it into one string.
 - **The Type filter's combined value uses a pipe** (`media|uploaded`), not a
   dot — `event_type` can itself contain a dot on migrated v1 rows
   (`post.delete`), so a dot separator would misread a stored slug as a

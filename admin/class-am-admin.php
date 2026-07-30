@@ -32,7 +32,6 @@ class AM_Admin {
 		add_action( 'admin_post_am_revoke_expired',           array( $instance, 'handle_revoke_expired' ) );
 		add_action( 'admin_post_am_emergency_lockdown',       array( $instance, 'handle_emergency_lockdown' ) );
 		add_action( 'admin_post_am_save_session_settings',    array( $instance, 'handle_save_session_settings' ) );
-		add_action( 'admin_post_am_save_traffic_settings',    array( $instance, 'handle_save_traffic_settings' ) );
 		add_action( 'admin_post_am_save_display_settings',    array( $instance, 'handle_save_display_settings' ) );
 		add_action( 'admin_post_am_export_log',               array( $instance, 'handle_export' ) );
 		add_action( 'admin_notices',                          array( $instance, 'show_notices' ) );
@@ -43,10 +42,8 @@ class AM_Admin {
 		add_action( 'wp_ajax_am_save_digest_config',          array( $instance, 'ajax_save_digest_config' ) );
 		add_action( 'wp_ajax_am_delete_digest_config',        array( $instance, 'ajax_delete_digest_config' ) );
 		add_action( 'wp_ajax_am_get_session_detail',          array( $instance, 'ajax_session_detail' ) );
-		add_action( 'wp_ajax_am_get_live_traffic',            array( $instance, 'ajax_live_traffic' ) );
 		add_action( 'wp_ajax_am_ip_lookup',                   array( $instance, 'ajax_ip_lookup' ) );
 		add_action( 'wp_ajax_am_user_profile',                array( $instance, 'ajax_user_profile' ) );
-		add_action( 'wp_ajax_am_traffic_hit_detail',          array( $instance, 'ajax_traffic_hit_detail' ) );
 		add_action( 'wp_ajax_am_channel_form',                array( $instance, 'ajax_channel_form' ) );
 		add_action( 'wp_ajax_am_save_channel',                array( $instance, 'ajax_save_channel' ) );
 		add_action( 'wp_ajax_am_delete_channel',              array( $instance, 'ajax_delete_channel' ) );
@@ -83,10 +80,8 @@ class AM_Admin {
 		wp_enqueue_style( 'am-admin', AM_URL . 'assets/css/admin.css', array(), AM_VERSION );
 		wp_enqueue_script( 'am-admin', AM_URL . 'assets/js/admin.js', array( 'jquery' ), AM_VERSION, true );
 		wp_localize_script( 'am-admin', 'amData', array(
-			'ajaxUrl'              => admin_url( 'admin-ajax.php' ),
-			'nonce'                => wp_create_nonce( 'am_ajax' ),
-			'trafficLivePollMs'    => absint( get_option( 'am_traffic_live_poll_seconds', 10 ) ) * 1000,
-			'trafficLiveFeedLimit' => absint( get_option( 'am_traffic_live_feed_limit', 25 ) ),
+			'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+			'nonce'   => wp_create_nonce( 'am_ajax' ),
 		) );
 	}
 
@@ -198,9 +193,6 @@ class AM_Admin {
 		}
 		if ( isset( $_GET['am_display_settings_saved'] ) ) {
 			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Display settings saved.', 'activity-monitor' ) . '</p></div>';
-		}
-		if ( isset( $_GET['am_traffic_settings_saved'] ) ) {
-			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Traffic settings saved.', 'activity-monitor' ) . '</p></div>';
 		}
 	}
 
@@ -396,28 +388,6 @@ class AM_Admin {
 
 		wp_safe_redirect( add_query_arg(
 			array( 'page' => 'activity-monitor', self::TAB_PARAM => 'settings', 'am_display_settings_saved' => '1' ),
-			admin_url( 'admin.php' )
-		) );
-		exit;
-	}
-
-	public function handle_save_traffic_settings() {
-		check_admin_referer( 'am_save_traffic_settings' );
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_die( esc_html__( 'Unauthorized.', 'activity-monitor' ) );
-		}
-
-		update_option( 'am_traffic_enabled', ! empty( $_POST['am_traffic_enabled'] ) ? '1' : '' );
-		// 0 = never prune, matches the same convention as am_retention_days.
-		update_option( 'am_traffic_retention_days', absint( $_POST['am_traffic_retention_days'] ?? 30 ) );
-		// Floor of 3s so the live feed can't be configured into hammering
-		// the DB every request; ceiling is just sanity (60s still "live"
-		// enough to be useful, beyond that the feed isn't really live).
-		update_option( 'am_traffic_live_poll_seconds', min( 60, max( 3, absint( $_POST['am_traffic_live_poll_seconds'] ?? 10 ) ) ) );
-		update_option( 'am_traffic_live_feed_limit', min( 200, max( 5, absint( $_POST['am_traffic_live_feed_limit'] ?? 25 ) ) ) );
-
-		wp_safe_redirect( add_query_arg(
-			array( 'page' => 'activity-monitor', self::TAB_PARAM => 'settings', 'am_traffic_settings_saved' => '1' ),
 			admin_url( 'admin.php' )
 		) );
 		exit;
@@ -751,64 +721,6 @@ class AM_Admin {
 	}
 
 	/**
-	 * Returns recent raw page-view hits for the Traffic tab's live feed.
-	 * Polled repeatedly from JS at an interval the person configures in
-	 * Settings (am_traffic_live_poll_seconds); after_id lets each poll
-	 * ask only for hits newer than what the client already has, so
-	 * repeated polls don't re-send the same rows.
-	 */
-	public function ajax_live_traffic() {
-		check_ajax_referer( 'am_ajax', 'nonce' );
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_die( '-1' );
-		}
-
-		$after_id = absint( $_POST['after_id'] ?? 0 );
-		$limit    = absint( get_option( 'am_traffic_live_feed_limit', 25 ) );
-
-		$hits = AM_Traffic_Query::get_recent_hits( $limit, $after_id );
-
-		$date_format = AM_Date_Format::time_format();
-		$formatted   = array();
-		foreach ( $hits as $hit ) {
-			$user = $hit['user_id'] ? get_userdata( $hit['user_id'] ) : false;
-			$formatted[] = array(
-				'id'                => $hit['id'],
-				'time'              => wp_date( $date_format, strtotime( $hit['date'] . ' UTC' ) ),
-				'url'               => $hit['url'],
-				'full_url'          => home_url( $hit['url'] ),
-				'ip'                => $hit['ip_address'],
-				'user_display_name' => $user ? ( $user->display_name ?: $user->user_login ) : __( 'Guest', 'activity-monitor' ),
-				'user_login'        => $user ? $user->user_login : '',
-			);
-		}
-
-		wp_send_json_success( array(
-			'hits' => $formatted,
-		) );
-	}
-
-	/**
-	 * Fetches geolocation/ISP data for an IP address from ipinfo.io's
-	 * free, no-signup "legacy" endpoint (https://ipinfo.io/{ip}/json) and
-	 * returns it as modal HTML, matching the look of the other detail
-	 * modals in this plugin.
-	 *
-	 * Deliberately NOT an iframe embed of ipinfo.io's own page: that was
-	 * the original approach considered, but sites in this category
-	 * commonly send X-Frame-Options/frame-ancestors headers blocking
-	 * exactly this kind of embedding (confirmed before building this),
-	 * so an iframe would likely show a blank/refused frame. Fetching
-	 * the JSON server-side and rendering our own markup sidesteps that
-	 * entirely.
-	 *
-	 * The legacy endpoint requires no API token/account and is rate
-	 * limited to 1,000 requests/day shared across everyone hitting it
-	 * from this server's IP -- more than enough for occasional manual
-	 * lookups from an admin page, and avoids requiring the person to
-	 * sign up for and configure an API key just to click an IP.
-	 */
-	/**
 	 * Profile card for a WordPress user, shown when a username in the
 	 * Activity Log is clicked.
 	 *
@@ -917,6 +829,26 @@ class AM_Admin {
 		wp_send_json_success( array( 'html' => ob_get_clean() ) );
 	}
 
+	/**
+	 * Fetches geolocation/ISP data for an IP address from ipinfo.io's
+	 * free, no-signup "legacy" endpoint (https://ipinfo.io/{ip}/json) and
+	 * returns it as modal HTML, matching the look of the other detail
+	 * modals in this plugin.
+	 *
+	 * Deliberately NOT an iframe embed of ipinfo.io's own page: that was
+	 * the original approach considered, but sites in this category
+	 * commonly send X-Frame-Options/frame-ancestors headers blocking
+	 * exactly this kind of embedding (confirmed before building this),
+	 * so an iframe would likely show a blank/refused frame. Fetching
+	 * the JSON server-side and rendering our own markup sidesteps that
+	 * entirely.
+	 *
+	 * The legacy endpoint requires no API token/account and is rate
+	 * limited to 1,000 requests/day shared across everyone hitting it
+	 * from this server's IP -- more than enough for occasional manual
+	 * lookups from an admin page, and avoids requiring the person to
+	 * sign up for and configure an API key just to click an IP.
+	 */
 	public function ajax_ip_lookup() {
 		check_ajax_referer( 'am_ajax', 'nonce' );
 		if ( ! current_user_can( 'manage_options' ) ) {
@@ -996,69 +928,6 @@ class AM_Admin {
 						);
 						?>
 					</small>
-				</td>
-			</tr>
-		</table>
-		<?php
-		wp_send_json_success( array( 'html' => ob_get_clean() ) );
-	}
-
-	/**
-	 * Returns detail for a single traffic hit (referrer, full user agent,
-	 * etc. -- fields the live feed's row doesn't show) for the page-detail
-	 * modal opened by clicking a page/URL in the Traffic tab's live feed.
-	 */
-	public function ajax_traffic_hit_detail() {
-		check_ajax_referer( 'am_ajax', 'nonce' );
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_die( '-1' );
-		}
-
-		$id  = absint( $_POST['id'] ?? 0 );
-		$hit = $id ? AM_Traffic_Query::get_hit( $id ) : null;
-
-		if ( ! $hit ) {
-			wp_send_json_error( array( 'message' => __( 'That page view could not be found — it may have been pruned.', 'activity-monitor' ) ) );
-		}
-
-		$browser      = $hit['user_agent'] ? $this->parse_user_agent( $hit['user_agent'] ) : __( 'Unknown', 'activity-monitor' );
-		$visitor_user = $hit['user_id'] ? get_userdata( $hit['user_id'] ) : false;
-
-		ob_start();
-		?>
-		<table class="am-detail-table">
-			<tr><th><?php esc_html_e( 'Time', 'activity-monitor' ); ?></th><td><?php echo esc_html( wp_date( AM_Date_Format::combined(), strtotime( $hit['date'] . ' UTC' ) ) ); ?></td></tr>
-			<tr><th><?php esc_html_e( 'Title', 'activity-monitor' ); ?></th><td><?php echo esc_html( $hit['title'] ); ?></td></tr>
-			<tr><th><?php esc_html_e( 'Page', 'activity-monitor' ); ?></th><td><?php echo esc_html( $hit['url'] ); ?></td></tr>
-			<tr>
-				<th><?php esc_html_e( 'Referrer', 'activity-monitor' ); ?></th>
-				<td>
-					<?php if ( $hit['referrer'] ) : ?>
-						<?php echo esc_html( $hit['referrer'] ); ?>
-					<?php else : ?>
-						<?php esc_html_e( 'Direct / none', 'activity-monitor' ); ?>
-					<?php endif; ?>
-				</td>
-			</tr>
-			<tr>
-				<th><?php esc_html_e( 'Visitor', 'activity-monitor' ); ?></th>
-				<td>
-					<?php if ( $visitor_user ) : ?>
-						<strong><?php echo esc_html( $visitor_user->display_name ?: $visitor_user->user_login ); ?></strong>
-						<br><small class="am-role"><?php echo esc_html( $visitor_user->user_login ); ?></small>
-					<?php else : ?>
-						<?php esc_html_e( 'Guest', 'activity-monitor' ); ?>
-					<?php endif; ?>
-				</td>
-			</tr>
-			<tr><th><?php esc_html_e( 'IP Address', 'activity-monitor' ); ?></th><td><a href="#" class="am-ip-lookup" data-ip="<?php echo esc_attr( $hit['ip_address'] ); ?>"><?php echo esc_html( $hit['ip_address'] ); ?></a></td></tr>
-			<tr>
-				<th><?php esc_html_e( 'Browser', 'activity-monitor' ); ?></th>
-				<td>
-					<?php echo esc_html( $browser ); ?>
-					<?php if ( $hit['user_agent'] ) : ?>
-						<br><small class="am-role"><?php echo esc_html( $hit['user_agent'] ); ?></small>
-					<?php endif; ?>
 				</td>
 			</tr>
 		</table>
@@ -1194,7 +1063,6 @@ class AM_Admin {
 
 		$tabs = array(
 			'log'      => __( 'Activity Log',    'activity-monitor' ),
-			'traffic'  => __( 'Traffic',          'activity-monitor' ),
 			'sessions' => __( 'Active Sessions', 'activity-monitor' ),
 		);
 
@@ -1239,9 +1107,6 @@ class AM_Admin {
 						// complete (IP Address added) and every event source is
 						// ported. See activity-monitor-v2-spec.md §9.
 						$this->render_tab_v2_log();
-						break;
-					case 'traffic':
-						$this->render_tab_traffic();
 						break;
 					case 'sessions':
 						$this->render_tab_sessions();
@@ -1593,41 +1458,6 @@ class AM_Admin {
 		return preg_replace( '/[^a-z0-9_.|\-]/', '', strtolower( (string) $raw ) );
 	}
 
-	// ── Tab: Traffic ────────────────────────────────────────────────────
-
-	private function render_tab_traffic() {
-		?>
-
-		<?php if ( '1' !== get_option( 'am_traffic_enabled', '1' ) ) : ?>
-			<div class="notice notice-warning inline">
-				<p>
-					<?php esc_html_e( 'Traffic logging is currently disabled.', 'activity-monitor' ); ?>
-					<a href="<?php echo esc_url( add_query_arg( array( 'page' => 'activity-monitor', self::TAB_PARAM => 'settings' ), admin_url( 'admin.php' ) ) ); ?>">
-						<?php esc_html_e( 'Enable it in Settings.', 'activity-monitor' ); ?>
-					</a>
-				</p>
-			</div>
-		<?php endif; ?>
-
-		<div class="am-table-wrap am-table-scroll">
-			<table class="wp-list-table widefat am-log-table" id="am-live-traffic-table">
-				<thead>
-					<tr>
-						<th><?php esc_html_e( 'Time', 'activity-monitor' ); ?></th>
-						<th><?php esc_html_e( 'Page', 'activity-monitor' ); ?></th>
-						<th><?php esc_html_e( 'Visitor', 'activity-monitor' ); ?></th>
-						<th><?php esc_html_e( 'IP Address', 'activity-monitor' ); ?></th>
-						<th><?php esc_html_e( 'Actions', 'activity-monitor' ); ?></th>
-					</tr>
-				</thead>
-				<tbody id="am-live-traffic-body">
-					<tr><td colspan="5"><?php esc_html_e( 'Waiting for the next page view…', 'activity-monitor' ); ?></td></tr>
-				</tbody>
-			</table>
-		</div>
-		<?php
-	}
-
 	// ── Tab: Active Sessions ──────────────────────────────────────────────
 
 	private function render_tab_sessions() {
@@ -1962,7 +1792,7 @@ class AM_Admin {
 
 		<hr class="am-section-divider am-group-divider">
 
-		<h2 class="am-settings-group-title"><?php esc_html_e( 'Page Traffic', 'activity-monitor' ); ?></h2>
+		<h2 class="am-settings-group-title"><?php esc_html_e( 'Display', 'activity-monitor' ); ?></h2>
 
 		<div class="am-settings-section">
 			<h2 class="am-section-title">
@@ -1970,7 +1800,7 @@ class AM_Admin {
 				<?php esc_html_e( 'Date &amp; Time Display', 'activity-monitor' ); ?>
 			</h2>
 			<p class="am-description">
-				<?php esc_html_e( 'How timestamps are shown throughout the plugin — the activity log, the sessions and traffic tables, the detail popups, and the times reported on this screen. Chart labels are excluded, since those are sized to fit their axis. CSV and JSON exports are also excluded: those keep raw UTC values so they stay machine-readable.', 'activity-monitor' ); ?>
+				<?php esc_html_e( 'How timestamps are shown throughout the plugin — the activity log, the sessions table, the detail popups, and the times reported on this screen. CSV and JSON exports are excluded: those keep raw UTC values so they stay machine-readable.', 'activity-monitor' ); ?>
 			</p>
 
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
@@ -2001,76 +1831,6 @@ class AM_Admin {
 			</form>
 		</div>
 
-		<div class="am-settings-section">
-			<h2 class="am-section-title">
-				<span class="dashicons dashicons-chart-line"></span>
-				<?php esc_html_e( 'Page Traffic', 'activity-monitor' ); ?>
-			</h2>
-			<p class="am-description">
-				<?php esc_html_e( 'Logs front-end page views (URL, referrer, IP, visitor) separately from the audit log above. Raw hits are rolled up into daily totals and then pruned; the daily totals themselves are kept indefinitely.', 'activity-monitor' ); ?>
-			</p>
-
-			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-				<?php wp_nonce_field( 'am_save_traffic_settings' ); ?>
-				<input type="hidden" name="action" value="am_save_traffic_settings">
-
-				<table class="form-table">
-					<tr>
-						<th scope="row">
-							<?php esc_html_e( 'Enable traffic logging', 'activity-monitor' ); ?>
-						</th>
-						<td>
-							<label>
-								<input type="checkbox" name="am_traffic_enabled" value="1"
-								       <?php checked( get_option( 'am_traffic_enabled', '1' ), '1' ); ?>>
-								<?php esc_html_e( 'Log page views on the front end of the site', 'activity-monitor' ); ?>
-							</label>
-						</td>
-					</tr>
-					<tr>
-						<th scope="row">
-							<label for="am_traffic_retention_days"><?php esc_html_e( 'Raw hit retention', 'activity-monitor' ); ?></label>
-						</th>
-						<td>
-							<input type="number" min="0" id="am_traffic_retention_days" name="am_traffic_retention_days"
-							       value="<?php echo esc_attr( absint( get_option( 'am_traffic_retention_days', 30 ) ) ); ?>"
-							       class="small-text"> <?php esc_html_e( 'days', 'activity-monitor' ); ?>
-							<p class="description">
-								<?php esc_html_e( '0 = never prune. Only affects individual raw hit records; the daily views/top-pages totals are not deleted.', 'activity-monitor' ); ?>
-							</p>
-						</td>
-					</tr>
-					<tr>
-						<th scope="row">
-							<label for="am_traffic_live_poll_seconds"><?php esc_html_e( 'Live feed refresh rate', 'activity-monitor' ); ?></label>
-						</th>
-						<td>
-							<input type="number" min="3" max="60" id="am_traffic_live_poll_seconds" name="am_traffic_live_poll_seconds"
-							       value="<?php echo esc_attr( absint( get_option( 'am_traffic_live_poll_seconds', 10 ) ) ); ?>"
-							       class="small-text"> <?php esc_html_e( 'seconds', 'activity-monitor' ); ?>
-							<p class="description">
-								<?php esc_html_e( 'How often the live traffic feed checks for new page views while the Traffic tab is open. 3-60 seconds.', 'activity-monitor' ); ?>
-							</p>
-						</td>
-					</tr>
-					<tr>
-						<th scope="row">
-							<label for="am_traffic_live_feed_limit"><?php esc_html_e( 'Live feed size', 'activity-monitor' ); ?></label>
-						</th>
-						<td>
-							<input type="number" min="5" max="200" id="am_traffic_live_feed_limit" name="am_traffic_live_feed_limit"
-							       value="<?php echo esc_attr( absint( get_option( 'am_traffic_live_feed_limit', 25 ) ) ); ?>"
-							       class="small-text"> <?php esc_html_e( 'hits', 'activity-monitor' ); ?>
-							<p class="description">
-								<?php esc_html_e( 'Number of most recent page views shown in the live feed. 5-200.', 'activity-monitor' ); ?>
-							</p>
-						</td>
-					</tr>
-				</table>
-
-				<?php submit_button( __( 'Save Traffic Settings', 'activity-monitor' ), 'secondary' ); ?>
-			</form>
-		</div>
 		<?php
 	}
 

@@ -78,31 +78,6 @@
 		.fail(function () { $('#am-modal-body').html('<p>Request failed.</p>'); });
 	});
 
-	/* Page/hit detail modal. Triggered by clicking the Details button in
-	   the Traffic tab's live feed's Actions column -- shows referrer,
-	   visitor, IP, and browser for that specific page view (fields the
-	   live feed row itself doesn't have room for). The Page column
-	   itself is now a plain link straight to the actual page (opens in
-	   a new tab), separate from this. Fetches by hit id via
-	   ajax_traffic_hit_detail() rather than passing the row's data
-	   through the DOM, matching how the other detail modals work. */
-	$(document).on('click', '.am-traffic-hit-detail', function (e) {
-		e.preventDefault();
-		var id = $(this).data('id');
-		var url = $(this).data('url');
-		if (!id) return;
-		openModal(url ? ('Page View: ' + url) : 'Page View Details');
-		$.post(amData.ajaxUrl, { action: 'am_traffic_hit_detail', id: id, nonce: amData.nonce })
-		.done(function (r) {
-			if (r.success) {
-				$('#am-modal-body').html(r.data.html);
-			} else {
-				$('#am-modal-body').html('<p>' + (r.data && r.data.message ? r.data.message : 'Error.') + '</p>');
-			}
-		})
-		.fail(function () { $('#am-modal-body').html('<p>Request failed.</p>'); });
-	});
-
 	/* WordPress user profile modal. Triggered by clicking a username in
 	   the Activity Log. Sends the user ID rather than the login for the
 	   reason given on ajax_user_profile(): logins can be renamed and
@@ -328,64 +303,4 @@
 		.always(function () { $btn.prop('disabled', false); });
 	});
 
-	/* Live traffic feed (Traffic tab). Polls am_get_live_traffic at the
-	   interval/limit the person configured in Settings (localized as
-	   trafficLivePollMs / trafficLiveFeedLimit). Only runs when the
-	   feed table is actually on the page, and stops itself once the
-	   element is gone (e.g. the person switched tabs and the page
-	   re-rendered) rather than leaving an orphaned timer running. */
-	var $liveBody = $('#am-live-traffic-body');
-	if ($liveBody.length) {
-		var lastSeenId = 0;
-		var pollMs = (amData.trafficLivePollMs > 0) ? amData.trafficLivePollMs : 10000;
-
-		function escapeHtml(s) {
-			return $('<div>').text(s == null ? '' : s).html();
-		}
-
-		function pollLiveTraffic() {
-			if (!$('#am-live-traffic-body').length) {
-				return; // Left the Traffic tab; stop polling.
-			}
-			$.post(amData.ajaxUrl, { action: 'am_get_live_traffic', nonce: amData.nonce, after_id: lastSeenId })
-			.done(function (r) {
-				if (!r.success) return;
-
-				var hits = r.data.hits || [];
-				if (hits.length) {
-					// Server returns newest-first; prepend in that same
-					// order so the newest hit ends up at the very top.
-					var rows = hits.map(function (h) {
-						var ipCell   = '<a href="#" class="am-ip-lookup" data-ip="' + escapeHtml(h.ip) + '">' + escapeHtml(h.ip) + '</a>';
-						var pageCell = '<a href="' + escapeHtml(h.full_url) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(h.url) + '</a>';
-						var actionsCell = '<button class="button button-small am-traffic-hit-detail" data-id="' + escapeHtml(h.id) + '" data-url="' + escapeHtml(h.url) + '">Details</button>';
-						var userCell = h.user_login
-							? '<strong>' + escapeHtml(h.user_display_name) + '</strong><br><small class="am-role">' + escapeHtml(h.user_login) + '</small>'
-							: escapeHtml(h.user_display_name);
-						return '<tr><td>' + escapeHtml(h.time) + '</td>' +
-							'<td class="am-page-cell" title="' + escapeHtml(h.url) + '">' + pageCell + '</td>' +
-							'<td>' + userCell + '</td>' +
-							'<td class="am-ip-cell" title="' + escapeHtml(h.ip) + '">' + ipCell + '</td>' +
-							'<td>' + actionsCell + '</td></tr>';
-					}).join('');
-
-					var $body = $('#am-live-traffic-body');
-					if ($body.find('td[colspan]').length) {
-						$body.empty(); // Clear the "waiting" placeholder row.
-					}
-					$body.prepend(rows);
-
-					var limit = amData.trafficLiveFeedLimit || 25;
-					$body.find('tr').slice(limit).remove();
-
-					lastSeenId = Math.max.apply(null, hits.map(function (h) { return h.id; }));
-				}
-			})
-			.always(function () {
-				setTimeout(pollLiveTraffic, pollMs);
-			});
-		}
-
-		pollLiveTraffic();
-	}
 }(jQuery));

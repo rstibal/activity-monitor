@@ -6,11 +6,10 @@ Distributed on wordpress.org as a public plugin.
 
 ## Features
 
-- Single tabbed admin screen (Activity Log, Traffic, Active Sessions, Settings)
+- Single tabbed admin screen (Activity Log, Active Sessions, Settings)
 - Two-table event schema (`am_events` + `am_event_context`) with occasion grouping (repeated events collapse into one entry with a count), PSR-3 severity levels, and initiator tagging (user / visitor / cron / WP-CLI / auto-update / REST API / system)
 - Pluggable per-source logger architecture — one class per event type (posts, users, media, comments, plugins, themes, core, terms, menus, widgets, passwords, sites, security, fatal errors, file editor, maintenance mode, mail failures)
 - Session management on top of WordPress's own `session_tokens` storage: per-session revoke, configurable concurrent-session limits, emergency lockdown
-- Self-hosted page traffic tracking (no third-party service, no cookies): raw hit log with a live feed and a per-hit detail view (referrer, user agent, IP), bot-filtered, with a daily rollup and its own retention schedule
 - Scheduled email digests (daily/weekly/monthly), configurable as multiple independent schedules, with in-browser preview and test send
 - Log export: CSV, JSON, HTML, and plain text, honoring the current filter set
 - Email and Slack notification channels with configurable minimum severity

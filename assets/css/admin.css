@@ -201,17 +201,16 @@
 	-webkit-box-orient: vertical;
 }
 
-/* IP Address column (Activity Log + Traffic tab's live feed) — sized
-   in ch (character width) rather than a fixed px guess, so it scales
-   with font size. 16ch comfortably fits any IPv4 address (max 15
-   chars, e.g. 255.255.255.255) with a little breathing room; IPv6
-   (up to 45 chars per the traffic schema's column width) will overflow
-   and truncate with an ellipsis rather than widening the column or
-   wrapping. Single-line (not the multi-line clamp am-message-cell
-   uses), since an address wrapping across lines is harder to read,
-   not easier -- the full value is still available via the title
-   attribute (native browser tooltip) and by clicking through to the
-   IP lookup modal. */
+/* IP Address column (Activity Log + Active Sessions) — sized in ch
+   (character width) rather than a fixed px guess, so it scales with
+   font size. 16ch comfortably fits any IPv4 address (max 15 chars,
+   e.g. 255.255.255.255) with a little breathing room; IPv6 (up to 45
+   chars per the am_events column width) will overflow and truncate
+   with an ellipsis rather than widening the column or wrapping.
+   Single-line (not the multi-line clamp am-message-cell uses), since
+   an address wrapping across lines is harder to read, not easier --
+   the full value is still available via the title attribute (native
+   browser tooltip) and by clicking through to the IP lookup modal. */
 .am-ip-cell {
 	max-width: 16ch;
 	overflow: hidden;
@@ -219,17 +218,6 @@
 	white-space: nowrap;
 }
 
-/* Page column (Traffic tab's live feed) -- same single-line
-   truncation approach, sized in px since page
-   titles/URL paths don't have a natural character-count ceiling the
-   way IPv4/IPv6 do. Full path available via the title attribute and
-   (live feed only) the Details modal. */
-.am-page-cell {
-	max-width: 260px;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-}
 /* Row accent borders — one per AM_Log_Levels::ORDER value (debug lowest
    -> emergency highest). Ramp runs gray -> green -> blue -> yellow ->
    orange -> red -> deep red -> darkest red, so severity reads at a
@@ -332,7 +320,7 @@
 
 /* Settings form styling -- brings every <table class="form-table">
    block in this plugin's Settings tab (Notifications, Digest, Session
-   Management, Traffic) in line with the visual language used
+   Management, Date &amp; Time Display) in line with the visual language used
    elsewhere (Activity Log's badges, the pagination buttons) rather
    than leaving raw wp-admin defaults, which was the main visual gap
    between Settings and every other tab. */

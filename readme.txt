@@ -1,10 +1,10 @@
 === Activity Monitor ===
 Contributors: rstibal
-Tags: activity log, audit log, security, user activity, page traffic
+Tags: activity log, audit log, security, user activity, session management
 Requires at least: 5.3
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.1.1
+Stable tag: 2.2.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -29,10 +29,6 @@ Repeated events (a burst of failed logins, rapid comment status churn) are autom
 = Session management =
 
 See every active login session across your site, revoke individual sessions, set a limit on how many concurrent sessions a user can hold, or lock the site down immediately by terminating every session except your own.
-
-= Page traffic =
-
-Optional, self-hosted page-view tracking with no third-party service and no cookies: per-page views and unique visitors, a live feed of hits as they arrive, top pages, and a traffic-source breakdown (direct, search, social, referral, internal). Raw hits are rolled up daily and pruned on a retention schedule you set, so the tables stay small on busy sites.
 
 = Digests and exports =
 
@@ -70,10 +66,14 @@ Yes, retention is configurable and old entries are pruned automatically on a dai
 == Screenshots ==
 
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
-2. Page traffic, with a live feed of incoming hits.
-3. Active Sessions, with per-session revoke and site-wide emergency lockdown.
+2. Active Sessions, with per-session revoke and site-wide emergency lockdown.
 
 == Changelog ==
+
+= 2.2.0 =
+* Removed: page traffic tracking, in full — the Traffic tab, its live feed and page-view detail popup, and the Page Traffic settings block. Activity Monitor is now focused solely on the audit log and session management.
+* Important: upgrading to this version **permanently deletes all stored page-view data**. Both traffic database tables are dropped automatically the first time 2.2.0 loads, along with the traffic settings and the nightly rollup task. This cannot be undone — if you want to keep that history, export it from the database before updating.
+* Fixed: uninstalling the plugin now removes the traffic tables, options, and scheduled task it previously left behind, so deleting Activity Monitor really does leave nothing behind.
 
 = 2.1.1 =
 * Changed: everywhere a WordPress user is shown (Activity Log, Traffic tab, Active Sessions, and Slack/email notifications) now displays the profile's display name alongside the username, instead of the first/last name fields (which are often left blank).
@@ -159,6 +159,9 @@ Yes, retention is configurable and old entries are pruned automatically on a dai
 * Initial internal release.
 
 == Upgrade Notice ==
+
+= 2.2.0 =
+Page traffic tracking is removed. Upgrading permanently deletes all stored page-view data — both traffic tables are dropped on first load and cannot be recovered. Export that history first if you need it. Your activity log and sessions are unaffected.
 
 = 2.0.73 =
 Adds page traffic tracking (off until enabled in Settings) and replaces Stats & Insights with a Dashboard. Slack notification channels are available again.

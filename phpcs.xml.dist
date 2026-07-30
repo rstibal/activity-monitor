@@ -54,8 +54,8 @@
 		<exclude name="WordPress.PHP.YodaConditions"/>
 
 		<!-- This plugin's entire job is querying its own custom tables via
-		     $wpdb; there is no object-cache layer for am_events/am_traffic_*/
-		     am_installs, and none is planned. See CLAUDE.md architecture. -->
+		     $wpdb; there is no object-cache layer for am_events/am_event_context,
+		     and none is planned. See CLAUDE.md architecture. -->
 		<exclude name="WordPress.DB.DirectDatabaseQuery"/>
 	</rule>
 

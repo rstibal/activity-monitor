@@ -6,21 +6,22 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  * shows a timestamp.
  *
  * Each preset is stored as a *pair* of format strings rather than one
- * combined string, because the time half is sometimes needed on its
- * own: the live traffic feed shows only the time, since every row in
- * it is from today and repeating the date on each would be noise.
- * A single combined string can't be split back into its halves
- * reliably, so the pair is the source of truth and combined() joins
- * them, not the other way round.
+ * combined string, and combined() joins them rather than the pair being
+ * derived from a combined string -- a single string can't be split back
+ * into its halves reliably, so the pair has to be the source of truth
+ * if the halves are ever wanted separately.
  *
- * (The Activity Log's Date column was the other reason for the split,
- * stacking date over time on two lines; it went to a single line in
- * 2.0.70 and now uses combined() like everywhere else.)
+ * Nothing currently asks for a half on its own. Both callers that did
+ * are gone: the Activity Log's Date column stacked date over time until
+ * it went single-line in 2.0.70, and the live traffic feed showed
+ * time-only until page traffic was removed in 2.2.0 (its time_format()
+ * accessor went with it). The pair is kept anyway -- it costs nothing,
+ * it's the shape the FORMATS table is already written in, and it's the
+ * only shape that can be split later without re-deriving every preset.
  *
- * Chart axis labels ('M j') and the peak-hour KPI ('g A') deliberately
- * do NOT use this. Those are compact axis annotations sized to fit a
- * column, not timestamps, and a user picking a long format shouldn't
- * blow out the charts.
+ * CSV and JSON export deliberately do NOT use this: those keep raw UTC
+ * values so they stay machine-readable regardless of the display
+ * preset.
  */
 class AM_Date_Format {
 
@@ -56,9 +57,8 @@ class AM_Date_Format {
 
 	/**
 	 * Resolved date and time format strings for the current preset.
-	 * Private: callers want time_format() or combined(), and keeping
-	 * the raw pair internal means the 'site' resolution below stays in
-	 * one place.
+	 * Private: callers want combined(), and keeping the raw pair
+	 * internal means the 'site' resolution below stays in one place.
 	 *
 	 * @return array{date:string, time:string}
 	 */
@@ -70,12 +70,7 @@ class AM_Date_Format {
 		);
 	}
 
-	/** Time half only — for the live traffic feed. */
-	public static function time_format(): string {
-		return self::parts()['time'];
-	}
-
-	/** Both halves, for the single-line timestamps used most places. */
+	/** Both halves, for the single-line timestamps used everywhere. */
 	public static function combined(): string {
 		$parts = self::parts();
 		return $parts['date'] . ' ' . $parts['time'];
