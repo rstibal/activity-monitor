@@ -626,13 +626,14 @@ class AM_Admin {
 			<tr>
 				<th><?php esc_html_e( 'User', 'activity-monitor' ); ?></th>
 				<td>
-					<?php echo esc_html( $row->user_login ); ?>
+					<?php if ( '' !== $row->user_login ) : ?>
+						<strong><?php echo esc_html( '' !== $row->user_display_name ? $row->user_display_name : $row->user_login ); ?></strong>
+						<br><small class="am-role"><?php echo esc_html( $row->user_login ); ?></small>
+					<?php else : ?>
+						—
+					<?php endif; ?>
 					<?php if ( $row->user_role ) echo ' (' . esc_html( $row->user_role ) . ')'; ?>
 				</td>
-			</tr>
-			<tr>
-				<th><?php esc_html_e( 'Name', 'activity-monitor' ); ?></th>
-				<td><?php echo esc_html( self::real_name( (int) $row->user_id ) ?: '—' ); ?></td>
 			</tr>
 			<tr><th><?php esc_html_e( 'IP Address', 'activity-monitor' ); ?></th><td><a href="#" class="am-ip-lookup" data-ip="<?php echo esc_attr( $row->ip_address ); ?>"><?php echo esc_html( $row->ip_address ); ?></a></td></tr>
 			<tr>
@@ -667,26 +668,6 @@ class AM_Admin {
 		</table>
 		<?php
 		wp_send_json_success( array( 'html' => ob_get_clean() ) );
-	}
-
-	/**
-	 * "First Name Last Name" for a user, looked up live via WP user meta
-	 * — deliberately separate from user_display_name (the nickname
-	 * field), which the person may have set identically to their login
-	 * and which isn't a reliable real-name source. Falls back to
-	 * whichever of first/last is set, then to '' if neither exists
-	 * (e.g. user later deleted, or never filled in their profile).
-	 */
-	private static function real_name( int $user_id ): string {
-		if ( ! $user_id ) {
-			return '';
-		}
-		$user = get_userdata( $user_id );
-		if ( ! $user ) {
-			return '';
-		}
-		$name = trim( $user->first_name . ' ' . $user->last_name );
-		return $name;
 	}
 
 	/**
@@ -742,16 +723,13 @@ class AM_Admin {
 			<tr>
 				<th><?php esc_html_e( 'User', 'activity-monitor' ); ?></th>
 				<td>
-					<strong><?php echo esc_html( $user->user_login ); ?></strong>
+					<strong><?php echo esc_html( $user->display_name ?: $user->user_login ); ?></strong>
+					<br><small class="am-role"><?php echo esc_html( $user->user_login ); ?></small>
 					(ID: <?php echo esc_html( $user_id ); ?>)
 					<?php if ( $is_current ) : ?>
 						<span class="am-badge am-info"><?php esc_html_e( 'You', 'activity-monitor' ); ?></span>
 					<?php endif; ?>
 				</td>
-			</tr>
-			<tr>
-				<th><?php esc_html_e( 'Name', 'activity-monitor' ); ?></th>
-				<td><?php echo esc_html( self::real_name( $user_id ) ?: '—' ); ?></td>
 			</tr>
 			<tr><th><?php esc_html_e( 'Logged In', 'activity-monitor' ); ?></th><td><?php echo esc_html( $login_text ); ?></td></tr>
 			<tr>
@@ -793,13 +771,15 @@ class AM_Admin {
 		$date_format = AM_Date_Format::time_format();
 		$formatted   = array();
 		foreach ( $hits as $hit ) {
+			$user = $hit['user_id'] ? get_userdata( $hit['user_id'] ) : false;
 			$formatted[] = array(
-				'id'       => $hit['id'],
-				'time'     => wp_date( $date_format, strtotime( $hit['date'] . ' UTC' ) ),
-				'url'      => $hit['url'],
-				'full_url' => home_url( $hit['url'] ),
-				'ip'       => $hit['ip_address'],
-				'user'     => $hit['user_id'] ? ( get_userdata( $hit['user_id'] )->user_login ?? '' ) : __( 'Guest', 'activity-monitor' ),
+				'id'                => $hit['id'],
+				'time'              => wp_date( $date_format, strtotime( $hit['date'] . ' UTC' ) ),
+				'url'               => $hit['url'],
+				'full_url'          => home_url( $hit['url'] ),
+				'ip'                => $hit['ip_address'],
+				'user_display_name' => $user ? ( $user->display_name ?: $user->user_login ) : __( 'Guest', 'activity-monitor' ),
+				'user_login'        => $user ? $user->user_login : '',
 			);
 		}
 
@@ -1041,8 +1021,8 @@ class AM_Admin {
 			wp_send_json_error( array( 'message' => __( 'That page view could not be found — it may have been pruned.', 'activity-monitor' ) ) );
 		}
 
-		$browser = $hit['user_agent'] ? $this->parse_user_agent( $hit['user_agent'] ) : __( 'Unknown', 'activity-monitor' );
-		$visitor = $hit['user_id'] ? ( get_userdata( $hit['user_id'] )->user_login ?? __( 'Unknown user', 'activity-monitor' ) ) : __( 'Guest', 'activity-monitor' );
+		$browser      = $hit['user_agent'] ? $this->parse_user_agent( $hit['user_agent'] ) : __( 'Unknown', 'activity-monitor' );
+		$visitor_user = $hit['user_id'] ? get_userdata( $hit['user_id'] ) : false;
 
 		ob_start();
 		?>
@@ -1060,7 +1040,17 @@ class AM_Admin {
 					<?php endif; ?>
 				</td>
 			</tr>
-			<tr><th><?php esc_html_e( 'Visitor', 'activity-monitor' ); ?></th><td><?php echo esc_html( $visitor ); ?></td></tr>
+			<tr>
+				<th><?php esc_html_e( 'Visitor', 'activity-monitor' ); ?></th>
+				<td>
+					<?php if ( $visitor_user ) : ?>
+						<strong><?php echo esc_html( $visitor_user->display_name ?: $visitor_user->user_login ); ?></strong>
+						<br><small class="am-role"><?php echo esc_html( $visitor_user->user_login ); ?></small>
+					<?php else : ?>
+						<?php esc_html_e( 'Guest', 'activity-monitor' ); ?>
+					<?php endif; ?>
+				</td>
+			</tr>
 			<tr><th><?php esc_html_e( 'IP Address', 'activity-monitor' ); ?></th><td><a href="#" class="am-ip-lookup" data-ip="<?php echo esc_attr( $hit['ip_address'] ); ?>"><?php echo esc_html( $hit['ip_address'] ); ?></a></td></tr>
 			<tr>
 				<th><?php esc_html_e( 'Browser', 'activity-monitor' ); ?></th>
@@ -1558,7 +1548,8 @@ class AM_Admin {
 						<td><span class="am-badge am-init-<?php echo esc_attr( $row->initiator ); ?>"><?php echo esc_html( AM_Initiator_Detector::label( $row->initiator ) ); ?></span></td>
 						<td>
 							<?php if ( (int) $row->user_id > 0 && '' !== $row->user_login ) : ?>
-								<a href="#" class="am-user-profile-link" data-user-id="<?php echo esc_attr( (int) $row->user_id ); ?>"><?php echo esc_html( $row->user_login ); ?></a>
+								<a href="#" class="am-user-profile-link" data-user-id="<?php echo esc_attr( (int) $row->user_id ); ?>"><strong><?php echo esc_html( '' !== $row->user_display_name ? $row->user_display_name : $row->user_login ); ?></strong></a>
+								<br><small class="am-role"><?php echo esc_html( $row->user_login ); ?></small>
 							<?php else : ?>
 								<?php echo esc_html( '' !== $row->user_login ? $row->user_login : '—' ); ?>
 							<?php endif; ?>
@@ -1640,7 +1631,7 @@ class AM_Admin {
 	// ── Tab: Active Sessions ──────────────────────────────────────────────
 
 	private function render_tab_sessions() {
-		$users = get_users( array( 'fields' => array( 'ID', 'user_login' ) ) );
+		$users = get_users( array( 'fields' => array( 'ID', 'user_login', 'display_name' ) ) );
 
 		$sessions_data = array();
 
@@ -1648,22 +1639,15 @@ class AM_Admin {
 			$raw      = get_user_meta( $user->ID, 'session_tokens', true );
 			$sessions = is_array( $raw ) ? $raw : array();
 
-			// Skip before the name lookup below: most users on a site have
-			// no active session, and there's no reason to resolve a name
-			// for a row that will never be rendered.
 			if ( empty( $sessions ) ) {
 				continue;
 			}
-
-			// Resolved once per user rather than once per session, since a
-			// user can hold several at a time.
-			$name = self::real_name( $user->ID );
 
 			foreach ( $sessions as $token_hash => $session ) {
 				$sessions_data[] = array(
 					'user_id'      => $user->ID,
 					'user_login'   => $user->user_login,
-					'name'         => $name,
+					'display_name' => $user->display_name ?: $user->user_login,
 					'token_hash'   => $token_hash,
 					'expiration'   => $session['expiration'] ?? 0,
 					'login'        => $session['login']      ?? 0,
@@ -1713,16 +1697,8 @@ class AM_Admin {
 					?>
 					<tr<?php echo $row_class ? ' class="' . esc_attr( $row_class ) . '"' : ''; ?>>
 						<td>
-							<?php // real_name() returns '' whenever the user never filled in
-							      // first/last name, which is common. Falling back to the
-							      // login as the primary line avoids an empty <strong> above
-							      // a lone gray username, and avoids printing the login twice. ?>
-							<?php if ( '' !== $s['name'] ) : ?>
-								<strong><?php echo esc_html( $s['name'] ); ?></strong>
-								<small class="am-role"><?php echo esc_html( $s['user_login'] ); ?></small>
-							<?php else : ?>
-								<strong><?php echo esc_html( $s['user_login'] ); ?></strong>
-							<?php endif; ?>
+							<strong><?php echo esc_html( $s['display_name'] ); ?></strong>
+							<br><small class="am-role"><?php echo esc_html( $s['user_login'] ); ?></small>
 							<?php if ( $is_current ) : ?>
 								<span class="am-badge am-info"><?php esc_html_e( 'You', 'activity-monitor' ); ?></span>
 							<?php endif; ?>

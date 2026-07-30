@@ -359,9 +359,12 @@
 						var ipCell   = '<a href="#" class="am-ip-lookup" data-ip="' + escapeHtml(h.ip) + '">' + escapeHtml(h.ip) + '</a>';
 						var pageCell = '<a href="' + escapeHtml(h.full_url) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(h.url) + '</a>';
 						var actionsCell = '<button class="button button-small am-traffic-hit-detail" data-id="' + escapeHtml(h.id) + '" data-url="' + escapeHtml(h.url) + '">Details</button>';
+						var userCell = h.user_login
+							? '<strong>' + escapeHtml(h.user_display_name) + '</strong><br><small class="am-role">' + escapeHtml(h.user_login) + '</small>'
+							: escapeHtml(h.user_display_name);
 						return '<tr><td>' + escapeHtml(h.time) + '</td>' +
 							'<td class="am-page-cell" title="' + escapeHtml(h.url) + '">' + pageCell + '</td>' +
-							'<td>' + escapeHtml(h.user) + '</td>' +
+							'<td>' + userCell + '</td>' +
 							'<td class="am-ip-cell" title="' + escapeHtml(h.ip) + '">' + ipCell + '</td>' +
 							'<td>' + actionsCell + '</td></tr>';
 					}).join('');

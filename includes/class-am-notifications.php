@@ -51,11 +51,26 @@ class AM_Notifications {
 
 			$type = $channel['type'] ?? 'email';
 			if ( 'slack' === $type ) {
-				self::send_slack( $channel, $message, $args['user_login'] ?? '', (int) ( $args['event_id'] ?? 0 ) );
+				$user_label = self::format_user_label( $args['user_display_name'] ?? '', $args['user_login'] ?? '' );
+				self::send_slack( $channel, $message, $user_label, (int) ( $args['event_id'] ?? 0 ) );
 			} else {
 				self::send_email( $channel, $level, $event_type, $action, $message, $args );
 			}
 		}
+	}
+
+	/**
+	 * "Display Name (login)" for a notification's acting user -- display
+	 * name first since that's the name a person actually recognizes, login
+	 * alongside it since that's the account of record. Empty when there's
+	 * no logged-in user (system-initiated events), so callers can fall
+	 * back to their own "unknown"/no-"by"-clause handling.
+	 */
+	private static function format_user_label( string $display_name, string $user_login ): string {
+		if ( '' === $user_login ) {
+			return '';
+		}
+		return '' !== $display_name ? "{$display_name} ({$user_login})" : $user_login;
 	}
 
 	private static function send_email( array $channel, string $level, string $event_type, string $action, string $message, array $args ) {
@@ -67,7 +82,7 @@ class AM_Notifications {
 
 		$site    = get_bloginfo( 'name' );
 		$label   = AM_Log_Levels::label( $level );
-		$user    = $args['user_login'] ?? 'unknown';
+		$user    = self::format_user_label( $args['user_display_name'] ?? '', $args['user_login'] ?? '' ) ?: 'unknown';
 		$ip      = $args['ip_address'] ?? AM_DB_Legacy_IP::resolve();
 		/* translators: 1: site name, 2: log level label, 3: event type, 4: event action */
 		$subject = sprintf( __( '[%1$s] Activity Monitor Alert – %2$s: %3$s.%4$s', 'activity-monitor' ), $site, $label, $event_type, $action );
@@ -149,18 +164,19 @@ class AM_Notifications {
 	 * The message is read as one sentence rather than "message + fields":
 	 * a " by {user} on {domain}." clause is appended after stripping the
 	 * message's own trailing period, e.g. 'File "x" uploaded.' becomes
-	 * 'File "x" uploaded by rstibal on injurylawyers.com.' System-initiated
-	 * events with no logged-in user (WP-Cron, WP-CLI, core, failed logins)
-	 * drop the "by" clause and read '... on injurylawyers.com.' instead.
+	 * 'File "x" uploaded by Rob Stibal (rstibal) on injurylawyers.com.'
+	 * System-initiated events with no logged-in user (WP-Cron, WP-CLI,
+	 * core, failed logins) drop the "by" clause and read '... on
+	 * injurylawyers.com.' instead.
 	 */
-	private static function send_slack( array $channel, string $message, string $user_login, int $event_id ) {
+	private static function send_slack( array $channel, string $message, string $user_label, int $event_id ) {
 		$webhook_url = trim( $channel['webhook_url'] ?? '' );
 		if ( '' === $webhook_url ) {
 			return;
 		}
 
 		$domain = wp_strip_all_tags( (string) wp_parse_url( home_url(), PHP_URL_HOST ) );
-		$user   = wp_strip_all_tags( $user_login );
+		$user   = wp_strip_all_tags( $user_label );
 		$base   = rtrim( wp_strip_all_tags( (string) $message ), '.' );
 
 		$log_url = add_query_arg(

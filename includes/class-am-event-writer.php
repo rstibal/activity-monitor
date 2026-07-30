@@ -126,10 +126,11 @@ class AM_Event_Writer {
 				$row['action'],
 				$row['message'],
 				array(
-					'user_login'  => $row['user_login'],
-					'ip_address'  => $row['ip_address'],
-					'object_name' => $row['object_name'],
-					'event_id'    => $event_id,
+					'user_login'        => $row['user_login'],
+					'user_display_name' => $row['user_display_name'],
+					'ip_address'        => $row['ip_address'],
+					'object_name'       => $row['object_name'],
+					'event_id'          => $event_id,
 				)
 			);
 		}

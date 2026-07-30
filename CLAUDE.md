@@ -20,9 +20,17 @@ workflow disappears.
 - **`<code>` is only for actual code** (HTML, JS, SQL). Never for data values —
   IPs, URLs, slugs, IDs, hashes all render as plain text. There is deliberately
   no CSS override of core's grey `<code>` background; real code wants it.
-- **"User" always means `user_login`.** "Name" means the real first + last name
-  from user meta via `AM_Admin::real_name()`, never WordPress's `display_name`
-  (that's the nickname field and is often just a copy of the login).
+- **Anywhere a WordPress user is shown, display only `display_name` and
+  `user_login`** — stacked as `display_name` bold with `user_login` beneath in
+  a `small.am-role`, or `"display_name (user_login)"` inline in single-line
+  contexts (Slack/email). Never first/last name (`AM_Admin::real_name()` was
+  removed — those fields are frequently blank). `display_name` is read live
+  via `get_userdata()`/`WP_User` where the user still exists, or from the
+  `am_events.user_display_name` snapshot column otherwise (populated
+  alongside `user_login` at write time in `AM_Event_Writer::log()`, and
+  backfilled for migrated v1.x rows in `AM_Schema::migrate_legacy_row()`).
+  Rows written before that column existed default to `''`; always fall back
+  to `user_login` when it's empty.
 - **Timestamps** go through `AM_Date_Format::combined()` or `time_format()`.
   Chart axis labels (`'M j'`), the peak-hour KPI (`'g A'`), and CSV/JSON export
   deliberately bypass it — the first two are sized to their axis, the third

@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, page traffic
 Requires at least: 5.3
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.1.0
+Stable tag: 2.1.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -74,6 +74,9 @@ Yes, retention is configurable and old entries are pruned automatically on a dai
 3. Active Sessions, with per-session revoke and site-wide emergency lockdown.
 
 == Changelog ==
+
+= 2.1.1 =
+* Changed: everywhere a WordPress user is shown (Activity Log, Traffic tab, Active Sessions, and Slack/email notifications) now displays the profile's display name alongside the username, instead of the first/last name fields (which are often left blank).
 
 = 2.1.0 =
 * Removed: the Dashboard tab. The Activity Log is now the first/default tab.
