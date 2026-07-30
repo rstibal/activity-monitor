@@ -65,11 +65,17 @@ modals into it too.
 All modals share that one overlay, the `openModal()` JS helper, and the
 `am_ajax` nonce.
 
+**Cleaning up after removed features** goes in `am_run_upgrade_cleanup()`
+(`activity-monitor.php`), which drops tables, options, and cron events left by
+features that no longer exist. It's keyed on a stored `am_cleanup_version`, not
+a boolean per removal: add a block guarded by `version_compare( $done, '<x.y.z>', '<' )`
+for the version that dropped the feature. **Every step must be idempotent** —
+the 2.2.2 switch from the old `am_traffic_cleanup_done` boolean re-runs the
+2.2.0 block once on sites that already ran it. `uninstall.php` repeats the
+drops defensively, since it can't assume any upgrade path ever ran.
+
 Page traffic was removed in 2.2.0 — `AM_Traffic*`, the Traffic tab, and the
-`am_traffic_log`/`am_traffic_daily` tables are all gone. `am_maybe_cleanup_traffic()`
-in `activity-monitor.php` drops the tables, options, and rollup cron once on
-upgrade, guarded by the `am_traffic_cleanup_done` flag; `uninstall.php` repeats
-the drops defensively. Don't reintroduce page-view capture as a parallel
+`am_traffic_log`/`am_traffic_daily` tables are all gone. Don't reintroduce page-view capture as a parallel
 subsystem — if the forensic value is ever wanted back, the audit-relevant
 subset (404 storms, `wp-login.php`/`xmlrpc.php` probing, anonymous hits on
 restricted paths) belongs in a logger writing through `AM_Event_Writer`, where

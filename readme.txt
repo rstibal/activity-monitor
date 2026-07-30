@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, session management
 Requires at least: 5.3
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.2.1
+Stable tag: 2.2.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -69,6 +69,9 @@ Yes, retention is configurable and old entries are pruned automatically on a dai
 2. Active Sessions, with per-session revoke and site-wide emergency lockdown.
 
 == Changelog ==
+
+= 2.2.2 =
+* Fixed: upgrading now clears leftover settings rows belonging to features that have been removed, instead of leaving them in the database until the plugin is deleted. Nothing you can see or configure changes.
 
 = 2.2.1 =
 * Changed: Activity Log, Active Sessions, and Settings are now three separate screens listed under Activity Monitor in the admin menu, instead of tabs on a single page. Each has its own address, so any of them can be bookmarked or linked to directly. Links into the Activity Log — including the ones in digest emails and Slack alerts — are unchanged.

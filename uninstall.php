@@ -27,10 +27,10 @@ $wpdb->query( "DROP TABLE IF EXISTS `{$wpdb->prefix}am_installs`" );
 delete_option( 'am_installs_db_version' );
 
 // Page traffic was removed in 2.2.0, which drops these on upgrade via
-// am_maybe_cleanup_traffic(). Repeated here because uninstall must not
+// am_run_upgrade_cleanup(). Repeated here because uninstall must not
 // assume that ran: a site deleting the plugin without ever loading the
-// 2.2.0 bootstrap (or one where the cleanup flag was cleared) would
-// otherwise leave both tables behind. Dropped directly rather than via
+// 2.2.0 bootstrap (or one where the cleanup bookkeeping was cleared)
+// would otherwise leave both tables behind. Dropped directly rather than via
 // AM_Traffic_Schema, whose class was removed with the feature -- same
 // precedent as am_installs above. IF EXISTS makes this a no-op once the
 // upgrade path has already run.
@@ -55,6 +55,10 @@ delete_option( 'am_traffic_retention_days' );
 delete_option( 'am_traffic_live_poll_seconds' );
 delete_option( 'am_traffic_live_feed_limit' );
 delete_option( 'am_traffic_db_version' );
+// Bookkeeping for am_run_upgrade_cleanup(). am_traffic_cleanup_done is the
+// boolean it used before 2.2.2; still deleted here for anyone uninstalling
+// from a version that predates the switch to a stored version number.
+delete_option( 'am_cleanup_version' );
 delete_option( 'am_traffic_cleanup_done' );
 
 // Clear scheduled cron events.

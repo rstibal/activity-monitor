@@ -3,7 +3,7 @@
  * Plugin Name: Activity Monitor
  * Plugin URI:  https://robstibal.com
  * Description: Comprehensive WordPress audit log – tracks logins, content changes, settings updates, security events, and more.
- * Version:     2.2.1
+ * Version:     2.2.2
  * Author:      Rob Stibal
  * Author URI:  http://robstibal.com
  * License:     GPL v2 or later
@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'AM_VERSION', '2.2.1' );
+define( 'AM_VERSION', '2.2.2' );
 define( 'AM_FILE',    __FILE__ );
 define( 'AM_DIR',     plugin_dir_path( __FILE__ ) );
 define( 'AM_URL',     plugin_dir_url( __FILE__ ) );
@@ -74,7 +74,7 @@ register_activation_hook( AM_FILE, array( 'AM_Schema', 'install' ) );
 // ── Bootstrap ─────────────────────────────────────────────────────────────
 function am_init() {
 	AM_Schema::maybe_upgrade();
-	am_maybe_cleanup_traffic();
+	am_run_upgrade_cleanup();
 	AM_Logger_Manager::init();
 	AM_Admin::init();
 	AM_Digest::init();
@@ -91,59 +91,85 @@ function am_init() {
 add_action( 'plugins_loaded', 'am_init' );
 
 /**
- * One-time removal of the page-traffic subsystem, dropped in 2.2.0.
+ * Removes what past versions left behind: tables, options, and cron
+ * events belonging to features that no longer exist.
  *
- * Everything it owned goes: both tables, its five options, its own DB
- * version option, and the nightly rollup cron -- which would otherwise
- * stay scheduled forever against a hook no longer registered anywhere.
+ * Keyed on a stored version rather than a boolean flag per removal. The
+ * first of these (page traffic, 2.2.0) used its own am_traffic_cleanup_done
+ * flag; the second (2.2.1) would have meant a second flag, and every
+ * removal after that another one -- a row of dead bookkeeping accumulating
+ * to track the removal of dead bookkeeping. A single am_cleanup_version
+ * gives each future removal an obvious home: add a block, guard it with
+ * the version that dropped the feature.
  *
- * The tables are dropped outright rather than left in place. That is a
- * deliberate departure from how the v1.x am_activity_log table was
- * handled (kept until an explicit admin action, see AM_Schema's class
- * doc): that table held data being migrated into the schema that
- * replaced it, so keeping it cost nothing and losing it would have been
- * unrecoverable. Page-view data has no successor here -- nothing in the
- * plugin will ever read it again -- so the choice is between deleting it
- * on upgrade and leaving two orphan tables on every site indefinitely.
- * This is destructive and irreversible for anyone who was relying on
- * that history; it is called out in the 2.2.0 changelog rather than
- * done quietly.
+ * Every step must be idempotent, because the boolean-to-version switchover
+ * re-runs the 2.2.0 block once on sites that already did it. DROP TABLE IF
+ * EXISTS, delete_option(), and the wp_next_scheduled() guard all are, so
+ * that second pass is a no-op rather than an error.
  *
- * Guarded by an option flag so the DROPs run exactly once, matching the
- * am_v1_migrated pattern. The guard costs a single option read per load,
- * which is already in cache by the time this runs.
+ * Normal loads cost one option read and stop at the first compare.
  */
-function am_maybe_cleanup_traffic() {
-	if ( get_option( 'am_traffic_cleanup_done' ) ) {
+function am_run_upgrade_cleanup() {
+	$done = (string) get_option( 'am_cleanup_version', '0' );
+	if ( version_compare( $done, AM_VERSION, '>=' ) ) {
 		return;
 	}
 
 	global $wpdb;
 
-	// Dropped directly rather than through AM_Traffic_Schema, which no
-	// longer exists -- same precedent as the am_installs table in
-	// uninstall.php, whose class was likewise removed with its feature.
-	foreach ( array( 'am_traffic_log', 'am_traffic_daily' ) as $am_traffic_table ) {
-		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant.
-		$wpdb->query( "DROP TABLE IF EXISTS `{$wpdb->prefix}{$am_traffic_table}`" );
+	// 2.2.0 -- page traffic removed entirely.
+	//
+	// The tables go rather than being left in place. That's a deliberate
+	// departure from how the v1.x am_activity_log table was handled (kept
+	// until an explicit admin action, see AM_Schema's class doc): that
+	// table held data being migrated into the schema that replaced it, so
+	// keeping it cost nothing and losing it would have been unrecoverable.
+	// Page-view data has no successor -- nothing will ever read it again --
+	// so the choice was between deleting it on upgrade and leaving two
+	// orphan tables on every site forever. Destructive and irreversible for
+	// anyone relying on that history, which is why the 2.2.0 changelog says
+	// so outright instead of letting it happen quietly.
+	if ( version_compare( $done, '2.2.0', '<' ) ) {
+		// Dropped directly rather than through AM_Traffic_Schema, which no
+		// longer exists -- same precedent as the am_installs table in
+		// uninstall.php, whose class was likewise removed with its feature.
+		foreach ( array( 'am_traffic_log', 'am_traffic_daily' ) as $am_traffic_table ) {
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant.
+			$wpdb->query( "DROP TABLE IF EXISTS `{$wpdb->prefix}{$am_traffic_table}`" );
+		}
+
+		foreach ( array(
+			'am_traffic_enabled',
+			'am_traffic_retention_days',
+			'am_traffic_live_poll_seconds',
+			'am_traffic_live_feed_limit',
+			'am_traffic_db_version',
+		) as $am_traffic_option ) {
+			delete_option( $am_traffic_option );
+		}
+
+		// Would otherwise stay scheduled forever against a hook that is no
+		// longer registered anywhere.
+		$am_rollup_timestamp = wp_next_scheduled( 'am_traffic_rollup' );
+		if ( $am_rollup_timestamp ) {
+			wp_unschedule_event( $am_rollup_timestamp, 'am_traffic_rollup' );
+		}
 	}
 
-	foreach ( array(
-		'am_traffic_enabled',
-		'am_traffic_retention_days',
-		'am_traffic_live_poll_seconds',
-		'am_traffic_live_feed_limit',
-		'am_traffic_db_version',
-	) as $am_traffic_option ) {
-		delete_option( $am_traffic_option );
+	// 2.2.1 -- the "Active session threshold" setting was removed. It was
+	// saved but never read (see AM_Sessions' class doc), so nothing depends
+	// on the value; this just stops the row sitting in wp_options, where it
+	// would otherwise be autoloaded on every request until uninstall.
+	if ( version_compare( $done, '2.2.1', '<' ) ) {
+		delete_option( 'am_session_active_threshold_minutes' );
 	}
 
-	$am_rollup_timestamp = wp_next_scheduled( 'am_traffic_rollup' );
-	if ( $am_rollup_timestamp ) {
-		wp_unschedule_event( $am_rollup_timestamp, 'am_traffic_rollup' );
+	// 2.2.2 -- retires the per-removal boolean this function used to use.
+	if ( version_compare( $done, '2.2.2', '<' ) ) {
+		delete_option( 'am_traffic_cleanup_done' );
 	}
 
-	update_option( 'am_traffic_cleanup_done', true );
+	update_option( 'am_cleanup_version', AM_VERSION );
 }
 
 // ── Log retention cron ───────────────────────────────────────────────────
