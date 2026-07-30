@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, event log
 Requires at least: 5.3
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.4.0
+Stable tag: 2.4.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -60,6 +60,9 @@ Yes, retention is configurable and old entries are pruned automatically on a dai
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
 
 == Changelog ==
+
+= 2.4.1 =
+* Fixed: the Details popup on the Activity Log opened and then immediately closed again, making event details impossible to read. Introduced in 2.3.0, when the table moved inside the filter form and the Details button began submitting it.
 
 = 2.4.0 =
 * Removed: session management, in full — the Active Sessions screen, per-session revoke, the concurrent-session limit, Revoke All Expired Sessions, and Emergency Lockdown. Activity Monitor is now purely an activity log, with alerts, digests, and export.

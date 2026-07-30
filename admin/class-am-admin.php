@@ -941,7 +941,7 @@ class AM_Admin {
 			<div class="am-modal">
 				<div class="am-modal-header">
 					<h2 id="am-modal-title"><?php esc_html_e( 'Details', 'activity-monitor' ); ?></h2>
-					<button class="am-modal-close" id="am-modal-close">&times;</button>
+					<button type="button" class="am-modal-close" id="am-modal-close">&times;</button>
 				</div>
 				<div class="am-modal-body" id="am-modal-body">
 					<p class="am-loading"><?php esc_html_e( 'Loading…', 'activity-monitor' ); ?></p>
@@ -1259,7 +1259,13 @@ class AM_Admin {
 						<td class="am-ip-cell" title="<?php echo esc_attr( $row->ip_address ); ?>"><a href="#" class="am-ip-lookup" data-ip="<?php echo esc_attr( $row->ip_address ); ?>"><?php echo esc_html( $row->ip_address ); ?></a></td>
 						<td class="am-log-message-cell" title="<?php echo esc_attr( $row->message ); ?>"><span class="am-log-message-clamp"><?php echo esc_html( $row->message ); ?></span></td>
 						<td>
-							<button class="button button-small am-view-detail-v2"
+							<?php
+							// type="button" is required, not cosmetic: this row sits
+							// inside the filter form, and a <button> with no type
+							// defaults to type="submit", which submits that form and
+							// reloads the page the instant the modal opens.
+							?>
+							<button type="button" class="button button-small am-view-detail-v2"
 							        data-id="<?php echo esc_attr( $row->id ); ?>">
 								<?php esc_html_e( 'Details', 'activity-monitor' ); ?>
 							</button>

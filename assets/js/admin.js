@@ -21,7 +21,13 @@
 		.fail(function () { $('#am-modal-body').html('<p>Request failed.</p>'); });
 	}
 
-	$(document).on('click', '.am-view-detail-v2', function () {
+	/* preventDefault() belongs here even though the button now declares
+	   type="button": this row lives inside the filter form, so anything
+	   that reaches a default action submits it and reloads the page out
+	   from under the modal. Belt and braces on purpose -- that is exactly
+	   how this broke in 2.3.0. */
+	$(document).on('click', '.am-view-detail-v2', function (e) {
+		e.preventDefault();
 		loadEventDetail($(this).data('id'));
 	});
 

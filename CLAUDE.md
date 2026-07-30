@@ -76,6 +76,13 @@ membership against it. Never hardcode a hook string like
 sanitized *parent menu slug*, so a hand-written literal can be wrong in a way
 that fails silently: assets simply never enqueue on that screen.
 
+**On the Activity Log, the table sits inside `<form id="am-filter-form">`** — the
+filter/search controls and the rows are one form, matching core's list-table
+layout. So every `<button>` in a row needs an explicit `type="button"`: the HTML
+default is `type="submit"`, which submits the filter form and reloads the page.
+That's what broke the Details modal in 2.3.0 (it opened, then the reload wiped
+it). Row-level click handlers should also call `preventDefault()`.
+
 Each screen renders through `render_page_*()` → `render_screen_open()` → its
 `render_*_screen()` body → `render_screen_close()`. The close helper emits the
 shared modal overlay, which both screens need — Settings opens modals into it
