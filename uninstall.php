@@ -43,6 +43,10 @@ foreach ( array( 'am_traffic_log', 'am_traffic_daily' ) as $am_traffic_table ) {
 delete_option( 'am_notification_channels' );
 delete_option( 'am_retention_days' );
 delete_option( 'am_disabled_loggers' );
+// Session management was removed in 2.4.0; these are its two leftover
+// settings. Note what is deliberately NOT here: the session_tokens user
+// meta. That is WordPress's own storage, which this plugin only ever read
+// -- deleting it on uninstall would log out every user on the site.
 delete_option( 'am_session_concurrent_limit' );
 delete_option( 'am_session_active_threshold_minutes' );
 delete_option( 'am_digest_configs' );

@@ -6,10 +6,9 @@ Distributed on wordpress.org as a public plugin.
 
 ## Features
 
-- Three admin screens under one menu (Activity Log, Active Sessions, Settings)
+- Two admin screens under one menu (Activity Log, Settings)
 - Two-table event schema (`am_events` + `am_event_context`) with occasion grouping (repeated events collapse into one entry with a count), PSR-3 severity levels, and initiator tagging (user / visitor / cron / WP-CLI / auto-update / REST API / system)
 - Pluggable per-source logger architecture — one class per event type (posts, users, media, comments, plugins, themes, core, terms, menus, widgets, passwords, sites, security, fatal errors, file editor, maintenance mode, mail failures)
-- Session management on top of WordPress's own `session_tokens` storage: per-session revoke, configurable concurrent-session limits, emergency lockdown
 - Scheduled email digests (daily/weekly/monthly), configurable as multiple independent schedules, with in-browser preview and test send
 - Log export: CSV, JSON, HTML, and plain text, honoring the current filter set
 - Email and Slack notification channels with configurable minimum severity
@@ -33,7 +32,6 @@ All edits are made locally and packaged as a versioned ZIP for manual upload —
 ## Security
 
 - IP spoofing protection via Cloudflare CIDR validation
-- Session data is re-fetched from the database server-side rather than trusting POST input for display
 - Parameterized queries (`$wpdb->prepare()`) throughout
 - Output escaping on all email notification and digest bodies
 - `uninstall.php` cleanly removes all database tables, all plugin options, and all scheduled cron events

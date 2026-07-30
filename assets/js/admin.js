@@ -41,21 +41,6 @@
 		$('.am-view-detail-v2[data-id="' + amDeepLinkEventId + '"]').closest('tr').addClass('am-row-highlighted');
 	}
 
-	/* FIX #2: Only pass user_id + token_hash to the session detail handler.
-	   All other data is now re-fetched server-side from session_tokens. */
-	$(document).on('click', '.am-view-session-detail', function () {
-		var $btn = $(this);
-		openModal('Session Details');
-		$.post(amData.ajaxUrl, {
-			action:     'am_get_session_detail',
-			nonce:      amData.nonce,
-			user_id:    $btn.data('user-id'),
-			token_hash: $btn.data('token-hash')
-		})
-		.done(function (r) { $('#am-modal-body').html(r.success ? r.data.html : '<p>Error.</p>'); })
-		.fail(function () { $('#am-modal-body').html('<p>Request failed.</p>'); });
-	});
-
 	/* IP address lookup modal. Triggered by clicking any .am-ip-lookup
 	   element (the IP text itself, wherever it's shown) rather than a
 	   separate button, matching how a person expects a linked-looking

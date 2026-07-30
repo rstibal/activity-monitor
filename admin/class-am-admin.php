@@ -1,14 +1,14 @@
 <?php
 /**
- * AM_Admin – registers menus, renders all tabbed UI, handles form actions.
+ * AM_Admin – registers menus, renders every admin screen, handles form
+ * actions.
  *
- * Single top-level menu page with three tabs:
- *   1. Activity Log
- *   2. Active Sessions
- *   3. Settings  (notifications + general settings + clear-log)
+ * One top-level menu with two submenu pages:
+ *   1. Activity Log  (the default screen, keeps the bare plugin slug)
+ *   2. Settings      (notifications, digests, event sources, display,
+ *                     clear-log)
  *
  * @package ActivityMonitor
- * @version 1.4.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -21,7 +21,6 @@ class AM_Admin {
 	 *  into it -- the digest email, the plain-text alert, any bookmark --
 	 *  keep working unchanged. */
 	const PAGE_LOG      = 'activity-monitor';
-	const PAGE_SESSIONS = 'activity-monitor-sessions';
 	const PAGE_SETTINGS = 'activity-monitor-settings';
 
 	/**
@@ -48,10 +47,6 @@ class AM_Admin {
 		add_action( 'admin_enqueue_scripts',                  array( $instance, 'enqueue_assets' ) );
 		add_action( 'admin_init',                             array( $instance, 'register_settings' ) );
 		add_action( 'admin_post_am_clear_log',                array( $instance, 'handle_clear_log' ) );
-		add_action( 'admin_post_am_revoke_session',           array( $instance, 'handle_revoke_session' ) );
-		add_action( 'admin_post_am_revoke_expired',           array( $instance, 'handle_revoke_expired' ) );
-		add_action( 'admin_post_am_emergency_lockdown',       array( $instance, 'handle_emergency_lockdown' ) );
-		add_action( 'admin_post_am_save_session_settings',    array( $instance, 'handle_save_session_settings' ) );
 		add_action( 'admin_post_am_save_logger_settings',     array( $instance, 'handle_save_logger_settings' ) );
 		add_action( 'admin_post_am_save_display_settings',    array( $instance, 'handle_save_display_settings' ) );
 		add_action( 'admin_post_am_export_log',               array( $instance, 'handle_export' ) );
@@ -62,7 +57,6 @@ class AM_Admin {
 		add_action( 'wp_ajax_am_digest_config_form',          array( $instance, 'ajax_digest_config_form' ) );
 		add_action( 'wp_ajax_am_save_digest_config',          array( $instance, 'ajax_save_digest_config' ) );
 		add_action( 'wp_ajax_am_delete_digest_config',        array( $instance, 'ajax_delete_digest_config' ) );
-		add_action( 'wp_ajax_am_get_session_detail',          array( $instance, 'ajax_session_detail' ) );
 		add_action( 'wp_ajax_am_ip_lookup',                   array( $instance, 'ajax_ip_lookup' ) );
 		add_action( 'wp_ajax_am_user_profile',                array( $instance, 'ajax_user_profile' ) );
 		add_action( 'wp_ajax_am_channel_form',                array( $instance, 'ajax_channel_form' ) );
@@ -95,15 +89,6 @@ class AM_Admin {
 			'manage_options',
 			self::PAGE_LOG,
 			array( $this, 'render_page_log' )
-		);
-
-		self::$screen_hooks[] = add_submenu_page(
-			self::PAGE_LOG,
-			__( 'Active Sessions', 'activity-monitor' ),
-			__( 'Active Sessions', 'activity-monitor' ),
-			'manage_options',
-			self::PAGE_SESSIONS,
-			array( $this, 'render_page_sessions' )
 		);
 
 		self::$screen_hooks[] = add_submenu_page(
@@ -218,26 +203,6 @@ class AM_Admin {
 		if ( isset( $_GET['am_cleared'] ) ) {
 			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Activity log cleared.', 'activity-monitor' ) . '</p></div>';
 		}
-		if ( isset( $_GET['am_revoked'] ) ) {
-			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Session revoked.', 'activity-monitor' ) . '</p></div>';
-		}
-		if ( isset( $_GET['am_expired_revoked'] ) ) {
-			$count = absint( $_GET['am_expired_revoked'] );
-			echo '<div class="notice notice-success is-dismissible"><p>' . sprintf(
-				esc_html( _n( '%d expired session revoked.', '%d expired sessions revoked.', $count, 'activity-monitor' ) ),
-				$count
-			) . '</p></div>';
-		}
-		if ( isset( $_GET['am_lockdown'] ) ) {
-			$count = absint( $_GET['am_lockdown'] );
-			echo '<div class="notice notice-success is-dismissible"><p>' . sprintf(
-				esc_html( _n( 'Emergency lockdown complete: %d session terminated.', 'Emergency lockdown complete: %d sessions terminated.', $count, 'activity-monitor' ) ),
-				$count
-			) . '</p></div>';
-		}
-		if ( isset( $_GET['am_session_settings_saved'] ) ) {
-			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Session settings saved.', 'activity-monitor' ) . '</p></div>';
-		}
 		if ( isset( $_GET['am_display_settings_saved'] ) ) {
 			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Display settings saved.', 'activity-monitor' ) . '</p></div>';
 		}
@@ -275,145 +240,6 @@ class AM_Admin {
 
 		wp_safe_redirect( add_query_arg(
 			array( 'page' => self::PAGE_SETTINGS, 'am_cleared' => '1' ),
-			admin_url( 'admin.php' )
-		) );
-		exit;
-	}
-
-	public function handle_revoke_session() {
-		check_admin_referer( 'am_revoke_session' );
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_die( esc_html__( 'Unauthorized.', 'activity-monitor' ) );
-		}
-
-		$user_id    = absint( $_POST['session_user_id'] ?? 0 );
-		$token_hash = sanitize_text_field( wp_unslash( $_POST['session_token_hash'] ?? '' ) );
-
-		if ( $user_id && $token_hash ) {
-			$current_token_hash = hash( 'sha256', wp_get_session_token() );
-			$is_own_session     = ( $user_id === get_current_user_id() && hash_equals( $current_token_hash, $token_hash ) );
-
-			if ( ! $is_own_session ) {
-				$sessions = get_user_meta( $user_id, 'session_tokens', true );
-				if ( is_array( $sessions ) && isset( $sessions[ $token_hash ] ) ) {
-					unset( $sessions[ $token_hash ] );
-					AM_Sessions::update_session_meta_quietly( $user_id, $sessions );
-
-					$user = get_userdata( $user_id );
-					AM_Event_Writer::log(
-						'session',
-						'revoked',
-						sprintf(
-							/* translators: 1: username, 2: first 12 chars of the session token hash */
-							__( 'Session revoked for user "%1$s" (token: %2$s…).', 'activity-monitor' ),
-							$user ? $user->user_login : $user_id,
-							substr( $token_hash, 0, 12 )
-						),
-						array(
-							'level'       => AM_Log_Levels::WARNING,
-							'object_type' => 'user',
-							'object_id'   => $user_id,
-							'object_name' => $user ? $user->user_login : 'user-' . $user_id,
-							'group'       => false,
-						)
-					);
-				}
-			}
-		}
-
-		wp_safe_redirect( add_query_arg(
-			array( 'page' => self::PAGE_SESSIONS, 'am_revoked' => '1' ),
-			admin_url( 'admin.php' )
-		) );
-		exit;
-	}
-
-	public function handle_revoke_expired() {
-		check_admin_referer( 'am_revoke_expired' );
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_die( esc_html__( 'Unauthorized.', 'activity-monitor' ) );
-		}
-
-		$now   = time();
-		$count = 0;
-		$users = get_users( array( 'fields' => array( 'ID', 'user_login' ) ) );
-
-		foreach ( $users as $user ) {
-			$sessions = get_user_meta( $user->ID, 'session_tokens', true );
-			if ( ! is_array( $sessions ) || empty( $sessions ) ) {
-				continue;
-			}
-			$updated = false;
-			foreach ( $sessions as $token_hash => $session ) {
-				$expiration = isset( $session['expiration'] ) ? (int) $session['expiration'] : 0;
-				if ( $expiration > 0 && $expiration < $now ) {
-					unset( $sessions[ $token_hash ] );
-					$count++;
-					$updated = true;
-				}
-			}
-			if ( $updated ) {
-				AM_Sessions::update_session_meta_quietly( $user->ID, $sessions );
-			}
-		}
-
-		if ( $count > 0 ) {
-			AM_Event_Writer::log(
-				'session',
-				'expired_revoked',
-				sprintf(
-					/* translators: %d: number of expired sessions revoked */
-					_n( '%d expired session revoked across all users.', '%d expired sessions revoked across all users.', $count, 'activity-monitor' ),
-					$count
-				),
-				array(
-					'level'       => AM_Log_Levels::WARNING,
-					'object_type' => 'user',
-					'object_name' => 'all-users',
-					'context'     => array( 'count' => $count ),
-					'group'       => false,
-				)
-			);
-		}
-
-		wp_safe_redirect( add_query_arg(
-			array( 'page' => self::PAGE_SETTINGS, 'am_expired_revoked' => $count ),
-			admin_url( 'admin.php' )
-		) );
-		exit;
-	}
-
-	/**
-	 * v2.0 (spec §5, issue #5): terminate every session except the
-	 * caller's own. Confirmation happens client-side (the onsubmit
-	 * confirm() dialog in render_settings_screen) before this ever runs --
-	 * this handler does not prompt again, it acts immediately once called.
-	 */
-	public function handle_emergency_lockdown() {
-		check_admin_referer( 'am_emergency_lockdown' );
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_die( esc_html__( 'Unauthorized.', 'activity-monitor' ) );
-		}
-
-		$count = AM_Sessions::emergency_lockdown();
-
-		wp_safe_redirect( add_query_arg(
-			array( 'page' => self::PAGE_SETTINGS, 'am_lockdown' => $count ),
-			admin_url( 'admin.php' )
-		) );
-		exit;
-	}
-
-	public function handle_save_session_settings() {
-		check_admin_referer( 'am_save_session_settings' );
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_die( esc_html__( 'Unauthorized.', 'activity-monitor' ) );
-		}
-
-		update_option( 'am_session_concurrent_limit', absint( $_POST['am_session_concurrent_limit'] ?? 0 ) );
-
-		wp_safe_redirect( add_query_arg(
-			array( 'page' => self::PAGE_SETTINGS, 'am_session_settings_saved' => '1' ),
 			admin_url( 'admin.php' )
 		) );
 		exit;
@@ -716,86 +542,6 @@ class AM_Admin {
 				</td>
 			</tr>
 			<?php endif; ?>
-		</table>
-		<?php
-		wp_send_json_success( array( 'html' => ob_get_clean() ) );
-	}
-
-	/**
-	 * FIX #2: Re-fetch session data from the database rather than trusting
-	 * POST-supplied display values. Only user_id and token_hash are accepted
-	 * from POST; everything else is re-derived server-side.
-	 */
-	public function ajax_session_detail() {
-		check_ajax_referer( 'am_ajax', 'nonce' );
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_die( '-1' );
-		}
-
-		$user_id    = absint( $_POST['user_id'] ?? 0 );
-		$token_hash = sanitize_text_field( wp_unslash( $_POST['token_hash'] ?? '' ) );
-
-		if ( ! $user_id || ! $token_hash ) {
-			wp_send_json_error( 'Invalid request' );
-		}
-
-		// Re-fetch authoritative data from the database.
-		$user = get_userdata( $user_id );
-		if ( ! $user ) {
-			wp_send_json_error( 'User not found' );
-		}
-
-		$sessions = get_user_meta( $user_id, 'session_tokens', true );
-		if ( ! is_array( $sessions ) || ! isset( $sessions[ $token_hash ] ) ) {
-			wp_send_json_error( 'Session not found' );
-		}
-
-		$session = $sessions[ $token_hash ];
-
-		// Derive values from authoritative session data – not from POST.
-		$login_ts   = isset( $session['login'] )      ? (int) $session['login']      : 0;
-		$expiry_ts  = isset( $session['expiration'] ) ? (int) $session['expiration'] : 0;
-		$ip         = isset( $session['ip'] )         ? sanitize_text_field( $session['ip'] ) : '';
-		$ua         = isset( $session['ua'] )         ? sanitize_text_field( $session['ua'] ) : '';
-
-		$date_format = AM_Date_Format::combined();
-		$login_text  = $login_ts  ? wp_date( $date_format, $login_ts )  : __( 'Unknown', 'activity-monitor' );
-		$expiry_text = $expiry_ts ? wp_date( $date_format, $expiry_ts ) : __( 'Never',   'activity-monitor' );
-		$browser     = $this->parse_user_agent( $ua );
-		$now         = time();
-		$is_expired  = ( $expiry_ts > 0 && $expiry_ts < $now );
-
-		$current_token_hash = hash( 'sha256', wp_get_session_token() );
-		$is_current = ( $user_id === get_current_user_id() && hash_equals( $current_token_hash, $token_hash ) );
-
-		ob_start();
-		?>
-		<table class="am-detail-table">
-			<tr>
-				<th><?php esc_html_e( 'User', 'activity-monitor' ); ?></th>
-				<td>
-					<strong><?php echo esc_html( $user->display_name ?: $user->user_login ); ?></strong>
-					<br><small class="am-role"><?php echo esc_html( $user->user_login ); ?></small>
-					(ID: <?php echo esc_html( $user_id ); ?>)
-					<?php if ( $is_current ) : ?>
-						<span class="am-badge am-info"><?php esc_html_e( 'You', 'activity-monitor' ); ?></span>
-					<?php endif; ?>
-				</td>
-			</tr>
-			<tr><th><?php esc_html_e( 'Logged In', 'activity-monitor' ); ?></th><td><?php echo esc_html( $login_text ); ?></td></tr>
-			<tr>
-				<th><?php esc_html_e( 'Expiry', 'activity-monitor' ); ?></th>
-				<td>
-					<?php echo esc_html( $expiry_text ); ?>
-					<?php if ( $is_expired ) : ?>
-						<span class="am-badge am-warning"><?php esc_html_e( 'Expired', 'activity-monitor' ); ?></span>
-					<?php endif; ?>
-				</td>
-			</tr>
-			<tr><th><?php esc_html_e( 'IP Address', 'activity-monitor' ); ?></th><td><a href="#" class="am-ip-lookup" data-ip="<?php echo esc_attr( $ip ); ?>"><?php echo esc_html( $ip ); ?></a></td></tr>
-			<tr><th><?php esc_html_e( 'Browser / UA', 'activity-monitor' ); ?></th><td><?php echo esc_html( $browser ); ?></td></tr>
-			<tr><th><?php esc_html_e( 'User Agent', 'activity-monitor' ); ?></th><td><small><?php echo esc_html( $ua ); ?></small></td></tr>
-			<tr><th><?php esc_html_e( 'Session ID', 'activity-monitor' ); ?></th><td><?php echo esc_html( $token_hash ); ?></td></tr>
 		</table>
 		<?php
 		wp_send_json_success( array( 'html' => ob_get_clean() ) );
@@ -1140,9 +886,9 @@ class AM_Admin {
 	// One public callback per registered submenu page. Each wraps its
 	// screen body in the shared chrome: the .wrap/header opener, and the
 	// modal overlay closer. The overlay markup has to be emitted on every
-	// screen, not just the log -- Sessions and Settings both open modals
-	// into it (session detail, IP lookup, digest and channel forms), and
-	// without it in the DOM those clicks do nothing.
+	// screen, not just the log -- Settings opens modals into it too (IP
+	// lookup, digest and channel forms), and without it in the DOM those
+	// clicks do nothing.
 
 	public function render_page_log() {
 		if ( ! current_user_can( 'manage_options' ) ) {
@@ -1150,15 +896,6 @@ class AM_Admin {
 		}
 		$this->render_screen_open( __( 'Activity Log', 'activity-monitor' ) );
 		$this->render_log_screen();
-		$this->render_screen_close();
-	}
-
-	public function render_page_sessions() {
-		if ( ! current_user_can( 'manage_options' ) ) {
-			return;
-		}
-		$this->render_screen_open( __( 'Active Sessions', 'activity-monitor' ) );
-		$this->render_sessions_screen();
 		$this->render_screen_close();
 	}
 
@@ -1589,163 +1326,6 @@ class AM_Admin {
 		return preg_replace( '/[^a-z0-9_.|\-]/', '', strtolower( (string) $raw ) );
 	}
 
-	// ── Screen: Active Sessions ───────────────────────────────────────────
-
-	private function render_sessions_screen() {
-		$users = get_users( array( 'fields' => array( 'ID', 'user_login', 'display_name' ) ) );
-
-		$sessions_data = array();
-
-		foreach ( $users as $user ) {
-			$raw      = get_user_meta( $user->ID, 'session_tokens', true );
-			$sessions = is_array( $raw ) ? $raw : array();
-
-			if ( empty( $sessions ) ) {
-				continue;
-			}
-
-			foreach ( $sessions as $token_hash => $session ) {
-				$sessions_data[] = array(
-					'user_id'      => $user->ID,
-					'user_login'   => $user->user_login,
-					'display_name' => $user->display_name ?: $user->user_login,
-					'token_hash'   => $token_hash,
-					'expiration'   => $session['expiration'] ?? 0,
-					'login'        => $session['login']      ?? 0,
-					'ip'           => $session['ip']         ?? __( 'Unknown', 'activity-monitor' ),
-					'ua'           => $session['ua']         ?? '',
-				);
-			}
-		}
-
-		usort( $sessions_data, function ( $a, $b ) {
-			return $b['login'] - $a['login'];
-		} );
-
-		$current_token_hash = hash( 'sha256', wp_get_session_token() );
-		$now                = time();
-		?>
-		<div class="am-table-scroll">
-			<table class="wp-list-table widefat striped am-log-table">
-				<thead>
-					<tr>
-						<th><?php esc_html_e( 'User',        'activity-monitor' ); ?></th>
-						<th><?php esc_html_e( 'Logged In',   'activity-monitor' ); ?></th>
-						<th><?php esc_html_e( 'Expiry',      'activity-monitor' ); ?></th>
-						<th><?php esc_html_e( 'IP Address',  'activity-monitor' ); ?></th>
-						<th><?php esc_html_e( 'Browser / UA','activity-monitor' ); ?></th>
-						<th><?php esc_html_e( 'Actions',     'activity-monitor' ); ?></th>
-					</tr>
-				</thead>
-				<tbody>
-					<?php if ( empty( $sessions_data ) ) : ?>
-						<tr class="no-items">
-							<td class="colspanchange" colspan="6"><?php esc_html_e( 'No active sessions found.', 'activity-monitor' ); ?></td>
-						</tr>
-					<?php endif; ?>
-					<?php foreach ( $sessions_data as $s ) :
-						$is_expired  = ( $s['expiration'] > 0 && $s['expiration'] < $now );
-						$is_current  = ( (int) $s['user_id'] === (int) get_current_user_id() && hash_equals( $current_token_hash, $s['token_hash'] ) );
-						$expiry_text = $s['expiration']
-							? wp_date( AM_Date_Format::combined(), $s['expiration'] )
-							: __( 'Never', 'activity-monitor' );
-						$login_text  = $s['login']
-							? wp_date( AM_Date_Format::combined(), $s['login'] )
-							: __( 'Unknown', 'activity-monitor' );
-						$browser     = $this->parse_user_agent( $s['ua'] );
-						$row_class   = trim( ( $is_expired ? 'am-session-expired' : '' ) . ' ' . ( $is_current ? 'am-session-current' : '' ) );
-					?>
-					<tr<?php echo $row_class ? ' class="' . esc_attr( $row_class ) . '"' : ''; ?>>
-						<td>
-							<strong><?php echo esc_html( $s['display_name'] ); ?></strong>
-							<br><small class="am-role"><?php echo esc_html( $s['user_login'] ); ?></small>
-							<?php if ( $is_current ) : ?>
-								<span class="am-badge am-info"><?php esc_html_e( 'You', 'activity-monitor' ); ?></span>
-							<?php endif; ?>
-						</td>
-						<td><?php echo esc_html( $login_text ); ?></td>
-						<td>
-							<?php echo esc_html( $expiry_text ); ?>
-							<?php if ( $is_expired ) : ?>
-								<span class="am-badge am-warning"><?php esc_html_e( 'Expired', 'activity-monitor' ); ?></span>
-							<?php endif; ?>
-						</td>
-						<td class="am-ip-cell" title="<?php echo esc_attr( $s['ip'] ); ?>"><a href="#" class="am-ip-lookup" data-ip="<?php echo esc_attr( $s['ip'] ); ?>"><?php echo esc_html( $s['ip'] ); ?></a></td>
-						<td>
-							<span title="<?php echo esc_attr( $s['ua'] ); ?>">
-								<?php echo esc_html( $browser ); ?>
-							</span>
-						</td>
-						<td>
-							<?php /* FIX #2: Only pass user_id + token_hash; the AJAX handler re-fetches everything else. */ ?>
-							<button class="button button-small am-view-session-detail"
-							        data-user-id="<?php echo esc_attr( $s['user_id'] ); ?>"
-							        data-token-hash="<?php echo esc_attr( $s['token_hash'] ); ?>">
-								<?php esc_html_e( 'Details', 'activity-monitor' ); ?>
-							</button>
-							<?php if ( $is_current ) : ?>
-								<button class="button button-small" disabled
-								        title="<?php esc_attr_e( 'Cannot revoke your own active session.', 'activity-monitor' ); ?>">
-									<?php esc_html_e( 'Revoke', 'activity-monitor' ); ?>
-								</button>
-							<?php else : ?>
-								<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>"
-								      onsubmit="return confirm('<?php esc_attr_e( 'Revoke this session? The user will be logged out immediately.', 'activity-monitor' ); ?>')"
-								      style="display:inline;">
-									<?php wp_nonce_field( 'am_revoke_session' ); ?>
-									<input type="hidden" name="action"              value="am_revoke_session">
-									<input type="hidden" name="session_user_id"    value="<?php echo esc_attr( $s['user_id'] ); ?>">
-									<input type="hidden" name="session_token_hash" value="<?php echo esc_attr( $s['token_hash'] ); ?>">
-									<button type="submit" class="button button-small am-btn-danger">
-										<?php esc_html_e( 'Revoke', 'activity-monitor' ); ?>
-									</button>
-								</form>
-							<?php endif; ?>
-						</td>
-					</tr>
-					<?php endforeach; ?>
-				</tbody>
-			</table>
-		</div><!-- .am-table-scroll -->
-
-		<p class="am-sessions-note">
-			<?php printf(
-				/* translators: 1: number of active sessions, 2: number of users on the site */
-				esc_html__( '%1$d active session(s) across %2$d user(s).', 'activity-monitor' ),
-				count( $sessions_data ),
-				count( $users )
-			); ?>
-		</p>
-		<?php
-	}
-
-	// ── UA parser ─────────────────────────────────────────────────────────
-
-	private function parse_user_agent( $ua ) {
-		if ( empty( $ua ) ) {
-			return __( 'Unknown', 'activity-monitor' );
-		}
-		$browsers = array(
-			'Edg' => 'Edge', 'OPR' => 'Opera', 'Chrome' => 'Chrome',
-			'Firefox' => 'Firefox', 'Safari' => 'Safari',
-			'MSIE' => 'Internet Explorer', 'Trident' => 'Internet Explorer',
-		);
-		$os_map = array(
-			'Windows NT 10' => 'Windows 10/11', 'Windows NT 6' => 'Windows',
-			'Mac OS X' => 'macOS', 'Linux' => 'Linux',
-			'Android' => 'Android', 'iPhone' => 'iOS', 'iPad' => 'iPadOS',
-		);
-		$browser = __( 'Other', 'activity-monitor' );
-		foreach ( $browsers as $key => $name ) {
-			if ( strpos( $ua, $key ) !== false ) { $browser = $name; break; }
-		}
-		$os = '';
-		foreach ( $os_map as $key => $name ) {
-			if ( strpos( $ua, $key ) !== false ) { $os = $name; break; }
-		}
-		return $os ? $browser . ' / ' . $os : $browser;
-	}
-
 	// ── Screen: Settings ──────────────────────────────────────────────────
 
 	private function render_settings_screen() {
@@ -1875,80 +1455,6 @@ class AM_Admin {
 
 		<hr class="am-section-divider am-group-divider">
 
-		<h2 class="am-settings-group-title"><?php esc_html_e( 'Sessions', 'activity-monitor' ); ?></h2>
-
-		<div class="am-settings-section">
-			<h2 class="am-section-title">
-				<span class="dashicons dashicons-groups"></span>
-				<?php esc_html_e( 'Session Management (v2.0)', 'activity-monitor' ); ?>
-			</h2>
-			<p class="am-description">
-				<?php esc_html_e( 'These settings apply on top of the Active Sessions tab. Sessions themselves are still WordPress\'s own session tokens -- this plugin does not maintain a separate copy.', 'activity-monitor' ); ?>
-			</p>
-
-			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-				<?php wp_nonce_field( 'am_save_session_settings' ); ?>
-				<input type="hidden" name="action" value="am_save_session_settings">
-
-				<table class="form-table">
-					<tr>
-						<th scope="row">
-							<label for="am_session_concurrent_limit"><?php esc_html_e( 'Concurrent session limit', 'activity-monitor' ); ?></label>
-						</th>
-						<td>
-							<input type="number" min="0" id="am_session_concurrent_limit" name="am_session_concurrent_limit"
-							       value="<?php echo esc_attr( absint( get_option( 'am_session_concurrent_limit', 0 ) ) ); ?>"
-							       class="small-text">
-							<p class="description">
-								<?php esc_html_e( '0 = disabled. When a user logs in past this limit, their oldest sessions are revoked automatically (the new login always survives).', 'activity-monitor' ); ?>
-							</p>
-						</td>
-					</tr>
-				</table>
-
-				<?php submit_button( __( 'Save Session Settings', 'activity-monitor' ), 'secondary' ); ?>
-			</form>
-		</div>
-
-		<hr class="am-section-divider">
-
-		<div class="am-settings-section am-danger-zone">
-			<h2 class="am-section-title am-danger-title">
-				<span class="dashicons dashicons-warning"></span>
-				<?php esc_html_e( 'Session Actions', 'activity-monitor' ); ?>
-			</h2>
-
-			<p class="am-description">
-				<?php esc_html_e( 'Remove all expired sessions across every user account.', 'activity-monitor' ); ?>
-			</p>
-			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>"
-			      onsubmit="return confirm('<?php esc_attr_e( 'Revoke all expired sessions? This cannot be undone.', 'activity-monitor' ); ?>')">
-				<?php wp_nonce_field( 'am_revoke_expired' ); ?>
-				<input type="hidden" name="action" value="am_revoke_expired">
-				<button type="submit" class="button am-btn-danger">
-					<span class="dashicons dashicons-remove"></span>
-					<?php esc_html_e( 'Revoke All Expired Sessions', 'activity-monitor' ); ?>
-				</button>
-			</form>
-
-			<br>
-
-			<p class="am-description">
-				<?php esc_html_e( 'Immediately terminate every active session on the site except your own. Every other logged-in user will be logged out.', 'activity-monitor' ); ?>
-			</p>
-			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>"
-			      onsubmit="return confirm('<?php esc_attr_e( 'Emergency lockdown: terminate ALL other sessions immediately? Every other logged-in user will be signed out right now. This cannot be undone.', 'activity-monitor' ); ?>')">
-				<?php wp_nonce_field( 'am_emergency_lockdown' ); ?>
-				<input type="hidden" name="action" value="am_emergency_lockdown">
-				<button type="submit" class="button am-btn-danger">
-					<span class="dashicons dashicons-lock"></span>
-					<?php esc_html_e( 'Emergency Lockdown', 'activity-monitor' ); ?>
-				</button>
-			</form>
-		</div>
-
-		<hr class="am-section-divider am-group-divider">
-
 		<h2 class="am-settings-group-title"><?php esc_html_e( 'Display', 'activity-monitor' ); ?></h2>
 
 		<div class="am-settings-section">
@@ -1957,7 +1463,7 @@ class AM_Admin {
 				<?php esc_html_e( 'Date &amp; Time Display', 'activity-monitor' ); ?>
 			</h2>
 			<p class="am-description">
-				<?php esc_html_e( 'How timestamps are shown throughout the plugin — the activity log, the sessions table, the detail popups, and the times reported on this screen. CSV and JSON exports are excluded: those keep raw UTC values so they stay machine-readable.', 'activity-monitor' ); ?>
+				<?php esc_html_e( 'How timestamps are shown throughout the plugin — the activity log, the detail popups, and the times reported on this screen. CSV and JSON exports are excluded: those keep raw UTC values so they stay machine-readable.', 'activity-monitor' ); ?>
 			</p>
 
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">

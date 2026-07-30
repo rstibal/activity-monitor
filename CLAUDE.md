@@ -1,7 +1,7 @@
 # Activity Monitor — project notes
 
-Custom WordPress plugin: audit logging and session management. Being built
-toward a wordpress.org release.
+Custom WordPress plugin: audit logging, with alerts, digests, and export.
+Being built toward a wordpress.org release.
 
 **The repo root is the plugin root.** `.github/workflows/claude.yml` and
 `.gitignore` also live here and are *not* part of the distributable plugin —
@@ -50,13 +50,21 @@ workflow disappears.
 
 Core: `AM_Schema`, `AM_Event_Writer`, `AM_Event_Query`, `AM_Log_Levels`
 (8 PSR-3 levels), `AM_Initiator_Detector`, `AM_Logger_Manager` plus one
-`AM_Logger_*` per domain, `AM_Sessions`, `AM_Event_Labels`, `AM_Date_Format`.
+`AM_Logger_*` per domain, `AM_Event_Labels`, `AM_Date_Format`.
 
-Admin screens: three separate submenu pages under one top-level menu —
-Activity Log (`activity-monitor`, the default), Active Sessions
-(`activity-monitor-sessions`), Settings (`activity-monitor-settings`). The
-tabbed single page they replaced went in 2.2.1; `am_tab` no longer means
+Admin screens: two submenu pages under one top-level menu — Activity Log
+(`activity-monitor`, the default) and Settings (`activity-monitor-settings`).
+The tabbed single page they replaced went in 2.2.1; `am_tab` no longer means
 anything and old links carrying it just land on the log.
+
+Session management (the Active Sessions screen, per-session revoke, the
+concurrent-session limit, Revoke Expired, Emergency Lockdown, and `AM_Sessions`
+itself) was removed in 2.4.0. Sessions live in WordPress's own `session_tokens`
+user meta, which this plugin never owned — so the cleanup drops only the
+`am_session_concurrent_limit` option and **must never touch `session_tokens`**,
+which would log out every user on the site. The `session.*` entries in
+`AM_Event_Labels` are deliberately kept: upgraded sites still have those rows
+in `am_events` and they have to keep rendering.
 
 **The log keeps the bare `activity-monitor` slug** because the digest email and
 plain-text alert both link to it. Don't rename it.
@@ -70,8 +78,8 @@ that fails silently: assets simply never enqueue on that screen.
 
 Each screen renders through `render_page_*()` → `render_screen_open()` → its
 `render_*_screen()` body → `render_screen_close()`. The close helper emits the
-shared modal overlay, which every screen needs — Sessions and Settings open
-modals into it too.
+shared modal overlay, which both screens need — Settings opens modals into it
+too.
 
 All modals share that one overlay, the `openModal()` JS helper, and the
 `am_ajax` nonce.
@@ -167,6 +175,7 @@ rather than touching the ruleset, matching every other occurrence in
 `includes/`.
 
 Most sites run with `WP_DEBUG` off, which hides undefined-array-key warnings; a
-`display_name` key was read but never built in the sessions table for a long
-time before a debug-enabled environment surfaced it. When touching a render
-loop, check every key read against what the builder actually creates.
+`display_name` key was once read but never built in a render loop, and went
+unnoticed for a long time before a debug-enabled environment surfaced it. When
+touching a render loop, check every key read against what the builder actually
+creates.

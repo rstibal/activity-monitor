@@ -3,7 +3,7 @@
  * Plugin Name: Activity Monitor
  * Plugin URI:  https://robstibal.com
  * Description: Comprehensive WordPress audit log – tracks logins, content changes, settings updates, security events, and more.
- * Version:     2.3.0
+ * Version:     2.4.0
  * Author:      Rob Stibal
  * Author URI:  http://robstibal.com
  * License:     GPL v2 or later
@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'AM_VERSION', '2.3.0' );
+define( 'AM_VERSION', '2.4.0' );
 define( 'AM_FILE',    __FILE__ );
 define( 'AM_DIR',     plugin_dir_path( __FILE__ ) );
 define( 'AM_URL',     plugin_dir_url( __FILE__ ) );
@@ -41,7 +41,6 @@ require_once AM_DIR . 'includes/class-am-event-labels.php';
 require_once AM_DIR . 'includes/class-am-initiator-detector.php';
 require_once AM_DIR . 'includes/class-am-event-writer.php';
 require_once AM_DIR . 'includes/class-am-event-query.php';
-require_once AM_DIR . 'includes/class-am-sessions.php';
 require_once AM_DIR . 'includes/class-am-notifications.php';
 require_once AM_DIR . 'includes/class-am-digest.php';
 require_once AM_DIR . 'includes/class-am-export.php';
@@ -157,9 +156,9 @@ function am_run_upgrade_cleanup() {
 	}
 
 	// 2.2.1 -- the "Active session threshold" setting was removed. It was
-	// saved but never read (see AM_Sessions' class doc), so nothing depends
-	// on the value; this just stops the row sitting in wp_options, where it
-	// would otherwise be autoloaded on every request until uninstall.
+	// saved but never read, so nothing depended on the value; this just
+	// stops the row sitting in wp_options, where it would otherwise be
+	// autoloaded on every request until uninstall.
 	if ( version_compare( $done, '2.2.1', '<' ) ) {
 		delete_option( 'am_session_active_threshold_minutes' );
 	}
@@ -167,6 +166,14 @@ function am_run_upgrade_cleanup() {
 	// 2.2.2 -- retires the per-removal boolean this function used to use.
 	if ( version_compare( $done, '2.2.2', '<' ) ) {
 		delete_option( 'am_traffic_cleanup_done' );
+	}
+
+	// 2.4.0 -- session management removed. Only the setting is dropped:
+	// sessions themselves live in WordPress's own session_tokens user
+	// meta, which this plugin never owned and must not touch on the way
+	// out. Deleting those would log every user on the site out.
+	if ( version_compare( $done, '2.4.0', '<' ) ) {
+		delete_option( 'am_session_concurrent_limit' );
 	}
 
 	update_option( 'am_cleanup_version', AM_VERSION );

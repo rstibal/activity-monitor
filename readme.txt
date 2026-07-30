@@ -1,14 +1,14 @@
 === Activity Monitor ===
 Contributors: rstibal
-Tags: activity log, audit log, security, user activity, session management
+Tags: activity log, audit log, security, user activity, event log
 Requires at least: 5.3
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.3.0
+Stable tag: 2.4.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-A complete activity log for WordPress: track logins, content changes, plugin/theme updates, settings, and security-relevant events, with session management and scheduled email digests.
+A complete activity log for WordPress: track logins, content changes, plugin/theme updates, settings, and security-relevant events, with alerts and scheduled email digests.
 
 == Description ==
 
@@ -25,10 +25,6 @@ Activity Monitor is a WordPress audit log plugin that records what happens on yo
 = Noise control, not noise =
 
 Repeated events (a burst of failed logins, rapid comment status churn) are automatically grouped into a single log entry with a repeat count, instead of flooding your log with duplicates. Every event is tagged with a severity level and an initiator (was this a logged-in user, an anonymous visitor, WP-Cron, WP-CLI, an unattended auto-update, a REST API call, or WordPress itself?) so you can filter down to exactly what you're looking for.
-
-= Session management =
-
-See every active login session across your site, revoke individual sessions, set a limit on how many concurrent sessions a user can hold, or lock the site down immediately by terminating every session except your own.
 
 = Digests and exports =
 
@@ -51,10 +47,6 @@ Configure one or more notification channels — email or Slack — each with its
 
 Activity Monitor only writes to its own database tables on the actions it tracks (an admin action, a login, a content change) — it does not run on every front-end page load for logged-out visitors beyond what's needed to record their own logged actions (e.g. leaving a comment).
 
-= Where is session data stored? =
-
-Active sessions are WordPress's own built-in session tokens — Activity Monitor reads and manages them directly rather than keeping a separate copy, so what you see always reflects the real, current session state.
-
 = What happens to my data if I uninstall the plugin? =
 
 Deleting the plugin through the Plugins screen removes its database tables, all stored settings, and any scheduled tasks. Simply deactivating the plugin does not delete anything, so you can safely reactivate later without losing your log.
@@ -66,9 +58,12 @@ Yes, retention is configurable and old entries are pruned automatically on a dai
 == Screenshots ==
 
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
-2. Active Sessions, with per-session revoke and site-wide emergency lockdown.
 
 == Changelog ==
+
+= 2.4.0 =
+* Removed: session management, in full — the Active Sessions screen, per-session revoke, the concurrent-session limit, Revoke All Expired Sessions, and Emergency Lockdown. Activity Monitor is now purely an activity log, with alerts, digests, and export.
+* Your logins are not affected. Sessions belong to WordPress itself, and this only removes the plugin's screen and controls for them — nobody is logged out by this upgrade, and WordPress continues to manage sessions exactly as it always has. Session entries already in your activity log are kept and still display normally.
 
 = 2.3.0 =
 * Changed: the admin screens now use WordPress's own styling instead of a custom look. The white panel that wrapped each screen is gone, so sections and tables sit on the standard gray background and read the same way the Plugins and Posts screens do.
@@ -176,6 +171,9 @@ Yes, retention is configurable and old entries are pruned automatically on a dai
 * Initial internal release.
 
 == Upgrade Notice ==
+
+= 2.4.0 =
+Session management is removed — the Active Sessions screen, session revoke, the concurrent-session limit, and Emergency Lockdown all go. Nobody is logged out by this upgrade: sessions belong to WordPress, and it keeps managing them as before. Your activity log is unaffected.
 
 = 2.2.0 =
 Page traffic tracking is removed. Upgrading permanently deletes all stored page-view data — both traffic tables are dropped on first load and cannot be recovered. Export that history first if you need it. Your activity log and sessions are unaffected.

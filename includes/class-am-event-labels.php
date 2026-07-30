@@ -42,6 +42,12 @@ class AM_Event_Labels {
 		'post.trashed'                           => 'Post Moved to Trash',
 		'post.updated'                           => 'Post Updated',
 		'security.access_denied'                => 'Access Denied',
+		// Session management was removed in 2.4.0 and nothing writes these
+		// any more, but an upgraded site still has session.* rows in
+		// am_events and they have to keep rendering. Dropping these would
+		// degrade a logged "Emergency Session Lockdown" to the generic
+		// fallback "Session emergency lockdown" -- same reason LEGACY_MAP
+		// exists for v1.x slugs. Keep them.
 		'session.emergency_lockdown'            => 'Emergency Session Lockdown',
 		'session.limit_enforced'                => 'Session Limit Enforced',
 		'site.created'                           => 'Site Created',
@@ -162,7 +168,7 @@ class AM_Event_Labels {
 		'plugin'   => 'Plugin',
 		'post'     => 'Post',
 		'security' => 'Security',
-		'session'  => 'Session',
+		'session'  => 'Session', // Retained for pre-2.4.0 rows -- see MAP above.
 		'site'     => 'Site',
 		'system'   => 'System',
 		'term'     => 'Term',

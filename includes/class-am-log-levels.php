@@ -44,7 +44,6 @@ class AM_Log_Levels {
 		'plugin.update'   => self::NOTICE,
 		'theme.update'    => self::NOTICE,
 		'core.update'     => self::NOTICE,
-		'session.destroy' => self::NOTICE,
 		'post.delete'     => self::WARNING,
 		'post.trash'      => self::NOTICE,
 		'media.update'    => self::INFO,

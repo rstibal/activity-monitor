@@ -39,10 +39,6 @@ class AM_Logger_Manager {
 		// exclusively from AM_Event_Query against this schema, and email
 		// notifications (AM_Notifications) are wired directly into
 		// AM_Event_Writer rather than the old AM_Logger::log() call path.
-		// Session management (concurrent limit, emergency lockdown) is
-		// handled separately by AM_Sessions, not a logger in this list,
-		// since sessions are read/written via WP core's own session_tokens
-		// user meta rather than events on this table.
 	);
 
 	public static function init() {

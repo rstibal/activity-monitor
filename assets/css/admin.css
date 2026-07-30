@@ -162,7 +162,7 @@
 	-webkit-box-orient: vertical;
 }
 
-/* IP Address column (Activity Log + Active Sessions) — sized in ch
+/* IP Address column (Activity Log) — sized in ch
    (character width) rather than a fixed px guess, so it scales with
    font size. 16ch comfortably fits any IPv4 address (max 15 chars,
    e.g. 255.255.255.255) with a little breathing room; IPv6 (up to 45
@@ -221,10 +221,6 @@
 .am-init-system         { background: #f5f5f5; color: #616161; } /* internal/unattributed */
 
 .am-role { display: block; color: #646970; font-size: 11px; }
-
-.am-session-expired td { opacity: 0.6; }
-.am-session-current td { background-color: #f0f6fc !important; }
-.am-sessions-note { color: #646970; margin: 8px 0 0; }
 
 /* Destructive actions. Core has no "danger button", so this is one of
    the few genuinely additive rules here -- kept to a red label and

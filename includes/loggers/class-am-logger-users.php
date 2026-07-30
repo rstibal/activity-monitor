@@ -103,12 +103,6 @@ class AM_Logger_Users extends AM_Logger_Base {
 				'group'       => false, // Each login is individually meaningful.
 			)
 		);
-
-		// v2.0 session management (spec §5, issue #5): enforce the
-		// concurrent-session limit, if configured, right after the new
-		// session is recorded so the just-created login always survives
-		// the trim (AM_Sessions revokes oldest-first).
-		AM_Sessions::enforce_concurrent_limit( $user->ID );
 	}
 
 	public function on_login_failed( string $username ) {
