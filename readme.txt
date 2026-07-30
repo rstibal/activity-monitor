@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, page traffic
 Requires at least: 5.3
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.0.87
+Stable tag: 2.0.88
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -76,6 +76,9 @@ Yes, retention is configurable and old entries are pruned automatically on a dai
 4. Active Sessions, with per-session revoke and site-wide emergency lockdown.
 
 == Changelog ==
+
+= 2.0.88 =
+* Build: No plugin code changes. Hardens the release pipeline to fail the build if the packaged zip ever contains backslash-separated paths, which WordPress's uploader can extract as corrupted flat filenames instead of nested files.
 
 = 2.0.87 =
 * Fixed: Activity Log table and Recent notable events read stored UTC timestamps without a UTC suffix, so they could display shifted times depending on server timezone. Now parsed consistently with the rest of the plugin.
