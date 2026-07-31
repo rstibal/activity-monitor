@@ -16,7 +16,18 @@ workflow disappears.
   `Stable tag:` in `readme.txt`. They must agree.
 - **PHP 7.4 is the floor** (`Requires PHP: 7.4`). No `match`, `?->`,
   `str_contains()`, named arguments, enums, or constructor promotion. Linting
-  with a modern binary will not catch these — see Verifying below.
+  with a modern binary will not catch these — see Verifying below. Raising it
+  has been considered and declined: the gain across this codebase is six
+  `strpos()` calls and five `switch` blocks, i.e. cosmetic, while PHP version
+  is the host's decision rather than the user's, and raising a floor blocks
+  *updates* for sites already below it — stranding exactly the neglected
+  installs an audit log is most useful on.
+- **WordPress 6.0 is the floor** (`Requires at least: 6.0`), raised from 5.3
+  in 2.4.3. The opposite calculus: core version is one click for the user,
+  auto-updates are on by default, and 5.3 (Nov 2019) was a claim nothing here
+  had ever tested. It paid for itself immediately by deleting a
+  `version_compare()` around the screen-option save hook. Keep the floor at
+  something actually exercised; `Tested up to:` should stay current with it.
 - **`<code>` is only for actual code** (HTML, JS, SQL). Never for data values —
   IPs, URLs, slugs, IDs, hashes all render as plain text. There is deliberately
   no CSS override of core's grey `<code>` background; real code wants it.
@@ -43,13 +54,16 @@ workflow disappears.
   `.wrap` + `.wp-heading-inline` + `.wp-header-end`, `.subsubsub` for status
   filters, `.search-box`, `.tablenav` (`.alignleft.actions` left,
   `.tablenav-pages` right, `<br class="clear">`), `.wp-list-table widefat
-  striped`, and core's `.postbox` framing for settings sections. `admin.css`
-  should only define what core has no equivalent for — severity/initiator
-  badges, the modal, column widths, and `.page-numbers` (which core's list
-  tables don't emit, so core ships no styling for it). Before 2.3.0 this file
-  restyled buttons, inputs, form-tables, table headers and wrapped every
-  screen in a white panel; the result read as a separate product embedded in
-  wp-admin. Don't reintroduce that.
+  striped`, and — on Settings — the Settings API's own `<h2>` + `.form-table`
+  output. `admin.css` should only define what core has no equivalent for —
+  severity/initiator badges, the modal, column widths, and `.page-numbers`
+  (which core's list tables don't emit, so core ships no styling for it).
+  Before 2.3.0 this file restyled buttons, inputs, form-tables, table headers
+  and wrapped every screen in a white panel; the result read as a separate
+  product embedded in wp-admin. Don't reintroduce that. Settings kept a
+  version of it until 2.4.3 in `.am-settings-section` (a hand-rolled
+  `.postbox`) plus an invented group heading, section divider and red "danger
+  zone" — all deleted. If a settings control needs framing, it already has it.
 - **Dead code gets deleted, not commented out or marked unused.**
 
 ## Architecture
@@ -94,8 +108,53 @@ Each screen renders through `render_page_*()` → `render_screen_open()` → its
 shared modal overlay, which both screens need — Settings opens modals into it
 too.
 
+**Settings runs on the Settings API** as of 2.4.3: one option group
+(`AM_Admin::SETTINGS_GROUP`), four sections, one `options.php` POST, one Save
+Changes button, and core's own "Settings saved." notice — which is why
+`render_settings_screen()` calls `settings_errors()` itself (a custom
+top-level menu doesn't get core's automatic call). Every scalar option is
+registered with a `sanitize_callback`, so adding one means `register_options()`
++ `register_sections_and_fields()` + a `field_*()` renderer and nothing else:
+no handler, no nonce, no redirect, no notice. Before this there were three
+`admin_post_` handlers with three redirects and three custom notices; if you
+find yourself adding a fourth, you want a settings field instead.
+
+**Two things on that screen are deliberately not settings fields.**
+Notification channels and digest configs are *lists of records*, added and
+edited through modals that save over AJAX immediately, so they render *below*
+the Save button — everything above it is a field, everything below carries its
+own control. Clear Log stays an `admin_post` action for the same reason, and
+sits last because it's destructive. Don't fold either into the form.
+
+**`sanitize_disabled_loggers()` is inverted on purpose.** The checkboxes read
+"record this" and post the *enabled* slugs under
+`am_disabled_loggers[enabled][]`; the option stores the *disabled* ones so a
+logger added later is on by default with no migration. The hidden
+`am_disabled_loggers[submitted]` marker is load-bearing: an all-unchecked
+fieldset posts nothing, and without it "disable everything" is
+indistinguishable from "this field wasn't on the page". The callback also
+accepts the plain stored shape, because a `sanitize_callback` runs on every
+`update_option()`, not just the form's.
+
+**Rows per page is a Screen Option, not a setting** — `am_log_per_page`, via
+`add_screen_option()` on the log's `load-` hook. It's per-user, which is the
+point. **There is deliberately no save-side hook**: since WP 5.4.2 core
+persists any option whose name ends in `per_page` on its own (validated
+1–999), which is why the option is named that way. Don't add a
+`set-screen-option` filter — it's deprecated from 5.4.2 and firing it logs a
+deprecation notice whenever *any* screen option is saved anywhere in wp-admin.
+This is the one API that set the WP floor; see below.
+
 All modals share that one overlay, the `openModal()` JS helper, and the
 `am_ajax` nonce.
+
+**`uninstall.php` returns early when `am_delete_data_on_uninstall` is off**
+(Settings → When the plugin is deleted; on by default, so an untouched site
+behaves as it always did). When it's off the file does *nothing* — including
+not deleting that option itself, or the choice wouldn't survive. Any new
+option added anywhere needs a matching `delete_option()` in that file's list;
+`am_datetime_format` and `am_maintenance_mode_last_state` were both missing
+from it until 2.4.3.
 
 **Cleaning up after removed features** goes in `am_run_upgrade_cleanup()`
 (`activity-monitor.php`), which drops tables, options, and cron events left by
@@ -113,9 +172,11 @@ subset (404 storms, `wp-login.php`/`xmlrpc.php` probing, anonymous hits on
 restricted paths) belongs in a logger writing through `AM_Event_Writer`, where
 it inherits the existing filters, grouping, export, and digest.
 
-`AM_Event_Writer` collapses repeat events within a 5-minute window keyed on
-`event_type` + `action` + `object_id` + `initiator`. Loggers with no meaningful
-object id (file-editor, fatal-errors) pass `'group' => false`.
+`AM_Event_Writer` collapses repeat events within a window keyed on
+`event_type` + `action` + `object_id` + `initiator`. The window is
+`am_occasion_window_seconds` (Settings → Logging; 5 minutes by default, 0 turns
+grouping off), still filterable on top. Loggers with no meaningful object id
+(file-editor, fatal-errors) pass `'group' => false`.
 
 ## Decisions worth not re-litigating
 
@@ -132,6 +193,20 @@ object id (file-editor, fatal-errors) pass `'group' => false`.
   `AM_Admin::sanitize_type_filter()`.
 - **The user profile modal keys on `user_id`, not the stored login** — logins
   can be renamed and reused, so a login lookup could show the wrong person.
+- **`am_ip_storage` is applied at write time, in `AM_Event_Writer::get_ip()`,
+  never at display time.** The point of choosing "anonymised" or "none" is that
+  the address never reaches the database — filtering it on the way out would
+  leave the data sitting there. `AM_DB_Legacy_IP::resolve()` itself stays
+  untouched (it was security-reviewed in v1.3.0); the setting layers on top of
+  what it returns. Consequence: `ip_address` can now be `''`, so anything
+  rendering it goes through `AM_Admin::ip_cell_html()`, which handles the empty
+  case and the lookups-disabled case together.
+- **Options read outside the admin always pass an explicit default to
+  `get_option()`.** `register_setting()`'s `default` is implemented as a
+  `default_option_*` filter registered on `admin_init`, and most log writes
+  (failed logins, comments, cron, fatal errors) happen on requests that never
+  load the admin — so relying on it silently yields `false` there. This bites
+  `am_ip_storage` and `am_occasion_window_seconds` specifically.
 
 ## Legacy v1.x data (a recurring source of surprises)
 

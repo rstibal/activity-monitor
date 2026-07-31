@@ -17,7 +17,13 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  */
 class AM_Event_Writer {
 
-	/** Repeat events within this window collapse into one row. Filterable. */
+	/**
+	 * Repeat events within this window collapse into one row. The window is
+	 * configurable on the Settings screen (am_occasion_window_seconds, where
+	 * 0 turns grouping off entirely) and still filterable on top of that --
+	 * this constant is only the fallback for a site that has never saved
+	 * the setting.
+	 */
 	const DEFAULT_OCCASION_WINDOW_SECONDS = 300;
 
 	/**
@@ -147,7 +153,20 @@ class AM_Event_Writer {
 	private static function maybe_increment_existing( string $occasion_id ): bool {
 		global $wpdb;
 		$events_table = $wpdb->prefix . AM_Schema::EVENTS_TABLE;
-		$window       = (int) apply_filters( 'am_occasion_window_seconds', self::DEFAULT_OCCASION_WINDOW_SECONDS );
+
+		// Explicit default in the get_option() call rather than relying on
+		// register_setting()'s: that only registers its default_option_*
+		// filter from admin_init, and plenty of events (failed logins,
+		// comments, cron) are written on requests that never reach the
+		// admin at all.
+		$window = (int) apply_filters(
+			'am_occasion_window_seconds',
+			(int) get_option( 'am_occasion_window_seconds', self::DEFAULT_OCCASION_WINDOW_SECONDS )
+		);
+
+		if ( $window <= 0 ) {
+			return false; // Grouping turned off -- every occurrence gets its own row.
+		}
 
 		$existing_id = $wpdb->get_var( $wpdb->prepare(
 			"SELECT id FROM `{$events_table}`
@@ -189,11 +208,36 @@ class AM_Event_Writer {
 	}
 
 	/**
-	 * IP resolution — ported as-is from v1.x AM_DB::get_ip() (Cloudflare
-	 * CIDR-validated, X-Forwarded-For intentionally not trusted). Kept
-	 * unchanged; this logic was already security-reviewed in v1.3.0.
+	 * IP resolution — AM_DB_Legacy_IP::resolve() is ported as-is from v1.x
+	 * AM_DB::get_ip() (Cloudflare CIDR-validated, X-Forwarded-For
+	 * intentionally not trusted) and is deliberately still untouched; this
+	 * logic was already security-reviewed in v1.3.0. What's layered on top
+	 * is the am_ip_storage privacy setting, applied to the resolved address
+	 * on the way into the row:
+	 *
+	 *   'full'       store the address as resolved (the default, and what
+	 *                every version before this one did unconditionally)
+	 *   'anonymized' mask the host part via WordPress's own
+	 *                wp_privacy_anonymize_ip(), so entries stay groupable
+	 *                by network without identifying a device
+	 *   'none'       store nothing at all
+	 *
+	 * Applied at write time, not at display time -- the point of the
+	 * setting is that the address never reaches the database, so an
+	 * existing log is unaffected by changing it.
 	 */
 	private static function get_ip(): string {
-		return AM_DB_Legacy_IP::resolve();
+		// Explicit default for the same reason as the grouping window above:
+		// most log writes happen outside the admin, where register_setting()
+		// has not run.
+		$mode = (string) get_option( 'am_ip_storage', 'full' );
+
+		if ( 'none' === $mode ) {
+			return '';
+		}
+
+		$ip = AM_DB_Legacy_IP::resolve();
+
+		return 'anonymized' === $mode ? (string) wp_privacy_anonymize_ip( $ip ) : $ip;
 	}
 }

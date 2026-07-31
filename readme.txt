@@ -1,10 +1,10 @@
 === Activity Monitor ===
 Contributors: rstibal
 Tags: activity log, audit log, security, user activity, event log
-Requires at least: 5.3
+Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.4.2
+Stable tag: 2.4.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -49,17 +49,35 @@ Activity Monitor only writes to its own database tables on the actions it tracks
 
 = What happens to my data if I uninstall the plugin? =
 
-Deleting the plugin through the Plugins screen removes its database tables, all stored settings, and any scheduled tasks. Simply deactivating the plugin does not delete anything, so you can safely reactivate later without losing your log.
+By default, deleting the plugin through the Plugins screen removes its database tables, all stored settings, and any scheduled tasks. You can change that under Settings → When the plugin is deleted: untick the box and the log and its settings stay in the database, so reinstalling picks up where it left off. Simply deactivating the plugin never deletes anything either way.
 
 = Can I control how long log entries are kept? =
 
-Yes, retention is configurable and old entries are pruned automatically on a daily schedule.
+Yes. Settings → Logging → "Keep entries for" sets the retention period, from 30 days up to 2 years, or Forever to never delete anything. Entries past the period are removed automatically once a day, and the setting tells you how many entries you currently have and how far back they reach.
+
+= Does the plugin send anything to a third party? =
+
+Only if you ask it to. Clicking an IP address in the log looks it up via ipinfo.io, which means sending that one address and nothing else; you can turn that off under Settings → Privacy. Slack alerts post to the webhook URL you configure. Nothing else leaves your site.
+
+= Can I stop the plugin recording IP addresses? =
+
+Yes. Settings → Privacy offers full addresses, anonymised addresses (the last part masked, using WordPress's own anonymisation), or none at all. It applies to entries recorded from that point on.
 
 == Screenshots ==
 
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
 
 == Changelog ==
+
+= 2.4.3 =
+* Changed: Activity Monitor now requires WordPress 6.0 or later, up from 5.3. WordPress 5.3 was released in 2019 and this plugin was no longer tested against it. If your site is on an older version, update WordPress first — this plugin's requirements are unchanged in every other respect, including PHP 7.4.
+* Changed: the Settings screen has been reorganised. Everything you can set is now in one form — Logging, Display, Privacy, and what happens when the plugin is deleted — with a single Save Changes button, instead of three separate save buttons scattered down the page. Notification channels and email digests keep saving as you add or edit them, and now sit below that form so it's clear which is which. Clearing the log moved to the bottom, where a destructive action belongs.
+* Changed: the screen is now built from WordPress's own settings furniture, so it matches Settings → General rather than looking like a separate product embedded in the admin.
+* Added: a retention setting — how long entries are kept, from 30 days to 2 years, or forever. Old entries have always been deleted automatically after 90 days; that was never adjustable, and now it is. The setting shows how many entries you have, how far back they reach, and when the next cleanup runs.
+* Added: privacy settings for IP addresses. Store them in full as before, store an anonymised version, or don't store them at all. IP address lookups (which send the address you click to ipinfo.io) can also be turned off, and addresses then show as plain text.
+* Added: a choice about what happens when the plugin is deleted. Deleting still removes everything by default, but you can now keep your log and settings instead.
+* Added: a setting for repeat-event grouping. Identical repeated events collapse into one entry with a count — you can now change that window from five minutes to anything between one minute and an hour, or turn grouping off entirely.
+* Added: "Entries per page" for the Activity Log, in the Screen Options panel at the top of that screen. It was fixed at 50, and it's per-person, so changing it doesn't affect other administrators.
 
 = 2.4.2 =
 * Fixed: the Activity Log table stopped short of the full page width, because the filter toolbar above it was taller than the height WordPress reserves for one and the table was flowing around it.

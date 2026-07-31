@@ -23,6 +23,18 @@ class AM_Admin {
 	const PAGE_LOG      = 'activity-monitor';
 	const PAGE_SETTINGS = 'activity-monitor-settings';
 
+	/** Option group posted to options.php by the Settings screen. */
+	const SETTINGS_GROUP = 'am_settings';
+
+	/**
+	 * Per-user rows-per-page for the Activity Log, stored as a user option
+	 * by core's Screen Options panel rather than as a site-wide setting --
+	 * this is exactly what core's own list tables use it for, and it keeps
+	 * one admin's preferred page size from changing everyone else's.
+	 */
+	const PER_PAGE_OPTION  = 'am_log_per_page';
+	const PER_PAGE_DEFAULT = 50;
+
 	/**
 	 * Hook suffixes returned by add_menu_page()/add_submenu_page(), used
 	 * by enqueue_assets() and show_notices() to recognize this plugin's
@@ -47,9 +59,10 @@ class AM_Admin {
 		add_action( 'admin_enqueue_scripts',                  array( $instance, 'enqueue_assets' ) );
 		add_action( 'admin_init',                             array( $instance, 'register_settings' ) );
 		add_action( 'admin_post_am_clear_log',                array( $instance, 'handle_clear_log' ) );
-		add_action( 'admin_post_am_save_logger_settings',     array( $instance, 'handle_save_logger_settings' ) );
-		add_action( 'admin_post_am_save_display_settings',    array( $instance, 'handle_save_display_settings' ) );
 		add_action( 'admin_post_am_export_log',               array( $instance, 'handle_export' ) );
+		// Note there is no 'set-screen-option' filter here. See
+		// add_screen_options() for why the log's per-page option needs no
+		// save-side hook at all.
 		add_action( 'admin_notices',                          array( $instance, 'show_notices' ) );
 		add_action( 'wp_ajax_am_get_v2_event_detail',         array( $instance, 'ajax_v2_event_detail' ) );
 		add_action( 'wp_ajax_am_digest_preview',              array( $instance, 'ajax_digest_preview' ) );
@@ -67,7 +80,7 @@ class AM_Admin {
 	// ── Menu ───────────────────────────────────────────────────────────
 
 	public function register_menu() {
-		self::$screen_hooks[] = add_menu_page(
+		$log_hook = add_menu_page(
 			__( 'Activity Monitor', 'activity-monitor' ),
 			__( 'Activity Monitor', 'activity-monitor' ),
 			'manage_options',
@@ -76,6 +89,16 @@ class AM_Admin {
 			'dashicons-shield-alt',
 			2
 		);
+		self::$screen_hooks[] = $log_hook;
+
+		// Screen Options for the log's page size. Has to be registered on
+		// that screen's load- hook (the panel is built before the page
+		// renders), and $log_hook is the hook to use for the submenu below
+		// too: WordPress gives a submenu sharing its parent's slug the
+		// parent's hook, so they are the same string.
+		if ( $log_hook ) {
+			add_action( 'load-' . $log_hook, array( $this, 'add_screen_options' ) );
+		}
 
 		// Registering a child with the same slug as the parent renames the
 		// item WordPress auto-creates for the top-level page, which would
@@ -103,6 +126,71 @@ class AM_Admin {
 		self::$screen_hooks = array_filter( self::$screen_hooks );
 	}
 
+	// ── Screen Options (Activity Log page size) ──────────────────────────
+
+	/**
+	 * Adds core's own "Number of items per page" control to the Activity
+	 * Log's Screen Options panel. The log used to hardcode 50 rows with no
+	 * way to change it; this is where core puts that control on every list
+	 * screen it ships, so it costs no new settings-page real estate and
+	 * behaves the way an admin already expects it to.
+	 *
+	 * Nothing is needed on the save side. Since WordPress 5.4.2,
+	 * set_screen_options() persists any option whose name ends in
+	 * "per_page" by itself, validating it to 1-999 -- which is why
+	 * PER_PAGE_OPTION is named the way it is. That is also the reason the
+	 * plugin's floor is 6.0: below 5.4.2 a custom screen option was dropped
+	 * unless the generic 'set-screen-option' filter claimed it, but that
+	 * filter is deprecated from 5.4.2 onward and attaching to it fires a
+	 * deprecation notice every time *any* screen option is saved anywhere
+	 * in wp-admin. Supporting both meant a version_compare() around a
+	 * hook; raising the floor deleted it. Don't add either filter back.
+	 */
+	public function add_screen_options() {
+		add_screen_option( 'per_page', array(
+			'label'   => __( 'Entries per page', 'activity-monitor' ),
+			'default' => self::PER_PAGE_DEFAULT,
+			'option'  => self::PER_PAGE_OPTION,
+		) );
+	}
+
+	/** The current user's log page size, falling back to the default. */
+	private static function per_page(): int {
+		$per_page = (int) get_user_option( self::PER_PAGE_OPTION );
+		return $per_page >= 1 ? $per_page : self::PER_PAGE_DEFAULT;
+	}
+
+	// ── Shared cell rendering ────────────────────────────────────────────
+
+	/** Whether the ipinfo.io lookup modal is available (Settings → Privacy). */
+	private static function ip_lookup_enabled(): bool {
+		return (bool) get_option( 'am_ip_lookup_enabled', 1 );
+	}
+
+	/**
+	 * One stored IP address, as a lookup link or as plain text.
+	 *
+	 * Three states share this: a normal address, an address on a site where
+	 * lookups are turned off (plain text -- nothing to click if clicking
+	 * can't reach the service), and no address at all, which is what
+	 * am_ip_storage => 'none' writes. That last case is why this exists as
+	 * a helper rather than inline markup in two places: an empty <a> is an
+	 * invisible click target, and both the log table and the event detail
+	 * modal have to handle it the same way.
+	 */
+	private static function ip_cell_html( string $ip ): string {
+		if ( '' === $ip ) {
+			return '<span aria-hidden="true">&mdash;</span><span class="screen-reader-text">'
+				. esc_html__( 'Not recorded', 'activity-monitor' ) . '</span>';
+		}
+
+		if ( ! self::ip_lookup_enabled() ) {
+			return esc_html( $ip );
+		}
+
+		return '<a href="#" class="am-ip-lookup" data-ip="' . esc_attr( $ip ) . '">' . esc_html( $ip ) . '</a>';
+	}
+
 	// ── Assets ─────────────────────────────────────────────────────────
 
 	public function enqueue_assets( $hook ) {
@@ -118,35 +206,217 @@ class AM_Admin {
 	}
 
 	// ── Settings registration ────────────────────────────────────────────
+	//
+	// Every scalar setting on the Settings screen goes through the Settings
+	// API and posts to options.php as one group: one nonce, one Save
+	// Changes button, one "Settings saved." notice, and core's own
+	// form-table markup for free. Before 2.4.3 each block had its own
+	// admin-post handler, its own submit button, its own redirect and its
+	// own custom success notice, which is why the screen had four different
+	// save behaviours on it at once.
+	//
+	// What is deliberately NOT here: notification channels and digest
+	// configs. Those are lists of records, not fields -- they are added,
+	// edited and deleted one at a time through a modal that saves over AJAX
+	// immediately, so they have nothing to contribute to a page-level Save
+	// button. They render below it for that reason.
 
 	public function register_settings() {
-		register_setting( 'am_notifications_group', 'am_notification_channels', array(
-			'sanitize_callback' => array( $this, 'sanitize_channels' ),
+		$this->register_options();
+		$this->register_sections_and_fields();
+	}
+
+	private function register_options() {
+		register_setting( self::SETTINGS_GROUP, 'am_disabled_loggers', array(
+			'sanitize_callback' => array( $this, 'sanitize_disabled_loggers' ),
 			'default'           => array(),
+		) );
+
+		register_setting( self::SETTINGS_GROUP, 'am_retention_days', array(
+			'type'              => 'integer',
+			'sanitize_callback' => array( $this, 'sanitize_retention_days' ),
+			'default'           => 90,
+		) );
+
+		register_setting( self::SETTINGS_GROUP, 'am_occasion_window_seconds', array(
+			'type'              => 'integer',
+			'sanitize_callback' => array( $this, 'sanitize_occasion_window' ),
+			'default'           => AM_Event_Writer::DEFAULT_OCCASION_WINDOW_SECONDS,
+		) );
+
+		register_setting( self::SETTINGS_GROUP, AM_Date_Format::OPTION, array(
+			'sanitize_callback' => array( $this, 'sanitize_datetime_format' ),
+			'default'           => AM_Date_Format::DEFAULT_KEY,
+		) );
+
+		register_setting( self::SETTINGS_GROUP, 'am_ip_storage', array(
+			'sanitize_callback' => array( $this, 'sanitize_ip_storage' ),
+			'default'           => 'full',
+		) );
+
+		register_setting( self::SETTINGS_GROUP, 'am_ip_lookup_enabled', array(
+			'type'              => 'boolean',
+			'sanitize_callback' => array( $this, 'sanitize_checkbox' ),
+			'default'           => 1,
+		) );
+
+		register_setting( self::SETTINGS_GROUP, 'am_delete_data_on_uninstall', array(
+			'type'              => 'boolean',
+			'sanitize_callback' => array( $this, 'sanitize_checkbox' ),
+			'default'           => 1,
 		) );
 	}
 
-	public function sanitize_channels( $input ) {
-		if ( ! is_array( $input ) ) {
-			return array();
+	private function register_sections_and_fields() {
+		add_settings_section(
+			'am_logging',
+			__( 'Logging', 'activity-monitor' ),
+			array( $this, 'section_intro_logging' ),
+			self::PAGE_SETTINGS
+		);
+		add_settings_field( 'am_field_event_sources', __( 'Event sources', 'activity-monitor' ), array( $this, 'field_event_sources' ), self::PAGE_SETTINGS, 'am_logging' );
+		add_settings_field( 'am_field_retention', __( 'Keep entries for', 'activity-monitor' ), array( $this, 'field_retention' ), self::PAGE_SETTINGS, 'am_logging' );
+		add_settings_field( 'am_field_grouping', __( 'Group repeat events', 'activity-monitor' ), array( $this, 'field_grouping' ), self::PAGE_SETTINGS, 'am_logging' );
+
+		add_settings_section(
+			'am_display',
+			__( 'Display', 'activity-monitor' ),
+			'__return_false',
+			self::PAGE_SETTINGS
+		);
+		add_settings_field(
+			'am_field_datetime',
+			__( 'Date and time format', 'activity-monitor' ),
+			array( $this, 'field_datetime_format' ),
+			self::PAGE_SETTINGS,
+			'am_display',
+			array( 'label_for' => AM_Date_Format::OPTION )
+		);
+
+		add_settings_section(
+			'am_privacy',
+			__( 'Privacy', 'activity-monitor' ),
+			array( $this, 'section_intro_privacy' ),
+			self::PAGE_SETTINGS
+		);
+		add_settings_field( 'am_field_ip_storage', __( 'IP addresses', 'activity-monitor' ), array( $this, 'field_ip_storage' ), self::PAGE_SETTINGS, 'am_privacy' );
+		add_settings_field( 'am_field_ip_lookup', __( 'IP address lookups', 'activity-monitor' ), array( $this, 'field_ip_lookup' ), self::PAGE_SETTINGS, 'am_privacy' );
+
+		add_settings_section(
+			'am_data',
+			__( 'When the plugin is deleted', 'activity-monitor' ),
+			'__return_false',
+			self::PAGE_SETTINGS
+		);
+		add_settings_field( 'am_field_uninstall', __( 'Stored data', 'activity-monitor' ), array( $this, 'field_delete_on_uninstall' ), self::PAGE_SETTINGS, 'am_data' );
+	}
+
+	// ── Setting sanitizers ───────────────────────────────────────────────
+
+	/**
+	 * Inverts the Event sources checkboxes into the stored option.
+	 *
+	 * The boxes read as "record this" and are submitted as the *enabled*
+	 * slugs, but the option stores the *disabled* ones, so a logger added
+	 * in a later version is on by default on every existing site without a
+	 * migration -- which is what AM_Logger_Base::is_enabled() assumes.
+	 *
+	 * The hidden 'submitted' marker exists because an all-unchecked
+	 * fieldset posts nothing at all: without it, "disable every source"
+	 * and "this form never carried the field" would be indistinguishable,
+	 * and the Settings API hands a missing option's callback null either
+	 * way. Only slugs matching a registered logger are kept, so a stale or
+	 * hand-crafted one can't accumulate in the option.
+	 *
+	 * Registering this as a sanitize_callback means it runs on *every*
+	 * update_option() for the option, not just the settings form's -- so
+	 * it also has to recognize the stored shape (a plain list of disabled
+	 * slugs) rather than turning a WP-CLI or programmatic write into a
+	 * silent no-op.
+	 */
+	public function sanitize_disabled_loggers( $input ): array {
+		$known = array_keys( AM_Logger_Manager::all() );
+
+		if ( is_array( $input ) && isset( $input['submitted'] ) ) {
+			$enabled = ( isset( $input['enabled'] ) && is_array( $input['enabled'] ) )
+				? array_map( 'sanitize_key', $input['enabled'] )
+				: array();
+
+			return array_values( array_diff( $known, $enabled ) );
 		}
-		$clean = array();
-		foreach ( $input as $ch ) {
-			$one = self::sanitize_one_channel( $ch );
-			if ( null !== $one ) {
-				$clean[] = $one;
-			}
+
+		if ( is_array( $input ) ) {
+			return array_values( array_intersect( $known, array_map( 'sanitize_key', $input ) ) );
 		}
-		return $clean;
+
+		// null -- the Settings API's "this option wasn't in the POST at
+		// all". Keeping the current value is the safe reading; the
+		// alternative is disabling every source because a form didn't
+		// render.
+		return (array) get_option( 'am_disabled_loggers', array() );
+	}
+
+	/** Whitelisted against the offered choices -- 0 means "keep forever". */
+	public function sanitize_retention_days( $input ): int {
+		$days = absint( $input );
+		return array_key_exists( $days, self::retention_choices() ) ? $days : 90;
+	}
+
+	public function sanitize_occasion_window( $input ): int {
+		$seconds = absint( $input );
+		return array_key_exists( $seconds, self::grouping_choices() ) ? $seconds : AM_Event_Writer::DEFAULT_OCCASION_WINDOW_SECONDS;
 	}
 
 	/**
-	 * Validates and sanitizes a single channel's raw form data. Shared by
-	 * sanitize_channels() (the whole-array options.php path, kept for
-	 * back-compat) and ajax_save_channel() (the per-channel modal save
-	 * path) so the validation rules only live in one place. Returns
-	 * null for an invalid/unrecognized channel (unknown type, or a
-	 * Slack webhook that doesn't point at hooks.slack.com).
+	 * Whitelisted against the known presets rather than storing whatever
+	 * was posted: the saved value is used to look up a format string, so an
+	 * unrecognized key would silently fall back anyway -- better to never
+	 * store one.
+	 */
+	public function sanitize_datetime_format( $input ): string {
+		$format = sanitize_key( $input );
+		return isset( AM_Date_Format::FORMATS[ $format ] ) ? $format : AM_Date_Format::DEFAULT_KEY;
+	}
+
+	public function sanitize_ip_storage( $input ): string {
+		$mode = sanitize_key( $input );
+		return in_array( $mode, array( 'full', 'anonymized', 'none' ), true ) ? $mode : 'full';
+	}
+
+	/** Unchecked boxes post nothing, which reaches this as null. */
+	public function sanitize_checkbox( $input ): int {
+		return empty( $input ) ? 0 : 1;
+	}
+
+	/** Retention periods offered, keyed by days. 0 = keep forever. */
+	private static function retention_choices(): array {
+		return array(
+			30  => __( '30 days', 'activity-monitor' ),
+			60  => __( '60 days', 'activity-monitor' ),
+			90  => __( '90 days', 'activity-monitor' ),
+			180 => __( '6 months', 'activity-monitor' ),
+			365 => __( '1 year', 'activity-monitor' ),
+			730 => __( '2 years', 'activity-monitor' ),
+			0   => __( 'Forever', 'activity-monitor' ),
+		);
+	}
+
+	/** Grouping windows offered, keyed by seconds. 0 = don't group. */
+	private static function grouping_choices(): array {
+		return array(
+			0    => __( 'Don’t group — record every occurrence separately', 'activity-monitor' ),
+			60   => __( 'Repeats within 1 minute', 'activity-monitor' ),
+			300  => __( 'Repeats within 5 minutes', 'activity-monitor' ),
+			900  => __( 'Repeats within 15 minutes', 'activity-monitor' ),
+			3600 => __( 'Repeats within 1 hour', 'activity-monitor' ),
+		);
+	}
+
+	/**
+	 * Validates and sanitizes a single channel's raw form data, for
+	 * ajax_save_channel() (the per-channel modal save path). Returns null
+	 * for an invalid/unrecognized channel (unknown type, or a Slack webhook
+	 * that doesn't point at hooks.slack.com).
 	 */
 	private static function sanitize_one_channel( array $ch ): ?array {
 		$type = sanitize_key( $ch['type'] ?? '' );
@@ -200,14 +470,14 @@ class AM_Admin {
 		if ( ! $screen || ! in_array( $screen->id, self::$screen_hooks, true ) ) {
 			return;
 		}
+		// Saving settings no longer needs a notice of its own: those all
+		// post to options.php now, which comes back with settings-updated
+		// and core's own "Settings saved." message (emitted by the
+		// settings_errors() call in render_settings_screen()). Clearing the
+		// log is not a setting -- it stays an admin-post action, so it
+		// still reports itself here.
 		if ( isset( $_GET['am_cleared'] ) ) {
 			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Activity log cleared.', 'activity-monitor' ) . '</p></div>';
-		}
-		if ( isset( $_GET['am_display_settings_saved'] ) ) {
-			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Display settings saved.', 'activity-monitor' ) . '</p></div>';
-		}
-		if ( isset( $_GET['am_logger_settings_saved'] ) ) {
-			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Event sources saved.', 'activity-monitor' ) . '</p></div>';
 		}
 	}
 
@@ -240,61 +510,6 @@ class AM_Admin {
 
 		wp_safe_redirect( add_query_arg(
 			array( 'page' => self::PAGE_SETTINGS, 'am_cleared' => '1' ),
-			admin_url( 'admin.php' )
-		) );
-		exit;
-	}
-
-	/**
-	 * Saves the per-logger noise-control toggles.
-	 *
-	 * The form posts the *enabled* slugs (checked boxes) but the option
-	 * stores the *disabled* ones, so the two are inverted here. That's
-	 * deliberate: storing disabled slugs means a logger added in a later
-	 * version is enabled by default on every existing site without a
-	 * migration, which is what AM_Logger_Base::is_enabled() assumes.
-	 *
-	 * Only slugs that actually correspond to a registered logger are kept,
-	 * so a stale or hand-crafted slug can't accumulate in the option.
-	 */
-	public function handle_save_logger_settings() {
-		check_admin_referer( 'am_save_logger_settings' );
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_die( esc_html__( 'Unauthorized.', 'activity-monitor' ) );
-		}
-
-		$known   = array_keys( AM_Logger_Manager::all() );
-		$enabled = isset( $_POST['am_enabled_loggers'] ) && is_array( $_POST['am_enabled_loggers'] )
-			? array_map( 'sanitize_key', wp_unslash( $_POST['am_enabled_loggers'] ) )
-			: array();
-
-		update_option( 'am_disabled_loggers', array_values( array_diff( $known, $enabled ) ) );
-
-		wp_safe_redirect( add_query_arg(
-			array( 'page' => self::PAGE_SETTINGS, 'am_logger_settings_saved' => '1' ),
-			admin_url( 'admin.php' )
-		) );
-		exit;
-	}
-
-	public function handle_save_display_settings() {
-		check_admin_referer( 'am_save_display_settings' );
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_die( esc_html__( 'Unauthorized.', 'activity-monitor' ) );
-		}
-
-		// Whitelist against the known presets rather than storing whatever
-		// was posted: the saved value is used to look up a format string,
-		// so an unrecognized key would just silently fall back anyway --
-		// better to never store one.
-		$format = sanitize_key( $_POST[ AM_Date_Format::OPTION ] ?? '' );
-		if ( ! isset( AM_Date_Format::FORMATS[ $format ] ) ) {
-			$format = AM_Date_Format::DEFAULT_KEY;
-		}
-		update_option( AM_Date_Format::OPTION, $format );
-
-		wp_safe_redirect( add_query_arg(
-			array( 'page' => self::PAGE_SETTINGS, 'am_display_settings_saved' => '1' ),
 			admin_url( 'admin.php' )
 		) );
 		exit;
@@ -512,7 +727,7 @@ class AM_Admin {
 					<?php if ( $row->user_role ) echo ' (' . esc_html( $row->user_role ) . ')'; ?>
 				</td>
 			</tr>
-			<tr><th><?php esc_html_e( 'IP Address', 'activity-monitor' ); ?></th><td><a href="#" class="am-ip-lookup" data-ip="<?php echo esc_attr( $row->ip_address ); ?>"><?php echo esc_html( $row->ip_address ); ?></a></td></tr>
+			<tr><th><?php esc_html_e( 'IP Address', 'activity-monitor' ); ?></th><td><?php echo self::ip_cell_html( (string) $row->ip_address ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped per-part in ip_cell_html(). ?></td></tr>
 			<tr>
 				<th><?php esc_html_e( 'Object', 'activity-monitor' ); ?></th>
 				<td>
@@ -681,6 +896,14 @@ class AM_Admin {
 		check_ajax_referer( 'am_ajax', 'nonce' );
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_die( '-1' );
+		}
+
+		// Re-checked here, not just in the markup: the addresses in the log
+		// stop being clickable when lookups are off, but this endpoint is
+		// what actually reaches the third-party service, so the setting has
+		// to hold at the point of the outbound request.
+		if ( ! self::ip_lookup_enabled() ) {
+			wp_send_json_error( array( 'message' => __( 'IP address lookups are turned off in Activity Monitor’s settings.', 'activity-monitor' ) ) );
 		}
 
 		$ip = sanitize_text_field( wp_unslash( $_POST['ip'] ?? '' ) );
@@ -964,7 +1187,7 @@ class AM_Admin {
 	// See activity-monitor-v2-spec.md §9 and GitHub issue #4.
 
 	private function render_log_screen() {
-		$per_page   = 50;
+		$per_page   = self::per_page();
 		$page       = max( 1, absint( $_GET['paged'] ?? 1 ) );
 		$level      = sanitize_key( $_GET['am_level'] ?? '' );
 		$initiator  = sanitize_key( $_GET['am_initiator'] ?? '' );
@@ -1257,7 +1480,7 @@ class AM_Admin {
 								<?php echo esc_html( '' !== $row->user_login ? $row->user_login : '—' ); ?>
 							<?php endif; ?>
 						</td>
-						<td class="am-ip-cell" title="<?php echo esc_attr( $row->ip_address ); ?>"><a href="#" class="am-ip-lookup" data-ip="<?php echo esc_attr( $row->ip_address ); ?>"><?php echo esc_html( $row->ip_address ); ?></a></td>
+						<td class="am-ip-cell" title="<?php echo esc_attr( $row->ip_address ); ?>"><?php echo self::ip_cell_html( (string) $row->ip_address ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped per-part in ip_cell_html(). ?></td>
 						<td class="am-log-message-cell" title="<?php echo esc_attr( $row->message ); ?>"><span class="am-log-message-clamp"><?php echo esc_html( $row->message ); ?></span></td>
 						<td>
 							<?php
@@ -1335,263 +1558,382 @@ class AM_Admin {
 
 	// ── Screen: Settings ──────────────────────────────────────────────────
 
+	/**
+	 * The Settings screen, top to bottom:
+	 *
+	 *   1. one options.php form holding every field (Logging, Display,
+	 *      Privacy, uninstall), ending in a single Save Changes button
+	 *   2. the two record lists -- notification channels and digests --
+	 *      which are added and edited through modals that save over AJAX
+	 *      as you go, so they have nothing to save at page level
+	 *   3. Clear Log, an action rather than a setting, last because it is
+	 *      destructive
+	 *
+	 * Everything above the Save button is a field; everything below it
+	 * carries its own control. That ordering is the point: before 2.4.3
+	 * this screen mixed two immediate-save tables in between three separate
+	 * per-section save buttons, and nothing on it said which was which.
+	 */
 	private function render_settings_screen() {
-		$channels = get_option( 'am_notification_channels', array() );
+		// This screen hangs off a custom top-level menu, so core doesn't
+		// call settings_errors() for it the way it does on the Settings
+		// menu's own pages. Without this, a successful save would redirect
+		// back here silently.
+		settings_errors();
 		?>
 
-		<h2 class="am-settings-group-title"><?php esc_html_e( 'Alerts & Reports', 'activity-monitor' ); ?></h2>
-
-		<div class="am-settings-section">
-			<h2 class="am-section-title">
-				<span class="dashicons dashicons-bell"></span>
-				<?php esc_html_e( 'Notification Channels', 'activity-monitor' ); ?>
-			</h2>
-			<p class="am-description">
-				<?php esc_html_e( 'Configure instant alerts. Each channel triggers when an event meets or exceeds its minimum level. Changes save immediately.', 'activity-monitor' ); ?>
-			</p>
-
-			<?php if ( empty( $channels ) ) : ?>
-				<p class="am-description"><?php esc_html_e( 'No channels configured yet.', 'activity-monitor' ); ?></p>
-				<div class="am-channel-add-buttons">
-					<button type="button" class="button button-secondary am-add-channel-btn" data-type="email">
-						<span class="dashicons dashicons-email-alt"></span>
-						<?php esc_html_e( 'Add Email Channel', 'activity-monitor' ); ?>
-					</button>
-					<button type="button" class="button button-secondary am-add-channel-btn" data-type="slack">
-						<span class="dashicons dashicons-format-chat"></span>
-						<?php esc_html_e( 'Add Slack Channel', 'activity-monitor' ); ?>
-					</button>
-				</div>
-			<?php else : ?>
-				<div class="am-table-scroll">
-					<table class="wp-list-table widefat striped am-log-table">
-						<thead>
-							<tr>
-								<th><?php esc_html_e( 'Type', 'activity-monitor' ); ?></th>
-								<th><?php esc_html_e( 'Name', 'activity-monitor' ); ?></th>
-								<th><?php esc_html_e( 'Minimum Level', 'activity-monitor' ); ?></th>
-								<th><?php esc_html_e( 'Target', 'activity-monitor' ); ?></th>
-								<th><?php esc_html_e( 'Actions', 'activity-monitor' ); ?></th>
-							</tr>
-						</thead>
-						<tbody id="am-channels-table-body">
-							<?php foreach ( $channels as $i => $ch ) : ?>
-								<?php $this->render_channel_table_row( $i, $ch ); ?>
-							<?php endforeach; ?>
-						</tbody>
-					</table>
-				</div>
-				<div class="am-channel-add-buttons">
-					<button type="button" class="button button-secondary am-add-channel-btn" data-type="email">
-						<span class="dashicons dashicons-email-alt"></span>
-						<?php esc_html_e( 'Add Email Channel', 'activity-monitor' ); ?>
-					</button>
-					<button type="button" class="button button-secondary am-add-channel-btn" data-type="slack">
-						<span class="dashicons dashicons-format-chat"></span>
-						<?php esc_html_e( 'Add Slack Channel', 'activity-monitor' ); ?>
-					</button>
-				</div>
-			<?php endif; ?>
-		</div>
-
-		<hr class="am-section-divider">
-
-		<?php $this->render_digest_section(); ?>
-
-		<hr class="am-section-divider am-group-divider">
-
-		<h2 class="am-settings-group-title"><?php esc_html_e( 'Activity Log', 'activity-monitor' ); ?></h2>
+		<form method="post" action="<?php echo esc_url( admin_url( 'options.php' ) ); ?>">
+			<?php
+			settings_fields( self::SETTINGS_GROUP );
+			do_settings_sections( self::PAGE_SETTINGS );
+			submit_button();
+			?>
+		</form>
 
 		<?php
-		// Noise control: one checkbox per registered logger. The option
-		// stores the *disabled* slugs rather than the enabled ones, so a
-		// logger added in a future version is on by default without needing
-		// a migration to opt every existing site into it -- matching how
-		// AM_Logger_Base::is_enabled() reads it.
+		$this->render_channels_section();
+		$this->render_digest_section();
+		$this->render_clear_log_section();
+	}
+
+	// ── Settings fields ──────────────────────────────────────────────────
+
+	public function section_intro_logging() {
+		echo '<p>' . esc_html__( 'What gets recorded, and how long it is kept.', 'activity-monitor' ) . '</p>';
+	}
+
+	public function section_intro_privacy() {
+		echo '<p>' . esc_html__( 'The activity log necessarily records who did what. These control how much of that is about the person rather than the action.', 'activity-monitor' ) . '</p>';
+	}
+
+	public function field_event_sources() {
 		$all_loggers      = AM_Logger_Manager::all();
 		$disabled_loggers = (array) get_option( 'am_disabled_loggers', array() );
-		if ( ! empty( $all_loggers ) ) :
+
+		if ( empty( $all_loggers ) ) {
+			echo '<p class="description">' . esc_html__( 'No event sources are registered.', 'activity-monitor' ) . '</p>';
+			return;
+		}
 		?>
-		<div class="am-settings-section">
-			<h2 class="am-section-title">
-				<span class="dashicons dashicons-filter"></span>
-				<?php esc_html_e( 'Event Sources', 'activity-monitor' ); ?>
-			</h2>
-			<p class="am-description">
-				<?php esc_html_e( 'Which categories of event get recorded. Turning one off stops it logging from that point on — entries already in the log are kept, and stay visible and exportable.', 'activity-monitor' ); ?>
+		<fieldset>
+			<legend class="screen-reader-text"><span><?php esc_html_e( 'Event sources', 'activity-monitor' ); ?></span></legend>
+
+			<?php // See sanitize_disabled_loggers() for why an all-unchecked form needs this marker. ?>
+			<input type="hidden" name="am_disabled_loggers[submitted]" value="1">
+
+			<div class="am-logger-grid">
+				<?php foreach ( $all_loggers as $logger_slug => $logger ) : ?>
+					<label>
+						<input type="checkbox" name="am_disabled_loggers[enabled][]"
+						       value="<?php echo esc_attr( $logger_slug ); ?>"
+						       <?php checked( ! in_array( $logger_slug, $disabled_loggers, true ) ); ?>>
+						<?php echo esc_html( $logger->label() ); ?>
+					</label>
+				<?php endforeach; ?>
+			</div>
+
+			<p class="description">
+				<?php esc_html_e( 'Unticking a source stops it being recorded from that point on. Entries already in the log are kept, and stay visible and exportable.', 'activity-monitor' ); ?>
 			</p>
-
-			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-				<?php wp_nonce_field( 'am_save_logger_settings' ); ?>
-				<input type="hidden" name="action" value="am_save_logger_settings">
-
-				<div class="am-logger-grid">
-					<?php foreach ( $all_loggers as $logger_slug => $logger ) : ?>
-						<label class="am-logger-toggle">
-							<input type="checkbox" name="am_enabled_loggers[]"
-							       value="<?php echo esc_attr( $logger_slug ); ?>"
-							       <?php checked( ! in_array( $logger_slug, $disabled_loggers, true ) ); ?>>
-							<?php echo esc_html( $logger->label() ); ?>
-						</label>
-					<?php endforeach; ?>
-				</div>
-
-				<?php submit_button( __( 'Save Event Sources', 'activity-monitor' ), 'secondary' ); ?>
-			</form>
-		</div>
-		<?php endif; ?>
-
-		<div class="am-settings-section am-danger-zone">
-			<h2 class="am-section-title am-danger-title">
-				<span class="dashicons dashicons-trash"></span>
-				<?php esc_html_e( 'Clear Log', 'activity-monitor' ); ?>
-			</h2>
-			<p class="am-description">
-				<?php esc_html_e( 'Permanently delete all entries from the activity log. This action cannot be undone.', 'activity-monitor' ); ?>
-			</p>
-			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>"
-			      onsubmit="return confirm('<?php esc_attr_e( 'Clear all log entries? This cannot be undone.', 'activity-monitor' ); ?>')">
-				<?php wp_nonce_field( 'am_clear_log' ); ?>
-				<input type="hidden" name="action" value="am_clear_log">
-				<button type="submit" class="button am-btn-danger">
-					<span class="dashicons dashicons-trash"></span>
-					<?php esc_html_e( 'Clear Entire Log', 'activity-monitor' ); ?>
-				</button>
-			</form>
-		</div>
-
-		<hr class="am-section-divider am-group-divider">
-
-		<h2 class="am-settings-group-title"><?php esc_html_e( 'Display', 'activity-monitor' ); ?></h2>
-
-		<div class="am-settings-section">
-			<h2 class="am-section-title">
-				<span class="dashicons dashicons-clock"></span>
-				<?php esc_html_e( 'Date &amp; Time Display', 'activity-monitor' ); ?>
-			</h2>
-			<p class="am-description">
-				<?php esc_html_e( 'How timestamps are shown throughout the plugin — the activity log, the detail popups, and the times reported on this screen. CSV and JSON exports are excluded: those keep raw UTC values so they stay machine-readable.', 'activity-monitor' ); ?>
-			</p>
-
-			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-				<?php wp_nonce_field( 'am_save_display_settings' ); ?>
-				<input type="hidden" name="action" value="am_save_display_settings">
-
-				<table class="form-table">
-					<tr>
-						<th scope="row">
-							<label for="<?php echo esc_attr( AM_Date_Format::OPTION ); ?>"><?php esc_html_e( 'Format', 'activity-monitor' ); ?></label>
-						</th>
-						<td>
-							<select id="<?php echo esc_attr( AM_Date_Format::OPTION ); ?>" name="<?php echo esc_attr( AM_Date_Format::OPTION ); ?>">
-								<?php foreach ( AM_Date_Format::choices() as $format_key => $format_label ) : ?>
-									<option value="<?php echo esc_attr( $format_key ); ?>" <?php selected( $format_key, AM_Date_Format::current_key() ); ?>>
-										<?php echo esc_html( $format_label ); ?>
-									</option>
-								<?php endforeach; ?>
-							</select>
-							<p class="description">
-								<?php esc_html_e( 'Each option shows how it renders right now. "Site default" follows Settings → General, so it stays in step if those change.', 'activity-monitor' ); ?>
-							</p>
-						</td>
-					</tr>
-				</table>
-
-				<?php submit_button( __( 'Save Display Settings', 'activity-monitor' ) ); ?>
-			</form>
-		</div>
-
+		</fieldset>
 		<?php
 	}
 
-	// ── Digest settings (spec §4) ──────────────────────────────────────────
+	public function field_retention() {
+		$current = (int) get_option( 'am_retention_days', 90 );
+		?>
+		<select id="am_retention_days" name="am_retention_days">
+			<?php foreach ( self::retention_choices() as $days => $label ) : ?>
+				<option value="<?php echo esc_attr( $days ); ?>" <?php selected( $days, $current ); ?>>
+					<?php echo esc_html( $label ); ?>
+				</option>
+			<?php endforeach; ?>
+		</select>
+		<p class="description"><?php echo esc_html( self::retention_status_text() ); ?></p>
+		<?php
+	}
+
+	/**
+	 * The sentence under the retention control: how much is in the log,
+	 * how far back it reaches, and when the next cleanup runs.
+	 *
+	 * A retention period is an abstract number on its own -- what makes it
+	 * decidable is knowing that shortening it would take real entries with
+	 * it. Kept as one plain sentence rather than a stat block; this is a
+	 * field description, not a dashboard.
+	 */
+	private static function retention_status_text(): string {
+		$total  = AM_Event_Query::total_count();
+		$oldest = AM_Event_Query::oldest_date();
+
+		if ( 0 === $total ) {
+			return __( 'The log is empty. Older entries are deleted automatically once a day.', 'activity-monitor' );
+		}
+
+		if ( '' !== $oldest ) {
+			$text = sprintf(
+				/* translators: 1: number of entries, 2: date of the oldest entry */
+				__( '%1$s in the log, reaching back to %2$s.', 'activity-monitor' ),
+				sprintf(
+					/* translators: %s: formatted number of entries */
+					_n( '%s entry', '%s entries', $total, 'activity-monitor' ),
+					number_format_i18n( $total )
+				),
+				wp_date( AM_Date_Format::combined(), strtotime( $oldest . ' UTC' ) )
+			);
+		} else {
+			$text = sprintf(
+				/* translators: %s: formatted number of entries */
+				_n( '%s entry in the log.', '%s entries in the log.', $total, 'activity-monitor' ),
+				number_format_i18n( $total )
+			);
+		}
+
+		$next_prune = wp_next_scheduled( 'am_log_prune' );
+		if ( $next_prune ) {
+			$text .= ' ' . sprintf(
+				/* translators: %s: next scheduled cleanup date/time */
+				__( 'Next cleanup: %s.', 'activity-monitor' ),
+				wp_date( AM_Date_Format::combined(), $next_prune )
+			);
+		}
+
+		return $text;
+	}
+
+	public function field_grouping() {
+		$current = (int) get_option( 'am_occasion_window_seconds', AM_Event_Writer::DEFAULT_OCCASION_WINDOW_SECONDS );
+		?>
+		<select id="am_occasion_window_seconds" name="am_occasion_window_seconds">
+			<?php foreach ( self::grouping_choices() as $seconds => $label ) : ?>
+				<option value="<?php echo esc_attr( $seconds ); ?>" <?php selected( $seconds, $current ); ?>>
+					<?php echo esc_html( $label ); ?>
+				</option>
+			<?php endforeach; ?>
+		</select>
+		<p class="description">
+			<?php esc_html_e( 'The same action, repeated on the same thing by the same person within this window, becomes one entry with a count beside it instead of many. It stops a burst of near-identical activity burying everything else.', 'activity-monitor' ); ?>
+		</p>
+		<?php
+	}
+
+	public function field_datetime_format() {
+		?>
+		<select id="<?php echo esc_attr( AM_Date_Format::OPTION ); ?>" name="<?php echo esc_attr( AM_Date_Format::OPTION ); ?>">
+			<?php foreach ( AM_Date_Format::choices() as $format_key => $format_label ) : ?>
+				<option value="<?php echo esc_attr( $format_key ); ?>" <?php selected( $format_key, AM_Date_Format::current_key() ); ?>>
+					<?php echo esc_html( $format_label ); ?>
+				</option>
+			<?php endforeach; ?>
+		</select>
+		<p class="description">
+			<?php esc_html_e( 'Each option shows how it renders right now. “Site default” follows Settings → General, so it stays in step if those change. CSV and JSON exports are excluded either way — those keep raw UTC values so they stay machine-readable.', 'activity-monitor' ); ?>
+		</p>
+		<?php
+	}
+
+	public function field_ip_storage() {
+		$current = (string) get_option( 'am_ip_storage', 'full' );
+		$modes   = array(
+			'full'       => array(
+				__( 'Store the full address', 'activity-monitor' ),
+				__( 'What an audit trail normally wants: the address is exact, so repeat activity from one machine is identifiable.', 'activity-monitor' ),
+			),
+			'anonymized' => array(
+				__( 'Store an anonymised address', 'activity-monitor' ),
+				__( 'Masks the last part of the address using WordPress’s own anonymisation, so entries can still be grouped by network without identifying a device.', 'activity-monitor' ),
+			),
+			'none'       => array(
+				__( 'Don’t store IP addresses', 'activity-monitor' ),
+				__( 'The column stays empty. Everything else about each entry is recorded as usual.', 'activity-monitor' ),
+			),
+		);
+		?>
+		<fieldset>
+			<legend class="screen-reader-text"><span><?php esc_html_e( 'IP addresses', 'activity-monitor' ); ?></span></legend>
+			<?php foreach ( $modes as $mode => $copy ) : ?>
+				<label>
+					<input type="radio" name="am_ip_storage" value="<?php echo esc_attr( $mode ); ?>" <?php checked( $mode, $current ); ?>>
+					<?php echo esc_html( $copy[0] ); ?>
+				</label>
+				<p class="description am-radio-description"><?php echo esc_html( $copy[1] ); ?></p>
+			<?php endforeach; ?>
+			<p class="description">
+				<?php esc_html_e( 'Applies to entries recorded from now on — this changes what reaches the database, so entries already in the log are unaffected.', 'activity-monitor' ); ?>
+			</p>
+		</fieldset>
+		<?php
+	}
+
+	public function field_ip_lookup() {
+		?>
+		<fieldset>
+			<legend class="screen-reader-text"><span><?php esc_html_e( 'IP address lookups', 'activity-monitor' ); ?></span></legend>
+			<label>
+				<input type="checkbox" name="am_ip_lookup_enabled" value="1" <?php checked( self::ip_lookup_enabled() ); ?>>
+				<?php esc_html_e( 'Allow IP addresses in the log to be looked up', 'activity-monitor' ); ?>
+			</label>
+			<p class="description">
+				<?php
+				printf(
+					/* translators: %s: link to ipinfo.io */
+					esc_html__( 'Clicking an address in the log opens its approximate location and network operator. Doing that sends the one address you clicked to %s, and nothing else about your site. Turn this off to keep the plugin entirely self-contained — addresses then show as plain text.', 'activity-monitor' ),
+					'<a href="' . esc_url( 'https://ipinfo.io' ) . '" target="_blank" rel="noopener noreferrer">ipinfo.io</a>'
+				);
+				?>
+			</p>
+		</fieldset>
+		<?php
+	}
+
+	public function field_delete_on_uninstall() {
+		?>
+		<fieldset>
+			<legend class="screen-reader-text"><span><?php esc_html_e( 'Stored data', 'activity-monitor' ); ?></span></legend>
+			<label>
+				<input type="checkbox" name="am_delete_data_on_uninstall" value="1" <?php checked( (bool) get_option( 'am_delete_data_on_uninstall', 1 ) ); ?>>
+				<?php esc_html_e( 'Delete the activity log and all settings when the plugin is deleted', 'activity-monitor' ); ?>
+			</label>
+			<p class="description">
+				<?php esc_html_e( 'Deactivating never deletes anything. Deleting the plugin from the Plugins screen does — untick this to leave the log and its settings in the database instead, so reinstalling picks up where it left off.', 'activity-monitor' ); ?>
+			</p>
+		</fieldset>
+		<?php
+	}
+
+	// ── Notification channels ────────────────────────────────────────────
+
+	private function render_channels_section() {
+		$channels = get_option( 'am_notification_channels', array() );
+		?>
+		<h2><?php esc_html_e( 'Notification Channels', 'activity-monitor' ); ?></h2>
+		<p>
+			<?php esc_html_e( 'Instant alerts. Each channel fires when an event meets or exceeds its minimum level. Channels save as you add or edit them — the Save Changes button above does not apply to them.', 'activity-monitor' ); ?>
+		</p>
+
+		<?php if ( empty( $channels ) ) : ?>
+			<p class="description"><?php esc_html_e( 'No channels configured yet.', 'activity-monitor' ); ?></p>
+		<?php else : ?>
+			<div class="am-table-scroll">
+				<table class="wp-list-table widefat striped am-log-table">
+					<thead>
+						<tr>
+							<th scope="col"><?php esc_html_e( 'Type', 'activity-monitor' ); ?></th>
+							<th scope="col"><?php esc_html_e( 'Name', 'activity-monitor' ); ?></th>
+							<th scope="col"><?php esc_html_e( 'Minimum Level', 'activity-monitor' ); ?></th>
+							<th scope="col"><?php esc_html_e( 'Target', 'activity-monitor' ); ?></th>
+							<th scope="col"><?php esc_html_e( 'Actions', 'activity-monitor' ); ?></th>
+						</tr>
+					</thead>
+					<tbody id="am-channels-table-body">
+						<?php foreach ( $channels as $i => $ch ) : ?>
+							<?php $this->render_channel_table_row( $i, $ch ); ?>
+						<?php endforeach; ?>
+					</tbody>
+				</table>
+			</div>
+		<?php endif; ?>
+
+		<p>
+			<button type="button" class="button am-add-channel-btn" data-type="email">
+				<?php esc_html_e( 'Add Email Channel', 'activity-monitor' ); ?>
+			</button>
+			<button type="button" class="button am-add-channel-btn" data-type="slack">
+				<?php esc_html_e( 'Add Slack Channel', 'activity-monitor' ); ?>
+			</button>
+		</p>
+		<?php
+	}
+
+	// ── Email digests ────────────────────────────────────────────────────
 
 	private function render_digest_section() {
-		$configs = AM_Digest::get_configs();
+		$configs  = AM_Digest::get_configs();
 		$next_run = wp_next_scheduled( AM_Digest::CRON_HOOK );
 		?>
-		<div class="am-settings-section">
-			<h2 class="am-section-title">
-				<span class="dashicons dashicons-email"></span>
-				<?php esc_html_e( 'Email Digest', 'activity-monitor' ); ?>
-			</h2>
-			<p class="am-description">
-				<?php esc_html_e( 'A scheduled summary of activity: totals, top event types, and notable (warning-and-above) events, with a link to the full log. Add as many digests as you need -- e.g. a daily summary to one address and a separate weekly one to another. Changes save immediately.', 'activity-monitor' ); ?>
-			</p>
+		<h2><?php esc_html_e( 'Email Digests', 'activity-monitor' ); ?></h2>
+		<p>
+			<?php esc_html_e( 'A scheduled summary of activity: totals, top event types, and notable events, with a link to the full log. Add as many as you need — say, a daily summary to one address and a weekly one to another. These save as you add or edit them too.', 'activity-monitor' ); ?>
+		</p>
 
-			<?php if ( empty( $configs ) ) : ?>
-				<p class="am-description"><?php esc_html_e( 'No digests configured yet.', 'activity-monitor' ); ?></p>
-				<div class="am-channel-add-buttons">
-					<button type="button" class="button button-secondary am-add-digest-btn">
-						<span class="dashicons dashicons-plus-alt2"></span>
-						<?php esc_html_e( 'Add Digest', 'activity-monitor' ); ?>
-					</button>
-				</div>
-			<?php else : ?>
-				<div class="am-table-scroll">
-					<table class="wp-list-table widefat striped am-log-table">
-						<thead>
-							<tr>
-								<th><?php esc_html_e( 'Frequency', 'activity-monitor' ); ?></th>
-								<th><?php esc_html_e( 'Recipients', 'activity-monitor' ); ?></th>
-								<th><?php esc_html_e( 'Last Sent', 'activity-monitor' ); ?></th>
-								<th><?php esc_html_e( 'Actions', 'activity-monitor' ); ?></th>
-							</tr>
-						</thead>
-						<tbody id="am-digest-table-body">
-							<?php foreach ( $configs as $config ) : ?>
-								<?php $this->render_digest_table_row( $config ); ?>
-							<?php endforeach; ?>
-						</tbody>
-					</table>
-				</div>
-				<p class="am-description">
-					<?php if ( $next_run ) : ?>
-						<?php
-						printf(
-							/* translators: %s: next scheduled check date/time */
-							esc_html__( 'Next check: %s (each digest above sends independently once its own frequency is due).', 'activity-monitor' ),
-							esc_html( wp_date( AM_Date_Format::combined(), $next_run ) )
-						);
-						?>
-					<?php endif; ?>
+		<?php if ( empty( $configs ) ) : ?>
+			<p class="description"><?php esc_html_e( 'No digests configured yet.', 'activity-monitor' ); ?></p>
+		<?php else : ?>
+			<div class="am-table-scroll">
+				<table class="wp-list-table widefat striped am-log-table">
+					<thead>
+						<tr>
+							<th scope="col"><?php esc_html_e( 'Frequency', 'activity-monitor' ); ?></th>
+							<th scope="col"><?php esc_html_e( 'Recipients', 'activity-monitor' ); ?></th>
+							<th scope="col"><?php esc_html_e( 'Last Sent', 'activity-monitor' ); ?></th>
+							<th scope="col"><?php esc_html_e( 'Actions', 'activity-monitor' ); ?></th>
+						</tr>
+					</thead>
+					<tbody id="am-digest-table-body">
+						<?php foreach ( $configs as $config ) : ?>
+							<?php $this->render_digest_table_row( $config ); ?>
+						<?php endforeach; ?>
+					</tbody>
+				</table>
+			</div>
+			<?php if ( $next_run ) : ?>
+				<p class="description">
+					<?php
+					printf(
+						/* translators: %s: next scheduled check date/time */
+						esc_html__( 'Next check: %s. Each digest sends independently, once its own frequency is due.', 'activity-monitor' ),
+						esc_html( wp_date( AM_Date_Format::combined(), $next_run ) )
+					);
+					?>
 				</p>
-				<div class="am-channel-add-buttons">
-					<button type="button" class="button button-secondary am-add-digest-btn">
-						<span class="dashicons dashicons-plus-alt2"></span>
-						<?php esc_html_e( 'Add Digest', 'activity-monitor' ); ?>
-					</button>
-				</div>
 			<?php endif; ?>
+		<?php endif; ?>
 
-			<hr class="am-section-divider">
+		<p>
+			<button type="button" class="button am-add-digest-btn">
+				<?php esc_html_e( 'Add Digest', 'activity-monitor' ); ?>
+			</button>
+		</p>
 
-			<h3 style="font-size: 13px; margin: 0 0 10px;"><?php esc_html_e( 'Preview & Test', 'activity-monitor' ); ?></h3>
-			<p class="am-description">
-				<?php esc_html_e( 'Not tied to any saved digest above -- pick a frequency to preview or test its content independently.', 'activity-monitor' ); ?>
-			</p>
-			<div class="am-channel-add-buttons">
-				<select id="am-digest-preview-frequency">
-					<option value="daily"><?php esc_html_e( 'Daily', 'activity-monitor' ); ?></option>
-					<option value="weekly" selected><?php esc_html_e( 'Weekly', 'activity-monitor' ); ?></option>
-					<option value="monthly"><?php esc_html_e( 'Monthly', 'activity-monitor' ); ?></option>
-				</select>
-				<button type="button" class="button button-secondary" id="am-digest-preview">
-					<span class="dashicons dashicons-visibility"></span>
-					<?php esc_html_e( 'Preview', 'activity-monitor' ); ?>
-				</button>
-				<input type="email" id="am-digest-test-email" placeholder="<?php esc_attr_e( 'test@example.com', 'activity-monitor' ); ?>" class="regular-text">
-				<button type="button" class="button button-secondary" id="am-digest-send-test">
-					<span class="dashicons dashicons-email-alt"></span>
-					<?php esc_html_e( 'Send Test Email', 'activity-monitor' ); ?>
-				</button>
-			</div>
-			<div id="am-digest-preview-frame-wrap" style="display:none; margin-top: 14px; border: 1px solid #c3c4c7; border-radius: 6px; overflow: hidden;">
-				<iframe id="am-digest-preview-frame" style="width: 100%; height: 500px; border: 0;"></iframe>
-			</div>
-			<p id="am-digest-test-result" class="am-description"></p>
+		<h3><?php esc_html_e( 'Preview and test', 'activity-monitor' ); ?></h3>
+		<p>
+			<?php esc_html_e( 'Independent of the digests above — pick a frequency to see or send what that digest would contain.', 'activity-monitor' ); ?>
+		</p>
+		<p>
+			<label for="am-digest-preview-frequency"><?php esc_html_e( 'Frequency', 'activity-monitor' ); ?></label>
+			<select id="am-digest-preview-frequency">
+				<option value="daily"><?php esc_html_e( 'Daily', 'activity-monitor' ); ?></option>
+				<option value="weekly" selected><?php esc_html_e( 'Weekly', 'activity-monitor' ); ?></option>
+				<option value="monthly"><?php esc_html_e( 'Monthly', 'activity-monitor' ); ?></option>
+			</select>
+			<button type="button" class="button" id="am-digest-preview"><?php esc_html_e( 'Preview', 'activity-monitor' ); ?></button>
+		</p>
+		<p>
+			<label for="am-digest-test-email"><?php esc_html_e( 'Send a test to', 'activity-monitor' ); ?></label>
+			<input type="email" id="am-digest-test-email" placeholder="<?php esc_attr_e( 'test@example.com', 'activity-monitor' ); ?>" class="regular-text">
+			<button type="button" class="button" id="am-digest-send-test"><?php esc_html_e( 'Send Test Email', 'activity-monitor' ); ?></button>
+		</p>
+		<p id="am-digest-test-result" class="description"></p>
+		<div id="am-digest-preview-frame-wrap" class="am-digest-preview">
+			<iframe id="am-digest-preview-frame" title="<?php esc_attr_e( 'Digest preview', 'activity-monitor' ); ?>"></iframe>
 		</div>
+		<?php
+	}
 
+	// ── Clear log ────────────────────────────────────────────────────────
+
+	private function render_clear_log_section() {
+		?>
+		<h2><?php esc_html_e( 'Clear Log', 'activity-monitor' ); ?></h2>
+		<p>
+			<?php esc_html_e( 'Permanently delete every entry in the activity log. This cannot be undone, and it is separate from the retention setting above, which only removes entries once they age out.', 'activity-monitor' ); ?>
+		</p>
+		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>"
+		      onsubmit="return confirm('<?php echo esc_js( __( 'Clear all log entries? This cannot be undone.', 'activity-monitor' ) ); ?>')">
+			<?php wp_nonce_field( 'am_clear_log' ); ?>
+			<input type="hidden" name="action" value="am_clear_log">
+			<?php submit_button( __( 'Clear Entire Log', 'activity-monitor' ), 'am-btn-danger', 'submit', true ); ?>
+		</form>
 		<?php
 	}
 
@@ -1692,7 +2034,7 @@ class AM_Admin {
 				</div>
 			</div>
 
-			<p id="am-digest-modal-error" class="am-description" style="color:#d63638; display:none;"></p>
+			<p id="am-digest-modal-error" class="am-modal-error" style="display:none;"></p>
 
 			<div class="am-modal-actions">
 				<?php if ( ! empty( $config['id'] ) ) : ?>
@@ -1822,7 +2164,7 @@ class AM_Admin {
 				<?php endif; ?>
 			</div>
 
-			<p id="am-channel-modal-error" class="am-description" style="color:#d63638; display:none;"></p>
+			<p id="am-channel-modal-error" class="am-modal-error" style="display:none;"></p>
 
 			<div class="am-modal-actions">
 				<?php if ( null !== $index ) : ?>

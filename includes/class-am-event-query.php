@@ -157,6 +157,20 @@ class AM_Event_Query {
 		return (int) $wpdb->get_var( "SELECT COUNT(*) FROM `{$table}`" );
 	}
 
+	/**
+	 * Date of the oldest surviving entry, as a UTC 'Y-m-d H:i:s' string, or
+	 * '' when the log is empty. Read by the retention setting, which is
+	 * otherwise an abstract number of days -- pairing it with how far back
+	 * the log actually reaches is what tells an admin whether shortening
+	 * retention would delete anything they still have.
+	 */
+	public static function oldest_date(): string {
+		global $wpdb;
+		$table = $wpdb->prefix . AM_Schema::EVENTS_TABLE;
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant.
+		return (string) $wpdb->get_var( "SELECT MIN(date) FROM `{$table}`" );
+	}
+
 	// ── Period-summary queries (email digest) ──────────────────────────────
 	//
 	// These take $days (7/14/30 typical) and query only am_events -- none

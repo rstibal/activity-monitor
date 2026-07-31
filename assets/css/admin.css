@@ -38,12 +38,6 @@
 	vertical-align: super;
 }
 
-.am-description {
-	color: #50575e;
-	margin-bottom: 20px;
-	font-size: 14px;
-}
-
 /* Label ahead of the export buttons in the bottom tablenav, aligned to
    core's own .tablenav .actions line-height so it sits on the same
    baseline as the buttons beside it. */
@@ -85,16 +79,16 @@
 
 /* Event-source toggles. Auto-fitting columns rather than a fixed count
    so the list reflows sensibly as loggers are added, and stays readable
-   on a narrow screen where a fixed grid would squash the labels. */
+   on a narrow screen where a fixed grid would squash the labels. The
+   labels themselves are core's -- a checkbox inside a <label> in a
+   form-table cell is already styled by wp-admin, so only the grid that
+   arranges them belongs here. */
 .am-logger-grid {
 	display: grid;
 	grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-	gap: 8px 20px;
+	gap: 4px 20px;
+	max-width: 900px;
 	margin-bottom: 4px;
-}
-.am-logger-toggle {
-	display: flex; align-items: center; gap: 8px;
-	font-size: 13px; color: #1d2327;
 }
 
 /* Core sets .tablenav { height: 30px }, sized for the single short row
@@ -282,44 +276,59 @@
 .am-diff-before { color: #b32d2e; text-decoration: line-through; }
 .am-diff-after { color: #2271b1; }
 
-/* Settings sections use core's .postbox framing -- white on the gray
-   page, 1px #c3c4c7, no radius or shadow. That's what gives each
-   section its contrast now that the screen itself is no longer boxed.
-   Note there is deliberately no styling below for inputs, checkboxes,
-   buttons, or .form-table: those were all restyled here once (rounded
-   blue-ringed fields, custom blue save buttons) and it was the single
-   biggest reason Settings didn't look like wp-admin. Core styles them. */
-.am-settings-section {
-	background: #fff;
+/* Settings screen. There is deliberately almost nothing here.
+   Everything on that screen is now core furniture -- <h2> headings,
+   .form-table rows built by the Settings API, .description paragraphs,
+   .wp-list-table for the channel/digest lists, submit_button() -- and
+   core styles all of it. Until 2.4.3 this block reimplemented .postbox
+   as .am-settings-section, added a small-caps group heading, a section
+   divider rule and a red-bordered "danger zone", none of which core
+   needed help with; the screen read as a separate product embedded in
+   wp-admin, exactly what 2.3.0 removed from the log screen. Don't
+   reintroduce it.
+
+   In particular: no styling below for inputs, checkboxes, buttons or
+   .form-table. Those were all restyled here once (rounded blue-ringed
+   fields, custom blue save buttons) and it was the single biggest reason
+   Settings didn't look like wp-admin. */
+
+/* The per-option explanation under each radio in Privacy > IP addresses.
+   Core's .description sits under a whole field, not under one choice
+   within it, so it has no indent of its own -- without this the text
+   lines up with the radio instead of the label it belongs to. */
+.am-radio-description {
+	margin: 0 0 10px 24px;
+}
+
+/* Digest preview. Hidden until the Preview button loads a document into
+   it (jQuery .show() sets the inline display that overrides this), then
+   framed like a document rather than left as a bare iframe. */
+.am-digest-preview {
+	display: none;
+	margin-top: 14px;
 	border: 1px solid #c3c4c7;
-	padding: 4px 20px 16px;
-	margin-bottom: 20px;
+	max-width: 900px;
+}
+.am-digest-preview iframe {
+	display: block;
+	width: 100%;
+	height: 500px;
+	border: 0;
 }
 
-.am-section-title { display: flex; align-items: center; gap: 8px; font-size: 14px; }
-.am-section-title .dashicons { color: #646970; }
-.am-settings-section > .am-description { margin-top: 0; margin-bottom: 12px; }
-
-.am-section-divider { border: none; border-top: 1px solid #dcdcde; margin: 24px 0; }
-
-/* Group heading above a run of related sections. Core's closest
-   equivalent is the small-caps label above a settings block. */
-.am-settings-group-title {
-	font-size: 13px;
-	color: #646970;
-	margin: 0 0 12px !important;
+/* Validation message inside the channel/digest modals. Core has no
+   inline form-error style to borrow, and this is the same red it uses
+   for destructive/error text elsewhere in wp-admin. */
+.am-modal-error {
+	color: #d63638;
+	margin: 12px 0 0;
 }
-.am-danger-zone {
-	border-left: 4px solid #d63638;
-}
-.am-danger-zone .am-danger-title .dashicons { color: #d63638; }
 
 .am-channel-fields { padding: 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .am-field-row { display: flex; flex-direction: column; }
 .am-field-full { grid-column: 1 / -1; }
 .am-field-row label { font-size: 12px; font-weight: 600; color: #1d2327; display: flex; flex-direction: column; gap: 4px; }
 .am-field-row .description { font-size: 11px !important; color: #646970; margin: 2px 0 0 !important; }
-.am-channel-add-buttons { display: flex; gap: 10px; margin: 14px 0; }
 
 /* Pagination. paginate_links() emits .page-numbers, which core's list
    tables don't use (they build their own prev/next markup), so core

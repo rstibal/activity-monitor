@@ -10,6 +10,16 @@ if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 	exit;
 }
 
+// Settings > When the plugin is deleted. On by default, so a site that has
+// never opened the Settings screen behaves exactly as every version before
+// 2.4.3 did. Unticked, this file does nothing at all: the tables, the
+// options (including this one, so the choice survives), and the cron
+// events are all left in place, and reinstalling picks the log back up
+// where it left off.
+if ( ! get_option( 'am_delete_data_on_uninstall', 1 ) ) {
+	return;
+}
+
 global $wpdb;
 
 // v2.0: drop am_events / am_event_context, plus the legacy am_activity_log
@@ -43,6 +53,12 @@ foreach ( array( 'am_traffic_log', 'am_traffic_daily' ) as $am_traffic_table ) {
 delete_option( 'am_notification_channels' );
 delete_option( 'am_retention_days' );
 delete_option( 'am_disabled_loggers' );
+delete_option( 'am_occasion_window_seconds' );
+delete_option( 'am_datetime_format' );
+delete_option( 'am_ip_storage' );
+delete_option( 'am_ip_lookup_enabled' );
+delete_option( 'am_delete_data_on_uninstall' );
+delete_option( 'am_maintenance_mode_last_state' );
 // Session management was removed in 2.4.0; these are its two leftover
 // settings. Note what is deliberately NOT here: the session_tokens user
 // meta. That is WordPress's own storage, which this plugin only ever read
