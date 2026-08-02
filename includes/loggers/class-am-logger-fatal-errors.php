@@ -79,7 +79,7 @@ class AM_Logger_Fatal_Errors extends AM_Logger_Base {
 					'group'       => false,
 				)
 			);
-		} catch ( \Throwable $e ) { // phpcs:ignore Generic.Files.LineLength -- defensive catch-all, see class doc.
+		} catch ( \Throwable $e ) { // phpcs:ignore Generic.CodeAnalysis.EmptyStatement.DetectedCatch -- intentionally silent; a failure here must not compound the fatal error being logged. See class doc.
 			// Intentionally silent -- see class doc.
 		}
 	}

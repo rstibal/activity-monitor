@@ -15,16 +15,10 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  *     publishing turns out to be unwanted in practice, it's a filter
  *     setting now, not a code change.
  *   - Field-level diffs go into event context as structured before/after
- *     pairs (not just a "fields_changed" list) — this is the addition
- *     called out in the spec (§9 build order item 2 references Simple
- *     History's diff feature as the model).
+ *     pairs (not just a "fields_changed" list), modelled on Simple
+ *     History's diff feature.
  *
- * This class is the template for the remaining v1.x AM_Hooks callbacks
- * (users, media, comments, plugins, themes, widgets, menus, taxonomy,
- * options, core updates) — each becomes its own AM_Logger_* subclass
- * following this same shape.
- *
- * See activity-monitor-v2-spec.md §2, §6.
+ * This class is the template the other AM_Logger_* subclasses follow.
  */
 class AM_Logger_Posts extends AM_Logger_Base {
 

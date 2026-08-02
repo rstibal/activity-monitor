@@ -5,15 +5,12 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  * AM_Notifications — alerts (email and Slack) for events meeting a
  * configured minimum level.
  *
- * BUGFIX: v1.x's AM_Notifications::maybe_notify() was only ever called
- * from the legacy AM_Logger::log() (see the old class-am-logger.php).
- * Every event source was ported onto AM_Event_Writer over several
- * builds (dev.1 through dev.12), and nothing was ever added to call
- * notifications from the new write path -- so notifications have been
- * silently non-functional for every ported event type since the first
- * logger (posts) was converted. This rewrite wires the call into
- * AM_Event_Writer::log() directly, on the new schema, so it actually
- * fires again.
+ * maybe_notify() is called from AM_Event_Writer::log(), which is the
+ * single write path. It used to be called from the legacy AM_Logger::log()
+ * instead; every event source was ported onto AM_Event_Writer without
+ * anything calling notifications from the new path, which left them
+ * silently non-functional for every ported event type. Keep the call
+ * where the rows are actually written.
  *
  * Slack support: previously removed at Rob's request (email-only for
  * a while); re-added per a later request for a delivery-confirmed
@@ -87,10 +84,9 @@ class AM_Notifications {
 		/* translators: 1: site name, 2: log level label, 3: event type, 4: event action */
 		$subject = sprintf( __( '[%1$s] Activity Monitor Alert – %2$s: %3$s.%4$s', 'activity-monitor' ), $site, $label, $event_type, $action );
 
-		// FIX #7 (carried forward from v1.x): strip tags from all
-		// user-derived values before interpolating into the plain-text
-		// email body. Prevents crafted log messages or usernames from
-		// injecting header-like content or misleading text.
+		// Strip tags from every user-derived value before interpolating it
+		// into the plain-text email body. Prevents a crafted log message or
+		// username from injecting header-like content or misleading text.
 		$safe_site    = wp_strip_all_tags( $site );
 		$safe_label   = wp_strip_all_tags( $label );
 		$safe_type    = wp_strip_all_tags( $event_type . '.' . $action );

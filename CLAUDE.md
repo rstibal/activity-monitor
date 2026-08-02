@@ -180,6 +180,17 @@ grouping off), still filterable on top. Loggers with no meaningful object id
 
 ## Decisions worth not re-litigating
 
+- **A logger sets its own level, and there is no per-event-type default
+  table.** `AM_Event_Writer::log()` defaults `level` to `AM_Log_Levels::INFO`
+  flat; anything that isn't routine passes `'level'` explicitly. There *was* an
+  `AM_Log_Levels::EVENT_TYPE_DEFAULTS` consulted here, keyed on `post.delete`,
+  `plugin.update` and the like — but `$event_type` is only ever the type half
+  (`post`, `plugin`), so not one key could match and the lookup always returned
+  INFO. It was deleted in 2.4.4 rather than re-keyed to bare types: several
+  loggers already pass a level that differs from what that table intended for
+  their type, so making it live would silently reclassify existing events, and
+  two places defining levels is just somewhere for them to disagree. If a
+  level looks wrong, fix it in the logger.
 - **`AM_Date_Format` presets store separate date and time halves**, not one
   combined string, and `combined()` joins them rather than the reverse. Both
   callers that needed a half on its own are gone (the two-line Date column in
@@ -255,12 +266,38 @@ needed. That ruleset runs `WordPress-Extra` (security/correctness) plus
 a modern binary will happily accept syntax that fatals on 7.4) in one pass,
 with formatting/doc-block sniffs excluded — this codebase doesn't conform to
 WPCS's structured doc-block or whitespace style, and that's a style choice,
-not a defect. If a genuinely new `phpcs.xml.dist` finding is a plugin-constant
-table name interpolated into SQL text (not a placeholder), that's accepted
-project-wide; suppress it inline with
-`// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant.`
-rather than touching the ruleset, matching every other occurrence in
-`includes/`.
+not a defect.
+
+**`phpcs` runs clean as of 2.4.4, and is meant to stay that way** — a run with
+findings in it can't tell you which are new. If a genuinely new finding is a
+plugin-constant table name interpolated into SQL text (not a placeholder),
+that's accepted project-wide; suppress it rather than touching the ruleset.
+
+Suppress it *on the line the sniff actually reports*, which for `$wpdb`
+queries is the SQL string, **not** the `$wpdb->prepare()` call above it. Six
+annotations sat one line off and were silently suppressing nothing until 2.4.4;
+`phpcs --report=json` gives you the exact line and `source` to match. Two forms,
+both in `includes/`:
+
+- Interpolation on the string's *first* line — a `phpcs:ignore` immediately
+  above the string, inside the `prepare()` call:
+  `// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant.`
+- Interpolation on a *later* line of a multi-line string (or spanning two
+  statements) — an inline ignore can't reach it, so wrap the statement in a
+  `// phpcs:disable <sniff> -- <reason>` / `// phpcs:enable <sniff>` pair. Always
+  name the sniff on both, never a bare `disable`, and always close it. Where the
+  statement is a `return`, prefer reflowing the SQL so the interpolated name
+  lands on line one and a single `phpcs:ignore` covers it, rather than leaving
+  an `enable` stranded after the return.
+
+Name the *right* sniff, too: an ignore citing a sniff that isn't firing reads as
+handled and isn't. `Generic.Files.LineLength` was cited for an empty `catch`
+(the sniff is `Generic.CodeAnalysis.EmptyStatement.DetectedCatch`) and survived
+that way for several versions.
+
+`phpcs.xml.dist`'s `minimum_supported_wp_version` feeds the deprecation sniffs
+and has to track `Requires at least:` — it was still 5.3 two versions after the
+floor moved to 6.0.
 
 Most sites run with `WP_DEBUG` off, which hides undefined-array-key warnings; a
 `display_name` key was once read but never built in a render loop, and went

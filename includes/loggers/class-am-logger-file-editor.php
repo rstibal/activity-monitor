@@ -70,10 +70,10 @@ class AM_Logger_File_Editor extends AM_Logger_Base {
 
 		$file = sanitize_text_field( wp_unslash( $_POST['file'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
 
-		if ( ! empty( $_POST['plugin'] ) ) {
+		if ( ! empty( $_POST['plugin'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Missing -- detection only, see class doc; not acted on.
 			$plugin = sanitize_text_field( wp_unslash( $_POST['plugin'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
 			$this->log_edit( 'plugin', $plugin, $file );
-		} elseif ( ! empty( $_POST['theme'] ) ) {
+		} elseif ( ! empty( $_POST['theme'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Missing -- detection only, see class doc; not acted on.
 			$theme = sanitize_text_field( wp_unslash( $_POST['theme'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
 			$this->log_edit( 'theme', $theme, $file );
 		}

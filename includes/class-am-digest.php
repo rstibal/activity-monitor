@@ -4,9 +4,8 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 /**
  * AM_Digest — scheduled email digest(s) summarizing recent activity.
  *
- * Per activity-monitor-v2-spec.md §4, extended to support MULTIPLE
- * independent digest configs (e.g. a daily digest to one address and a
- * separate weekly digest to another) -- originally a single
+ * Supports MULTIPLE independent digest configs (e.g. a daily digest to
+ * one address and a separate weekly digest to another) -- originally a single
  * frequency/day/recipients/last-sent set of scalar options, changed to
  * a list per a later request once it became clear a single config
  * couldn't represent "daily to ops@, weekly to owner@" at the same time.
@@ -130,7 +129,7 @@ class AM_Digest {
 	 * used both for the actual send and for the in-browser preview so
 	 * they show identical content.
 	 */
-	public static function period_days_for_frequency( string $frequency ): int {
+	private static function period_days_for_frequency( string $frequency ): int {
 		switch ( $frequency ) {
 			case 'weekly':
 				return 7;
@@ -306,7 +305,7 @@ class AM_Digest {
 		$by_type  = AM_Event_Query::get_breakdown_by_event_type( $days, 5 );
 		$notable  = AM_Event_Query::get_notable_events( $days, 10 );
 		$site     = esc_html( get_bloginfo( 'name' ) );
-		$log_url  = esc_url( admin_url( 'admin.php?page=activity-monitor' ) );
+		$log_url  = admin_url( 'admin.php?page=activity-monitor' );
 		$period   = self::period_label( $frequency );
 
 		$delta        = $totals['current'] - $totals['previous'];
@@ -367,7 +366,7 @@ class AM_Digest {
 			<?php endif; ?>
 
 			<p style="margin-top: 24px;">
-				<a href="<?php echo $log_url; ?>" style="color: #2271b1;"><?php esc_html_e( 'View full activity log', 'activity-monitor' ); ?> &rarr;</a>
+				<a href="<?php echo esc_url( $log_url ); ?>" style="color: #2271b1;"><?php esc_html_e( 'View full activity log', 'activity-monitor' ); ?> &rarr;</a>
 			</p>
 		</div>
 		<?php

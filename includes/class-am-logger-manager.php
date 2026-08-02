@@ -6,9 +6,10 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  * its hooks, but only if that logger is enabled (per-logger toggle,
  * settings key `am_disabled_loggers`).
  *
- * Add new loggers here as they're ported from v1.x AM_Hooks (see
- * activity-monitor-v2-spec.md §9, build order item 2). Each entry is a
- * fully-qualified AM_Logger_* class name implementing AM_Logger_Base.
+ * Add new loggers to REGISTERED_LOGGER_CLASSES below. Each entry is a
+ * class name extending AM_Logger_Base; registering one is the whole of
+ * what's needed, since the Settings screen's Event sources list is built
+ * from all() and a logger absent from am_disabled_loggers is on.
  */
 class AM_Logger_Manager {
 
@@ -33,12 +34,6 @@ class AM_Logger_Manager {
 		'AM_Logger_File_Editor',
 		'AM_Logger_Maintenance_Mode',
 		'AM_Logger_Mail_Failures',
-		// All 13 v1.x AM_Hooks event-source callbacks are ported. AM_Hooks,
-		// AM_DB, and legacy AM_Logger have all been fully retired (dev.12
-		// through dev.14) -- the "Activity Log" admin tab now reads
-		// exclusively from AM_Event_Query against this schema, and email
-		// notifications (AM_Notifications) are wired directly into
-		// AM_Event_Writer rather than the old AM_Logger::log() call path.
 	);
 
 	public static function init() {

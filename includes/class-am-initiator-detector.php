@@ -13,8 +13,6 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  * default; admins filter/hide by initiator instead (see noise-control
  * settings), which is strictly more useful — "show me only what WP-CLI
  * touched" becomes a one-click filter instead of unrecoverable data loss.
- *
- * See activity-monitor-v2-spec.md §3, §6.
  */
 class AM_Initiator_Detector {
 

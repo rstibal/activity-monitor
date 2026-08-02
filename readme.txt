@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, event log
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.4.3
+Stable tag: 2.4.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -68,6 +68,11 @@ Yes. Settings → Privacy offers full addresses, anonymised addresses (the last 
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
 
 == Changelog ==
+
+= 2.4.4 =
+* Housekeeping only — nothing about how the plugin behaves has changed. The code now passes the project's WordPress coding-standards check cleanly: a number of the annotations marking already-reviewed database queries had drifted onto the wrong line and were silently doing nothing, so the check had stopped being a useful signal.
+* Removed a table of per-event default severity levels that could never match anything it was looked up with, so it had silently done nothing since it was written. The levels you see in the log have always come from the individual event sources, and still do.
+* Removed two unused stylesheet rules, and corrected a batch of code comments that described how the plugin worked several versions ago.
 
 = 2.4.3 =
 * Changed: Activity Monitor now requires WordPress 6.0 or later, up from 5.3. WordPress 5.3 was released in 2019 and this plugin was no longer tested against it. If your site is on an older version, update WordPress first — this plugin's requirements are unchanged in every other respect, including PHP 7.4.

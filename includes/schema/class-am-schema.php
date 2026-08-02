@@ -14,12 +14,10 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  *                        event row itself stays lean and queryable.
  *
  * Migration from v1.x is additive and non-destructive: the old
- * `am_activity_log` table is left in place after migration until the
- * admin explicitly confirms removal (see AM_Schema::drop_legacy_table()),
- * which is only ever called from an explicit admin action, never
- * automatically.
- *
- * See activity-monitor-v2-spec.md §2.
+ * `am_activity_log` table is left in place after migration, and is only
+ * ever dropped when the plugin is deleted outright (uninstall.php ->
+ * uninstall() -> drop_legacy_table()). Nothing on the upgrade or
+ * activation path touches it.
  */
 class AM_Schema {
 
@@ -122,8 +120,8 @@ class AM_Schema {
 		$offset       = 0;
 
 		do {
-			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant.
 			$rows = $wpdb->get_results( $wpdb->prepare(
+				// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant.
 				"SELECT * FROM `{$legacy_table}` ORDER BY id ASC LIMIT %d OFFSET %d",
 				$batch_size,
 				$offset
@@ -197,8 +195,13 @@ class AM_Schema {
 	}
 
 	/**
-	 * Explicit, admin-triggered removal of the v1.x legacy table.
-	 * Never called automatically — wire this to a confirmed admin action only.
+	 * Removal of the v1.x legacy table. Called only from uninstall() --
+	 * i.e. only when the plugin is deleted from the Plugins screen, and
+	 * only when the "delete my data" setting allows it. Never on upgrade,
+	 * activation, or any normal load: maybe_migrate_from_v1() reads this
+	 * table and deliberately leaves it in place afterward, so anything
+	 * that drops it outside an explicit, confirmed removal destroys the
+	 * only copy of pre-2.0 history on that site.
 	 */
 	public static function drop_legacy_table() {
 		global $wpdb;
@@ -256,6 +259,7 @@ class AM_Schema {
 		$events_table  = $wpdb->prefix . self::EVENTS_TABLE;
 		$context_table = $wpdb->prefix . self::CONTEXT_TABLE;
 
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table names are plugin constants.
 		$wpdb->query( $wpdb->prepare(
 			"DELETE ctx FROM `{$context_table}` ctx
 			 INNER JOIN `{$events_table}` ev ON ev.id = ctx.event_id
@@ -267,5 +271,6 @@ class AM_Schema {
 			"DELETE FROM `{$events_table}` WHERE date < DATE_SUB(UTC_TIMESTAMP(), INTERVAL %d DAY)",
 			$retention_days
 		) );
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 	}
 }

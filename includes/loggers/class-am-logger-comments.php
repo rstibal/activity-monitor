@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  * on_comment_delete / on_comment_status. Status changes (approve → spam,
  * etc.) participate in occasion grouping by default, since a spam wave
  * hitting transition_comment_status repeatedly for the same comment is
- * noise, not signal — see activity-monitor-v2-spec.md §3.
+ * noise, not signal.
  *
  * See class-am-logger-posts.php for the template this follows.
  */

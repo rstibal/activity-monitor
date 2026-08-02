@@ -12,8 +12,6 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  *   - initiator tagging (via AM_Initiator_Detector)
  *   - user snapshotting
  *   - context (key/value) persistence
- *
- * See activity-monitor-v2-spec.md §3 (noise control) and §6 (architecture).
  */
 class AM_Event_Writer {
 
@@ -47,7 +45,17 @@ class AM_Event_Writer {
 		global $wpdb;
 
 		$defaults = array(
-			'level'       => AM_Log_Levels::default_for_event_type( $event_type ),
+			// Every event that isn't routine says so for itself, by passing
+			// 'level' explicitly -- that is the only mechanism there is.
+			// There used to be an AM_Log_Levels::default_for_event_type()
+			// consulted here, backed by a table keyed on 'post.delete',
+			// 'plugin.update' and the like; those keys are type.action pairs,
+			// but $event_type is only ever the type half ('post', 'plugin'),
+			// so not one of them could ever match and the lookup always
+			// returned INFO. Removed rather than re-keyed: the loggers
+			// already set their own levels, and a second place to define
+			// them would just be somewhere for the two to disagree.
+			'level'       => AM_Log_Levels::INFO,
 			'object_type' => '',
 			'object_id'   => 0,
 			'object_name' => '',
@@ -118,13 +126,13 @@ class AM_Event_Writer {
 			self::write_context( $event_id, $args['context'] );
 		}
 
-		// BUGFIX: notifications were only ever wired to the legacy
-		// AM_Logger::log() call path, which every event source stopped
-		// using once ported onto this writer (dev.1-dev.12) -- silently
-		// making notifications dead for every ported event. Wired here,
-		// on genuine new-row inserts only (an occasion-grouped repeat
-		// returns early above and never reaches this point, so a
-		// brute-force burst doesn't spam a notification per attempt).
+		// Notifications fire from here, and only here. They were once
+		// wired to the legacy AM_Logger::log() path instead, which every
+		// event source stopped using as it was ported onto this writer --
+		// silently making notifications dead for every ported event. Only
+		// genuine new-row inserts reach this point: an occasion-grouped
+		// repeat returns early above, so a brute-force burst doesn't spam
+		// a notification per attempt.
 		if ( $event_id && ! $args['skip_notify'] ) {
 			AM_Notifications::maybe_notify(
 				$row['level'],
@@ -169,6 +177,7 @@ class AM_Event_Writer {
 		}
 
 		$existing_id = $wpdb->get_var( $wpdb->prepare(
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant.
 			"SELECT id FROM `{$events_table}`
 			 WHERE occasion_id = %s
 			   AND date >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL %d SECOND)
@@ -182,6 +191,7 @@ class AM_Event_Writer {
 		}
 
 		$wpdb->query( $wpdb->prepare(
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant.
 			"UPDATE `{$events_table}` SET repeat_count = repeat_count + 1, date = %s WHERE id = %d",
 			current_time( 'mysql', true ),
 			$existing_id

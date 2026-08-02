@@ -476,6 +476,7 @@ class AM_Admin {
 		// settings_errors() call in render_settings_screen()). Clearing the
 		// log is not a setting -- it stays an admin-post action, so it
 		// still reports itself here.
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- presence-only display flag, set by this plugin's own post-action redirect, which did verify a nonce.
 		if ( isset( $_GET['am_cleared'] ) ) {
 			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Activity log cleared.', 'activity-monitor' ) . '</p></div>';
 		}
@@ -489,11 +490,11 @@ class AM_Admin {
 			wp_die( esc_html__( 'Unauthorized.', 'activity-monitor' ) );
 		}
 
-		// Clears the v2.0 am_events/am_event_context tables -- the only
-		// visible log now that AM_DB and the legacy "Activity Log" tab
-		// are both fully retired. (Previously this also called
-		// AM_DB::clear_all() on the legacy table; that class no longer
-		// exists as of full legacy retirement.)
+		// Clears am_events/am_event_context, which is the whole of the
+		// visible log. Deliberately does not touch the v1.x
+		// am_activity_log table: that one is only ever dropped on
+		// uninstall, so a site that has migrated keeps its pre-2.0
+		// history even after clearing.
 		AM_Schema::clear_all();
 
 		AM_Event_Writer::log(
@@ -566,7 +567,7 @@ class AM_Admin {
 		}
 
 		ob_start();
-		foreach ( AM_Digest::get_configs() as $i => $config ) {
+		foreach ( AM_Digest::get_configs() as $config ) {
 			$this->render_digest_table_row( $config );
 		}
 		wp_send_json_success( array( 'html' => ob_get_clean() ) );
@@ -684,6 +685,7 @@ class AM_Admin {
 		$id    = absint( $_POST['entry_id'] ?? 0 );
 		$table = $wpdb->prefix . AM_Schema::EVENTS_TABLE;
 		$row   = $wpdb->get_row( $wpdb->prepare(
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant.
 			"SELECT * FROM `{$table}` WHERE id = %d",
 			$id
 		) );
@@ -738,7 +740,10 @@ class AM_Admin {
 			</tr>
 			<tr><th><?php esc_html_e( 'Message', 'activity-monitor' ); ?></th><td><?php echo esc_html( $row->message ); ?></td></tr>
 			<?php if ( (int) $row->repeat_count > 1 ) : ?>
-			<tr><th><?php esc_html_e( 'Repeated', 'activity-monitor' ); ?></th><td><?php printf( esc_html__( '%d times (occasion grouping)', 'activity-monitor' ), (int) $row->repeat_count ); ?></td></tr>
+			<tr><th><?php esc_html_e( 'Repeated', 'activity-monitor' ); ?></th><td><?php
+				/* translators: %d: number of times this event was recorded within the grouping window */
+				printf( esc_html__( '%d times (occasion grouping)', 'activity-monitor' ), (int) $row->repeat_count );
+			?></td></tr>
 			<?php endif; ?>
 			<?php if ( ! empty( $context['diff'] ) && is_array( $context['diff'] ) ) : ?>
 			<tr>
@@ -1177,16 +1182,19 @@ class AM_Admin {
 
 	// ── Screen: Activity Log ──────────────────────────────────────────────
 	//
-	// Reads from the am_events / am_event_context schema. This was
-	// originally a "v2.0 preview" tab running alongside the legacy
-	// AM_DB-backed "Activity Log" tab while loggers were ported one at a
-	// time; that legacy tab (and its render_tab_log() method) is long gone,
-	// removed now that all 13 v1.x event sources are ported and this screen
-	// has full column parity (including IP Address, added when the old
-	// tab was retired).
-	// See activity-monitor-v2-spec.md §9 and GitHub issue #4.
+	// Reads from the am_events / am_event_context schema through
+	// AM_Event_Query. The whole screen is one <form id="am-filter-form">
+	// wrapping both the filter controls and the rows, matching core's
+	// list-table layout -- which is why every <button> in a row needs an
+	// explicit type="button". See the Details button below.
 
 	private function render_log_screen() {
+		// The filter bar is a GET form that only narrows what this screen
+		// displays -- it changes no state, so there is nothing for a nonce to
+		// protect. The screen itself is already manage_options-gated, and
+		// every value below is sanitized before it reaches AM_Event_Query,
+		// which binds them as placeholders.
+		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- read-only display filters, see above.
 		$per_page   = self::per_page();
 		$page       = max( 1, absint( $_GET['paged'] ?? 1 ) );
 		$level      = sanitize_key( $_GET['am_level'] ?? '' );
@@ -1211,6 +1219,7 @@ class AM_Admin {
 		$date_from  = sanitize_text_field( $_GET['am_from'] ?? '' );
 		$date_to    = sanitize_text_field( $_GET['am_to'] ?? '' );
 		$search     = sanitize_text_field( $_GET['am_search'] ?? '' );
+		// phpcs:enable WordPress.Security.NonceVerification.Recommended
 
 		$data      = AM_Event_Query::get_events( compact( 'per_page', 'page', 'level', 'initiator', 'event_type', 'action', 'user', 'date_from', 'date_to', 'search' ) );
 		$items     = $data['items'];
@@ -1279,6 +1288,7 @@ class AM_Admin {
 		// same as $pagination_html above -- avoids two copies of the same
 		// _n()/number_format_i18n() call drifting apart.
 		$displaying_num_html = sprintf(
+			/* translators: %s: formatted number of matching log entries */
 			esc_html( _n( '%s item', '%s items', $total, 'activity-monitor' ) ),
 			number_format_i18n( $total )
 		);

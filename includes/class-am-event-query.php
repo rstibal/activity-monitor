@@ -3,14 +3,9 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 /**
  * AM_Event_Query — read-side query layer for the v2.0 schema
- * (am_events + am_event_context). This is the only query layer left in
- * the plugin -- the legacy AM_DB class it was originally kept separate
- * from has been fully retired, and the "Activity Log" admin tab reads
- * exclusively through this class now.
- *
- * This is the minimal query surface needed for the "New admin log screen"
- * (v2.0 build order item 5, moved earlier to make occasion grouping /
- * initiators / levels visible while the rest of the loggers are ported).
+ * (am_events + am_event_context), and the only query layer in the plugin.
+ * The Activity Log screen, export, and the email digest all read through
+ * it; nothing else queries those tables directly.
  */
 class AM_Event_Query {
 
@@ -93,6 +88,7 @@ class AM_Event_Query {
 			$data_sql .= ' LIMIT %d OFFSET %d';
 		}
 
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- $count_sql/$data_sql are built above from plugin constants plus a fixed set of literal WHERE fragments; every caller-supplied value travels separately in $values as a %s placeholder.
 		if ( $args['no_limit'] ) {
 			$total = empty( $values ) ? (int) $wpdb->get_var( $count_sql ) : (int) $wpdb->get_var( $wpdb->prepare( $count_sql, $values ) );
 			$items = empty( $values ) ? $wpdb->get_results( $data_sql ) : $wpdb->get_results( $wpdb->prepare( $data_sql, $values ) );
@@ -103,6 +99,7 @@ class AM_Event_Query {
 			$total = (int) $wpdb->get_var( $count_sql );
 			$items = $wpdb->get_results( $wpdb->prepare( $data_sql, absint( $args['per_page'] ), $offset ) );
 		}
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
 
 		return compact( 'items', 'total' );
 	}
@@ -111,6 +108,7 @@ class AM_Event_Query {
 		global $wpdb;
 		$table = $wpdb->prefix . AM_Schema::CONTEXT_TABLE;
 		$rows  = $wpdb->get_results( $wpdb->prepare(
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant.
 			"SELECT `key`, value FROM `{$table}` WHERE event_id = %d",
 			$event_id
 		) );
@@ -140,10 +138,9 @@ class AM_Event_Query {
 	public static function get_event_type_actions(): array {
 		global $wpdb;
 		$table = $wpdb->prefix . AM_Schema::EVENTS_TABLE;
-		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant.
 		return $wpdb->get_results(
-			"SELECT DISTINCT event_type, action
-			 FROM `{$table}`
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant.
+			"SELECT DISTINCT event_type, action FROM `{$table}`
 			 ORDER BY event_type ASC, action ASC",
 			ARRAY_A
 		);
@@ -192,14 +189,14 @@ class AM_Event_Query {
 		global $wpdb;
 		$table = $wpdb->prefix . AM_Schema::EVENTS_TABLE;
 
-		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant.
 		$current = (int) $wpdb->get_var( $wpdb->prepare(
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant.
 			"SELECT COUNT(*) FROM `{$table}` WHERE date >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL %d DAY)",
 			$days
 		) );
 
-		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant.
 		$previous = (int) $wpdb->get_var( $wpdb->prepare(
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant.
 			"SELECT COUNT(*) FROM `{$table}`
 			 WHERE date >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL %d DAY)
 			   AND date <  DATE_SUB(UTC_TIMESTAMP(), INTERVAL %d DAY)",
@@ -219,7 +216,7 @@ class AM_Event_Query {
 		global $wpdb;
 		$table = $wpdb->prefix . AM_Schema::EVENTS_TABLE;
 
-		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant.
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant.
 		$rows = $wpdb->get_results( $wpdb->prepare(
 			"SELECT event_type, COUNT(*) AS total
 			 FROM `{$table}`
@@ -230,6 +227,7 @@ class AM_Event_Query {
 			$days,
 			$limit
 		), ARRAY_A );
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
 		$out = array();
 		foreach ( $rows as $row ) {
@@ -240,8 +238,7 @@ class AM_Event_Query {
 
 	/**
 	 * Notable/high-severity events within the window -- warning level or
-	 * above. Used by the digest email's "notable security events" section
-	 * (spec §4).
+	 * above. Used by the digest email's "notable events" section.
 	 *
 	 * @return array<object> up to $limit am_events rows, most recent first
 	 */
@@ -256,10 +253,14 @@ class AM_Event_Query {
 		$query_args[] = $days;
 		$query_args[] = $limit;
 
+		// $placeholders is a fixed count of %s built from count( $notable_levels ),
+		// never from input; the level values themselves travel in $query_args. The
+		// placeholder-count sniff can't see through the single-array form of
+		// prepare() and reads the one argument as one replacement.
+		// phpcs:ignore WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- see above.
 		return $wpdb->get_results( $wpdb->prepare(
-			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant, placeholders are a fixed count of %s.
-			"SELECT * FROM `{$table}`
-			 WHERE level IN ({$placeholders})
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant; see above.
+			"SELECT * FROM `{$table}` WHERE level IN ({$placeholders})
 			   AND date >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL %d DAY)
 			 ORDER BY date DESC
 			 LIMIT %d",

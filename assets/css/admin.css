@@ -15,11 +15,11 @@
  * inputs, uppercase table headers, a white panel wrapping the whole
  * screen -- and the result read as a different product bolted into
  * wp-admin rather than part of it. That was removed on purpose in 2.3.0.
+ *
+ * .am-wrap itself carries no rules, and shouldn't gain a max-width: core
+ * admin screens fill the available width, and a cap here left an odd
+ * gutter next to every other admin page.
  */
-.am-wrap {
-	/* No max-width: core admin screens fill the available width, and a
-	   cap here left an odd gutter next to every other admin page. */
-}
 
 /* No <code> styling override here on purpose. This plugin used to wrap
    IPs, URLs, session IDs and event slugs in <code> purely to get a
@@ -119,18 +119,16 @@
 	-webkit-overflow-scrolling: touch;
 }
 
-/* The log/session tables are plain core .wp-list-table.striped. Only
-   two behaviours differ from core's default: auto layout, because these
-   columns vary far more in natural width than a fixed layout handles
-   well, and nowrap cells, because a wrapped timestamp or IP is harder
-   to scan than a truncated one. Everything else -- header weight,
-   padding, borders, row striping -- is core's. */
+/* Applied to the Activity Log table and to the Notification Channels and
+   Email Digest tables on Settings, all of which are plain core
+   .wp-list-table.striped. Only two behaviours differ from core's default:
+   auto layout, because these columns vary far more in natural width than
+   a fixed layout handles well, and nowrap cells, because a wrapped
+   timestamp or IP is harder to scan than a truncated one. Everything
+   else -- header weight, padding, borders, row striping -- is core's. */
 .am-log-table { table-layout: auto; }
 .am-log-table td { vertical-align: middle; white-space: nowrap; }
 
-/* Date column (Activity Log) -- date and time on separate lines rather
-   than one long inline string, so the column reads at a glance instead
-   of making every row wider than it needs to be. */
 /* Type column in the Activity Log — the full readable event name from
    AM_Event_Labels::label(), i.e. "Media Uploaded" rather than just
    "Media". Deliberately more specific than the Type filter above the
@@ -268,9 +266,8 @@
 .am-detail-table { width: 100%; border-collapse: collapse; }
 .am-detail-table th, .am-detail-table td { padding: 8px 10px; border: 1px solid #dcdcde; font-size: 13px; vertical-align: top; }
 .am-detail-table th { background: #f6f7f7; font-weight: 600; width: 130px; white-space: nowrap; }
-.am-detail-table pre { background: #f6f7f7; padding: 8px; border-radius: 3px; font-size: 11px; white-space: pre-wrap; word-break: break-all; margin: 0; max-height: 200px; overflow-y: auto; }
 
-/* v2.0 preview: before/after diff table shown in the event detail modal. */
+/* Before/after diff table shown in the event detail modal. */
 .am-diff-table { width: 100%; border-collapse: collapse; }
 .am-diff-table td { padding: 4px 6px; font-size: 12px; vertical-align: top; border-bottom: 1px solid #f0f0f1; }
 .am-diff-before { color: #b32d2e; text-decoration: line-through; }

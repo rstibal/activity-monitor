@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  *     of failed logins for the same username collapses into one row with
  *     a repeat_count) — this replaces v1.x's Login Flood Guard concept
  *     from the competitive audit (Activity Log Pro) without needing a
- *     separate threshold setting; see activity-monitor-v2-spec.md §3.
+ *     separate threshold setting.
  *
  * See class-am-logger-posts.php for the template this follows.
  */

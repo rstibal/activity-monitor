@@ -3,7 +3,7 @@
  * Plugin Name: Activity Monitor
  * Plugin URI:  https://robstibal.com
  * Description: Comprehensive WordPress audit log – tracks logins, content changes, settings updates, security events, and more.
- * Version:     2.4.3
+ * Version:     2.4.4
  * Author:      Rob Stibal
  * Author URI:  http://robstibal.com
  * License:     GPL v2 or later
@@ -17,22 +17,19 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'AM_VERSION', '2.4.3' );
+define( 'AM_VERSION', '2.4.4' );
 define( 'AM_FILE',    __FILE__ );
 define( 'AM_DIR',     plugin_dir_path( __FILE__ ) );
 define( 'AM_URL',     plugin_dir_url( __FILE__ ) );
 
 // ── Core (schema, event writer, logger architecture) ─────────────────────
-// Full v1.x legacy retirement (dev.14): AM_Hooks (dev.12), AM_DB, and
-// AM_Logger (this build) are all gone. The am_activity_log table itself
-// is left in place on existing installs -- see AM_Schema's class doc --
-// but nothing in this plugin creates, writes to, reads from, or prunes
-// it anymore as of this version. AM_Schema::maybe_migrate_from_v1() still
-// runs its one-time backfill from that table if it exists (untouched,
-// no reason to remove a working non-destructive migration), but no
-// longer needs a sibling AM_DB::install() call to create the table in
-// the first place, since there's no legacy admin screen left that reads
-// from it. See activity-monitor-v2-spec.md §9.
+// The v1.x classes (AM_Hooks, AM_DB, AM_Logger) are all gone. The
+// am_activity_log table they used is still left in place on existing
+// installs -- see AM_Schema's class doc -- but nothing here creates,
+// writes to, reads from, or prunes it. The one exception is
+// AM_Schema::maybe_migrate_from_v1(), which still runs its one-time
+// backfill from that table when it exists; it is non-destructive and
+// works, so there is no reason to remove it.
 require_once AM_DIR . 'includes/schema/class-am-schema.php';
 require_once AM_DIR . 'includes/class-am-db-legacy-ip.php';
 require_once AM_DIR . 'includes/class-am-log-levels.php';

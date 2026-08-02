@@ -2,8 +2,9 @@
 /**
  * Activity Monitor – Uninstall
  *
- * FIX #9: Fires when the plugin is deleted via Plugins > Delete (not on deactivation).
- * Removes the log tables and all plugin options so no data is left behind.
+ * Fires when the plugin is deleted via Plugins > Delete, never on
+ * deactivation. Removes the log tables and all plugin options so no data
+ * is left behind -- unless the admin has opted out, see below.
  */
 
 if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
@@ -22,10 +23,8 @@ if ( ! get_option( 'am_delete_data_on_uninstall', 1 ) ) {
 
 global $wpdb;
 
-// v2.0: drop am_events / am_event_context, plus the legacy am_activity_log
-// table if it's still present, and all v1.x + v2.0 options.
-// See includes/schema/class-am-schema.php AM_Schema::uninstall() and
-// activity-monitor-v2-spec.md §7 (public-release uninstall bar).
+// Drops am_events / am_event_context, plus the legacy am_activity_log
+// table if it's still present. See AM_Schema::uninstall().
 require_once __DIR__ . '/includes/schema/class-am-schema.php';
 AM_Schema::uninstall();
 

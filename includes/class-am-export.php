@@ -4,10 +4,8 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 /**
  * AM_Export — log export in CSV, JSON, HTML, and TXT formats.
  *
- * Per activity-monitor-v2-spec.md §4 (build order item 6): "CSV and JSON
- * at minimum ... HTML/TXT as a stretch goal ... filterable by date
- * range, user, event type, action -- reuse the log screen's filter
- * component so export and the log view don't drift apart."
+ * Filterable by date range, user, event type and action, using the same
+ * filters the log screen itself offers, so the two can't drift apart.
  *
  * Filtering reuses AM_Event_Query::get_events() directly (with
  * no_limit => true) rather than a separate export-specific query
@@ -81,16 +79,23 @@ class AM_Export {
 		return $out;
 	}
 
+	/**
+	 * The WP_Filesystem sniffs below are suppressed rather than satisfied:
+	 * this writes to php://output, the response body itself, not to a file
+	 * on disk. WP_Filesystem has no equivalent for streaming a download,
+	 * and buffering the whole export in memory to hand it over would defeat
+	 * the point of streaming it.
+	 */
 	private static function stream_csv( array $items ) {
 		$out = fopen( 'php://output', 'w' );
 		// UTF-8 BOM so Excel opens the file with correct encoding rather
 		// than guessing (a common gotcha with plain UTF-8 CSVs on Windows).
-		fwrite( $out, "\xEF\xBB\xBF" );
+		fwrite( $out, "\xEF\xBB\xBF" ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fwrite -- php://output, see above.
 		fputcsv( $out, self::columns() );
 		foreach ( $items as $row ) {
 			fputcsv( $out, self::row_to_assoc( $row ) );
 		}
-		fclose( $out );
+		fclose( $out ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose -- php://output, see above.
 	}
 
 	private static function to_json( array $items ): string {

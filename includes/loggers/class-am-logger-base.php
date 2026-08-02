@@ -3,17 +3,14 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 /**
  * AM_Logger_Base — one subclass per event source (posts, users, plugins,
- * sessions, etc.), each registering its own WordPress hooks. Replaces
+ * comments, etc.), each registering its own WordPress hooks. Replaces
  * v1.x's monolithic AM_Hooks class, where every hook callback lived in one
  * file and noise control meant a single flat settings checklist.
  *
- * This is what lets noise control (§3 of the spec) become "which loggers
- * are on" rather than a hardcoded per-event-type list, and is the seam
- * where third-party plugin integrations (WooCommerce, Yoast, etc. — out
- * of scope for v2.0 per spec §8) would attach later without touching
- * core loggers.
- *
- * See activity-monitor-v2-spec.md §6.
+ * This is what lets noise control be "which loggers are on" rather than a
+ * hardcoded per-event-type list, and is the seam where a third-party
+ * plugin integration (WooCommerce, Yoast, and so on) would attach without
+ * touching the core loggers.
  */
 abstract class AM_Logger_Base {
 
