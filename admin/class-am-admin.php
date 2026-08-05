@@ -21,6 +21,7 @@ class AM_Admin {
 	 *  into it -- the digest email, the plain-text alert, any bookmark --
 	 *  keep working unchanged. */
 	const PAGE_LOG      = 'activity-monitor';
+	const PAGE_DEBUG    = 'activity-monitor-debug';
 	const PAGE_SETTINGS = 'activity-monitor-settings';
 
 	/** Option group posted to options.php by the Settings screen. */
@@ -116,6 +117,15 @@ class AM_Admin {
 
 		self::$screen_hooks[] = add_submenu_page(
 			self::PAGE_LOG,
+			__( 'Debug Log', 'activity-monitor' ),
+			__( 'Debug Log', 'activity-monitor' ),
+			'manage_options',
+			self::PAGE_DEBUG,
+			array( $this, 'render_page_debug' )
+		);
+
+		self::$screen_hooks[] = add_submenu_page(
+			self::PAGE_LOG,
 			__( 'Settings', 'activity-monitor' ),
 			__( 'Settings', 'activity-monitor' ),
 			'manage_options',
@@ -189,6 +199,51 @@ class AM_Admin {
 		}
 
 		return '<a href="#" class="am-ip-lookup" data-ip="' . esc_attr( $ip ) . '">' . esc_html( $ip ) . '</a>';
+	}
+
+	/**
+	 * One am_events row as a <tr>, shared by the Activity Log and Debug Log
+	 * screens -- both render the identical row shape from the same table,
+	 * so this is the one place that escaping logic lives rather than two
+	 * copies drifting apart. Echoes directly rather than returning a string,
+	 * matching every other render_*() method on this class.
+	 *
+	 * Sits inside each screen's #am-filter-form, so the Details button below
+	 * needs its explicit type="button" -- see the class doc for why.
+	 */
+	private static function render_event_row( $row ) {
+		?>
+		<tr class="am-row am-row-am-<?php echo esc_attr( $row->level ); ?>">
+			<td><span class="am-badge am-<?php echo esc_attr( $row->level ); ?>"><?php echo esc_html( AM_Log_Levels::label( $row->level ) ); ?></span></td>
+			<td class="am-type-cell" title="<?php echo esc_attr( AM_Event_Labels::raw( $row->event_type, $row->action ) ); ?>"><?php echo esc_html( AM_Event_Labels::label( $row->event_type, $row->action ) ); ?></td>
+			<td>
+				<span class="am-datetime-cell" title="<?php echo esc_attr( $row->date ); ?> UTC"><?php echo esc_html( wp_date( AM_Date_Format::combined(), strtotime( $row->date . ' UTC' ) ) ); ?></span>
+			</td>
+			<td><span class="am-badge am-init-<?php echo esc_attr( $row->initiator ); ?>"><?php echo esc_html( AM_Initiator_Detector::label( $row->initiator ) ); ?></span></td>
+			<td>
+				<?php if ( (int) $row->user_id > 0 && '' !== $row->user_login ) : ?>
+					<?php // Display name only -- the username is a row in the profile modal this links to. ?>
+					<a href="#" class="am-user-profile-link" data-user-id="<?php echo esc_attr( (int) $row->user_id ); ?>"><strong><?php echo esc_html( '' !== $row->user_display_name ? $row->user_display_name : $row->user_login ); ?></strong></a>
+				<?php else : ?>
+					<?php echo esc_html( '' !== $row->user_login ? $row->user_login : '—' ); ?>
+				<?php endif; ?>
+			</td>
+			<td class="am-ip-cell" title="<?php echo esc_attr( $row->ip_address ); ?>"><?php echo self::ip_cell_html( (string) $row->ip_address ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped per-part in ip_cell_html(). ?></td>
+			<td class="am-log-message-cell" title="<?php echo esc_attr( $row->message ); ?>"><span class="am-log-message-clamp"><?php echo esc_html( $row->message ); ?></span></td>
+			<td>
+				<?php
+				// type="button" is required, not cosmetic: this row sits
+				// inside the filter form, and a <button> with no type
+				// defaults to type="submit", which submits that form and
+				// reloads the page the instant the modal opens.
+				?>
+				<button type="button" class="button button-small am-view-detail-v2"
+				        data-id="<?php echo esc_attr( $row->id ); ?>">
+					<?php esc_html_e( 'Details', 'activity-monitor' ); ?>
+				</button>
+			</td>
+		</tr>
+		<?php
 	}
 
 	// ── Assets ─────────────────────────────────────────────────────────
@@ -1128,6 +1183,15 @@ class AM_Admin {
 		$this->render_screen_close();
 	}
 
+	public function render_page_debug() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+		$this->render_screen_open( __( 'Debug Log', 'activity-monitor' ) );
+		$this->render_debug_screen();
+		$this->render_screen_close();
+	}
+
 	public function render_page_settings() {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			return;
@@ -1475,36 +1539,7 @@ class AM_Admin {
 						</tr>
 					<?php endif; ?>
 					<?php foreach ( $items as $row ) : ?>
-					<tr class="am-row am-row-am-<?php echo esc_attr( $row->level ); ?>">
-						<td><span class="am-badge am-<?php echo esc_attr( $row->level ); ?>"><?php echo esc_html( AM_Log_Levels::label( $row->level ) ); ?></span></td>
-						<td class="am-type-cell" title="<?php echo esc_attr( AM_Event_Labels::raw( $row->event_type, $row->action ) ); ?>"><?php echo esc_html( AM_Event_Labels::label( $row->event_type, $row->action ) ); ?></td>
-						<td>
-							<span class="am-datetime-cell" title="<?php echo esc_attr( $row->date ); ?> UTC"><?php echo esc_html( wp_date( AM_Date_Format::combined(), strtotime( $row->date . ' UTC' ) ) ); ?></span>
-						</td>
-						<td><span class="am-badge am-init-<?php echo esc_attr( $row->initiator ); ?>"><?php echo esc_html( AM_Initiator_Detector::label( $row->initiator ) ); ?></span></td>
-						<td>
-							<?php if ( (int) $row->user_id > 0 && '' !== $row->user_login ) : ?>
-								<?php // Display name only -- the username is a row in the profile modal this links to. ?>
-								<a href="#" class="am-user-profile-link" data-user-id="<?php echo esc_attr( (int) $row->user_id ); ?>"><strong><?php echo esc_html( '' !== $row->user_display_name ? $row->user_display_name : $row->user_login ); ?></strong></a>
-							<?php else : ?>
-								<?php echo esc_html( '' !== $row->user_login ? $row->user_login : '—' ); ?>
-							<?php endif; ?>
-						</td>
-						<td class="am-ip-cell" title="<?php echo esc_attr( $row->ip_address ); ?>"><?php echo self::ip_cell_html( (string) $row->ip_address ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped per-part in ip_cell_html(). ?></td>
-						<td class="am-log-message-cell" title="<?php echo esc_attr( $row->message ); ?>"><span class="am-log-message-clamp"><?php echo esc_html( $row->message ); ?></span></td>
-						<td>
-							<?php
-							// type="button" is required, not cosmetic: this row sits
-							// inside the filter form, and a <button> with no type
-							// defaults to type="submit", which submits that form and
-							// reloads the page the instant the modal opens.
-							?>
-							<button type="button" class="button button-small am-view-detail-v2"
-							        data-id="<?php echo esc_attr( $row->id ); ?>">
-								<?php esc_html_e( 'Details', 'activity-monitor' ); ?>
-							</button>
-						</td>
-					</tr>
+						<?php self::render_event_row( $row ); ?>
 					<?php endforeach; ?>
 				</tbody>
 			</table>
@@ -1564,6 +1599,134 @@ class AM_Admin {
 	 */
 	private static function sanitize_type_filter( $raw ): string {
 		return preg_replace( '/[^a-z0-9_.|\-]/', '', strtolower( (string) $raw ) );
+	}
+
+	// ── Screen: Debug Log ──────────────────────────────────────────────────
+	//
+	// System/technical events only -- automatic updates and PHP
+	// errors/warnings -- via AM_Event_Query::get_debug_events(), whose fixed
+	// whitelist is documented there. No Type/Initiator/User filters or
+	// export: the whitelist already narrows the screen to one purpose, and
+	// there's nothing here the Activity Log's own export can't already
+	// cover. Reuses render_event_row() for identical row markup, and the
+	// same #am-filter-form + Details-modal wiring as the Activity Log.
+
+	private function render_debug_screen() {
+		// Read-only display filters, same reasoning as render_log_screen().
+		// phpcs:disable WordPress.Security.NonceVerification.Recommended
+		$per_page  = self::per_page();
+		$page      = max( 1, absint( $_GET['paged'] ?? 1 ) );
+		$date_from = sanitize_text_field( $_GET['am_from'] ?? '' );
+		$date_to   = sanitize_text_field( $_GET['am_to'] ?? '' );
+		$search    = sanitize_text_field( $_GET['am_search'] ?? '' );
+		// phpcs:enable WordPress.Security.NonceVerification.Recommended
+
+		$data      = AM_Event_Query::get_debug_events( compact( 'per_page', 'page', 'date_from', 'date_to', 'search' ) );
+		$items     = $data['items'];
+		$total     = $data['total'];
+		$num_pages = (int) ceil( $total / $per_page );
+
+		$base_url = add_query_arg(
+			array( 'page' => self::PAGE_DEBUG ),
+			admin_url( 'admin.php' )
+		);
+
+		$pagination_html = '';
+		if ( $num_pages > 1 ) {
+			$pagination_html = wp_kses_post( paginate_links( array(
+				'base'      => add_query_arg( 'paged', '%#%' ),
+				'format'    => '',
+				'prev_text' => '&laquo;',
+				'next_text' => '&raquo;',
+				'total'     => $num_pages,
+				'current'   => $page,
+			) ) );
+		}
+		$displaying_num_html = sprintf(
+			/* translators: %s: formatted number of matching debug log entries */
+			esc_html( _n( '%s item', '%s items', $total, 'activity-monitor' ) ),
+			number_format_i18n( $total )
+		);
+		?>
+
+		<?php if ( 0 === $total && '' === $date_from && '' === $date_to && '' === $search ) : ?>
+			<div class="notice notice-info inline">
+				<p>
+					<?php esc_html_e( 'No system events recorded yet -- this screen fills in when there is a core/plugin/theme update, or a PHP error or warning.', 'activity-monitor' ); ?>
+				</p>
+			</div>
+		<?php endif; ?>
+
+		<form method="get" action="" id="am-filter-form">
+			<input type="hidden" name="page" value="<?php echo esc_attr( self::PAGE_DEBUG ); ?>">
+
+			<p class="search-box">
+				<label class="screen-reader-text" for="am-search-input"><?php esc_html_e( 'Search debug log:', 'activity-monitor' ); ?></label>
+				<input type="search" id="am-search-input" name="am_search" value="<?php echo esc_attr( $search ); ?>">
+				<?php submit_button( __( 'Search Log', 'activity-monitor' ), '', '', false, array( 'id' => 'search-submit' ) ); ?>
+			</p>
+
+			<div class="tablenav top">
+				<div class="alignleft actions">
+					<label class="screen-reader-text" for="am-filter-from"><?php esc_html_e( 'From date', 'activity-monitor' ); ?></label>
+					<input type="date" id="am-filter-from" name="am_from" value="<?php echo esc_attr( $date_from ); ?>">
+					<label class="screen-reader-text" for="am-filter-to"><?php esc_html_e( 'To date', 'activity-monitor' ); ?></label>
+					<input type="date" id="am-filter-to" name="am_to" value="<?php echo esc_attr( $date_to ); ?>">
+
+					<?php submit_button( __( 'Filter', 'activity-monitor' ), '', '', false, array( 'id' => 'am-filter-submit' ) ); ?>
+
+					<?php if ( $date_from || $date_to || $search ) : ?>
+						<a href="<?php echo esc_url( $base_url ); ?>" class="button"><?php esc_html_e( 'Reset', 'activity-monitor' ); ?></a>
+					<?php endif; ?>
+				</div>
+
+				<div class="tablenav-pages<?php echo $num_pages > 1 ? '' : ' one-page'; ?>">
+					<span class="displaying-num"><?php echo $displaying_num_html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- built via esc_html() above. ?></span>
+					<?php if ( $num_pages > 1 ) : ?>
+						<span class="pagination-links"><?php echo $pagination_html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- already wp_kses_post()'d above. ?></span>
+					<?php endif; ?>
+				</div>
+				<br class="clear">
+			</div>
+
+			<div class="am-table-scroll">
+			<table class="wp-list-table widefat striped am-log-table">
+				<thead>
+					<tr>
+						<th><?php esc_html_e( 'Level',      'activity-monitor' ); ?></th>
+						<th><?php esc_html_e( 'Type',       'activity-monitor' ); ?></th>
+						<th><?php esc_html_e( 'Date',       'activity-monitor' ); ?></th>
+						<th><?php esc_html_e( 'Initiator',  'activity-monitor' ); ?></th>
+						<th><?php esc_html_e( 'User',       'activity-monitor' ); ?></th>
+						<th><?php esc_html_e( 'IP Address', 'activity-monitor' ); ?></th>
+						<th><?php esc_html_e( 'Message',    'activity-monitor' ); ?></th>
+						<th><?php esc_html_e( 'Actions',    'activity-monitor' ); ?></th>
+					</tr>
+				</thead>
+				<tbody>
+					<?php if ( empty( $items ) ) : ?>
+						<tr class="no-items">
+							<td class="colspanchange" colspan="8"><?php esc_html_e( 'No debug events found.', 'activity-monitor' ); ?></td>
+						</tr>
+					<?php endif; ?>
+					<?php foreach ( $items as $row ) : ?>
+						<?php self::render_event_row( $row ); ?>
+					<?php endforeach; ?>
+				</tbody>
+			</table>
+			</div><!-- .am-table-scroll -->
+
+			<div class="tablenav bottom">
+				<div class="tablenav-pages<?php echo $num_pages > 1 ? '' : ' one-page'; ?>">
+					<span class="displaying-num"><?php echo $displaying_num_html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- built via esc_html() above. ?></span>
+					<?php if ( $num_pages > 1 ) : ?>
+						<span class="pagination-links"><?php echo $pagination_html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- already wp_kses_post()'d above. ?></span>
+					<?php endif; ?>
+				</div>
+				<br class="clear">
+			</div>
+		</form>
+		<?php
 	}
 
 	// ── Screen: Settings ──────────────────────────────────────────────────

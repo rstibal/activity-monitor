@@ -31,6 +31,7 @@ class AM_Logger_Manager {
 		'AM_Logger_Sites',
 		'AM_Logger_Security',
 		'AM_Logger_Fatal_Errors',
+		'AM_Logger_Php_Warnings',
 		'AM_Logger_File_Editor',
 		'AM_Logger_Maintenance_Mode',
 		'AM_Logger_Mail_Failures',

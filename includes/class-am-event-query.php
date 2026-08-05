@@ -104,6 +104,91 @@ class AM_Event_Query {
 		return compact( 'items', 'total' );
 	}
 
+	/**
+	 * Events for the Debug Log screen: system/technical events only, not a
+	 * generic filter. Fixed whitelist rather than an argument, because it's
+	 * an OR across event_type/action pairs that get_events()'s single
+	 * event_type + action fields (ANDed with everything else) can't express:
+	 *   - event_type = 'system'                      (fatal errors, PHP
+	 *     warnings/notices, mail failures -- any action)
+	 *   - event_type = 'core'   AND action = 'updated'
+	 *   - event_type = 'plugin' AND action IN ('updated', 'installed')
+	 *   - event_type = 'theme'  AND action = 'updated'
+	 * Deliberately not level-based: ordinary audit events (failed logins,
+	 * password resets, plugin/theme deletions) already use WARNING, so a
+	 * level >= warning filter would pull normal audit noise onto this
+	 * screen instead of narrowing to system/technical events.
+	 */
+	public static function get_debug_events( array $args = array() ) {
+		global $wpdb;
+		$table = $wpdb->prefix . AM_Schema::EVENTS_TABLE;
+
+		$defaults = array(
+			'per_page'  => 50,
+			'page'      => 1,
+			'date_from' => '',
+			'date_to'   => '',
+			'search'    => '',
+			'orderby'   => 'date',
+			'order'     => 'DESC',
+			'no_limit'  => false,
+		);
+		$args   = wp_parse_args( $args, $defaults );
+		$offset = ( absint( $args['page'] ) - 1 ) * absint( $args['per_page'] );
+
+		$where  = array(
+			"( event_type = 'system'"
+			. " OR ( event_type = 'core' AND action = 'updated' )"
+			. " OR ( event_type = 'plugin' AND action IN ('updated', 'installed') )"
+			. " OR ( event_type = 'theme' AND action = 'updated' ) )",
+		);
+		$values = array();
+
+		if ( '' !== $args['date_from'] && false !== strtotime( $args['date_from'] ) ) {
+			$where[]  = 'date >= %s';
+			$values[] = gmdate( 'Y-m-d 00:00:00', strtotime( $args['date_from'] ) );
+		}
+		if ( '' !== $args['date_to'] && false !== strtotime( $args['date_to'] ) ) {
+			$where[]  = 'date <= %s';
+			$values[] = gmdate( 'Y-m-d 23:59:59', strtotime( $args['date_to'] ) );
+		}
+		if ( '' !== $args['search'] ) {
+			$like     = '%' . $wpdb->esc_like( $args['search'] ) . '%';
+			$where[]  = '( message LIKE %s OR object_name LIKE %s )';
+			$values[] = $like;
+			$values[] = $like;
+		}
+
+		$allowed_order   = array( 'ASC', 'DESC' );
+		$allowed_orderby = array( 'date', 'level', 'event_type', 'id' );
+		$order   = in_array( strtoupper( $args['order'] ), $allowed_order, true ) ? strtoupper( $args['order'] ) : 'DESC';
+		$orderby = in_array( $args['orderby'], $allowed_orderby, true ) ? $args['orderby'] : 'date';
+
+		$where_sql = implode( ' AND ', $where );
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table/column names are plugin constants.
+		$count_sql = "SELECT COUNT(*) FROM `{$table}` WHERE {$where_sql}";
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table/column names are plugin constants.
+		$data_sql  = "SELECT * FROM `{$table}` WHERE {$where_sql} ORDER BY {$orderby} {$order}";
+		if ( ! $args['no_limit'] ) {
+			$data_sql .= ' LIMIT %d OFFSET %d';
+		}
+
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- $count_sql/$data_sql are built above from plugin constants plus a fixed set of literal WHERE fragments; every caller-supplied value travels separately in $values as a %s placeholder.
+		if ( $args['no_limit'] ) {
+			$total = empty( $values ) ? (int) $wpdb->get_var( $count_sql ) : (int) $wpdb->get_var( $wpdb->prepare( $count_sql, $values ) );
+			$items = empty( $values ) ? $wpdb->get_results( $data_sql ) : $wpdb->get_results( $wpdb->prepare( $data_sql, $values ) );
+		} elseif ( ! empty( $values ) ) {
+			$total = (int) $wpdb->get_var( $wpdb->prepare( $count_sql, $values ) );
+			$items = $wpdb->get_results( $wpdb->prepare( $data_sql, array_merge( $values, array( absint( $args['per_page'] ), $offset ) ) ) );
+		} else {
+			$total = (int) $wpdb->get_var( $count_sql );
+			$items = $wpdb->get_results( $wpdb->prepare( $data_sql, absint( $args['per_page'] ), $offset ) );
+		}
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
+
+		return compact( 'items', 'total' );
+	}
+
 	public static function get_context( int $event_id ): array {
 		global $wpdb;
 		$table = $wpdb->prefix . AM_Schema::CONTEXT_TABLE;

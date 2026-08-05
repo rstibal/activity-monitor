@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, event log
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.4.4
+Stable tag: 2.4.5
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -68,6 +68,10 @@ Yes. Settings → Privacy offers full addresses, anonymised addresses (the last 
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
 
 == Changelog ==
+
+= 2.4.5 =
+* New Debug Log screen, alongside Activity Log and Settings: a filtered view of core/plugin/theme updates and PHP errors/warnings, separate from the day-to-day audit trail.
+* New: PHP warnings, notices, and deprecation notices are now recorded (previously only fatal errors were). Repeats of the same warning group into one row rather than flooding the log; turn this event source off entirely from Settings → Event Sources if you'd rather not track it.
 
 = 2.4.4 =
 * Housekeeping only — nothing about how the plugin behaves has changed. The code now passes the project's WordPress coding-standards check cleanly: a number of the annotations marking already-reviewed database queries had drifted onto the wrong line and were silently doing nothing, so the check had stopped being a useful signal.
