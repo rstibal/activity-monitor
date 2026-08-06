@@ -79,7 +79,7 @@
 		e.preventDefault();
 		var userId = $(this).data('user-id');
 		if (!userId) return;
-		openModal($(this).text());
+		openModal('User Details');
 		$.post(amData.ajaxUrl, { action: 'am_user_profile', user_id: userId, nonce: amData.nonce })
 		.done(function (r) {
 			if (r.success) {

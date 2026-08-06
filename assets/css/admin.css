@@ -254,15 +254,6 @@
 .am-modal-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 18px; padding-top: 16px; border-top: 1px solid #f0f0f1; }
 .am-modal-actions:has(> :only-child) { justify-content: flex-end; }
 
-/* Header of the user profile modal — avatar beside the display name
-   and login. Sits above the standard .am-detail-table below, which
-   carries the rest of the fields; this part is separate because an
-   avatar and name read better as a card header than as another
-   label/value row. */
-.am-user-profile-head { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
-.am-user-profile-head img { border-radius: 50%; flex-shrink: 0; }
-.am-user-profile-name { display: block; font-size: 15px; color: #1d2327; }
-
 .am-detail-table { width: 100%; border-collapse: collapse; }
 .am-detail-table th, .am-detail-table td { padding: 8px 10px; border: 1px solid #dcdcde; font-size: 13px; vertical-align: top; }
 .am-detail-table th { background: #f6f7f7; font-weight: 600; width: 130px; white-space: nowrap; }

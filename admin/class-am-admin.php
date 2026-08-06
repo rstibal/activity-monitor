@@ -864,17 +864,17 @@ class AM_Admin {
 		ob_start();
 		?>
 		<div class="am-user-profile">
-			<div class="am-user-profile-head">
-				<?php echo get_avatar( $user->ID, 64 ); ?>
-				<div>
-					<?php // Name only here -- the username has its own row below. ?>
-					<strong class="am-user-profile-name"><?php echo esc_html( $user->display_name ); ?></strong>
-				</div>
-			</div>
-
 			<table class="am-detail-table">
 				<tr><th><?php esc_html_e( 'User ID', 'activity-monitor' ); ?></th><td><?php echo esc_html( $user->ID ); ?></td></tr>
 				<tr><th><?php esc_html_e( 'Username', 'activity-monitor' ); ?></th><td><?php echo esc_html( $user->user_login ); ?></td></tr>
+				<?php
+				// display_name is a row here rather than a heading above the
+				// table. It used to be the modal's avatar-and-name header and
+				// also its title; the title is now the fixed "User Details",
+				// so without this row the display name would be the one
+				// identifying field the modal no longer showed at all.
+				?>
+				<tr><th><?php esc_html_e( 'Display Name', 'activity-monitor' ); ?></th><td><?php echo esc_html( $user->display_name ); ?></td></tr>
 				<tr><th><?php esc_html_e( 'Email', 'activity-monitor' ); ?></th><td><a href="<?php echo esc_url( 'mailto:' . $user->user_email ); ?>"><?php echo esc_html( $user->user_email ); ?></a></td></tr>
 				<tr>
 					<th><?php esc_html_e( 'Role', 'activity-monitor' ); ?></th>

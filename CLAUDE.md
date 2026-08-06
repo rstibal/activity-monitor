@@ -36,8 +36,12 @@ workflow disappears.
   — those fields are frequently blank). Which of the two to show depends on
   the context, and as of 2.4.2 they are no longer always stacked together:
   the Activity Log's **User column shows `display_name` alone**, linking to the
-  profile modal, where `user_login` is its own **Username** row under User ID —
-  the login was repeated on every row and earned none of that width. The event
+  profile modal, where both are their own rows — **Username** (`user_login`)
+  then **Display Name** — under User ID; the login was repeated on every row
+  and earned none of that width. That modal is titled a flat "User Details"
+  and has no avatar/name header: it was one in 2.4.9, and dropping it is why
+  `display_name` needs a row of its own, or the modal would show every field
+  about a user except the name it was previously headed with. The event
   detail modal still stacks both (`display_name` bold over `user_login` in a
   `small.am-role`), since there it's the row's own stored snapshot of who acted
   rather than a live lookup. Single-line contexts (Slack/email) stay
@@ -340,7 +344,7 @@ with formatting/doc-block sniffs excluded — this codebase doesn't conform to
 WPCS's structured doc-block or whitespace style, and that's a style choice,
 not a defect.
 
-**`phpcs` runs clean as of 2.4.8, and is meant to stay that way** — a run with
+**`phpcs` runs clean as of 2.4.9, and is meant to stay that way** — a run with
 findings in it can't tell you which are new. If a genuinely new finding is a
 plugin-constant table name interpolated into SQL text (not a placeholder),
 that's accepted project-wide; suppress it rather than touching the ruleset.
