@@ -72,10 +72,19 @@ Core: `AM_Schema`, `AM_Event_Writer`, `AM_Event_Query`, `AM_Log_Levels`
 (8 PSR-3 levels), `AM_Initiator_Detector`, `AM_Logger_Manager` plus one
 `AM_Logger_*` per domain, `AM_Event_Labels`, `AM_Date_Format`.
 
-Admin screens: two submenu pages under one top-level menu — Activity Log
-(`activity-monitor`, the default) and Settings (`activity-monitor-settings`).
-The tabbed single page they replaced went in 2.2.1; `am_tab` no longer means
-anything and old links carrying it just land on the log.
+Admin screens: three submenu pages under one top-level menu — Activity Log
+(`activity-monitor`, the default), Debug Log (`activity-monitor-debug`, added
+in 2.4.5) and Settings (`activity-monitor-settings`). The tabbed single page
+they replaced went in 2.2.1; `am_tab` no longer means anything and old links
+carrying it just land on the log.
+
+**The Debug Log is the same table, narrowed** — `AM_Event_Query::get_debug_events()`
+carries a fixed whitelist (`event_type = 'system'` any action, plus
+`core.updated`, `plugin.updated|installed`, `theme.updated`), which is an OR
+across type/action pairs that `get_events()`'s single ANDed `event_type` +
+`action` fields can't express. Both screens render rows through the shared
+`AM_Admin::render_event_row()`, so escaping logic lives in one place; the
+Debug Log has no Type/Initiator/User filters and no export of its own.
 
 Session management (the Active Sessions screen, per-session revoke, the
 concurrent-session limit, Revoke Expired, Emergency Lockdown, and `AM_Sessions`
@@ -176,10 +185,41 @@ it inherits the existing filters, grouping, export, and digest.
 `event_type` + `action` + `object_id` + `initiator`. The window is
 `am_occasion_window_seconds` (Settings → Logging; 5 minutes by default, 0 turns
 grouping off), still filterable on top. Loggers with no meaningful object id
-(file-editor, fatal-errors) pass `'group' => false`.
+(file-editor, fatal-errors) pass `'group' => false`. `AM_Logger_Php_Warnings`
+goes the other way and *synthesizes* one — `crc32( "$file:$line" ) & 0x7FFFFFFF`,
+since `object_id` is an int column — so repeats of the same warning collapse
+while a different warning still gets its own row.
 
 ## Decisions worth not re-litigating
 
+- **The Debug Log filters on an event-type whitelist, not a level
+  threshold.** `level >= WARNING` looks like the obvious implementation and
+  is wrong here: ordinary audit events (failed logins, password resets,
+  plugin/theme deletions) already use WARNING, so a level filter drags the
+  day-to-day audit trail onto a screen whose whole purpose is being separate
+  from it. If a new system-ish event should appear there, add its
+  type/action to the whitelist in `AM_Event_Query::get_debug_events()`.
+- **`AM_Logger_Php_Warnings` is the only logger that has to defend itself
+  against its own logging.** It runs on `set_error_handler()`, called
+  synchronously mid-request, so three things that are non-issues elsewhere
+  are load-bearing here and were all fixed in 2.4.6:
+  - **`error_reporting() & $errno` gate.** Without it, everything the `@`
+    operator suppresses gets logged — and core suppresses constantly
+    (`@fopen`, `@unlink`, `@getimagesize`). `@` means the author knows that
+    call can fail and handled it; logging it is noise by construction.
+  - **A re-entrancy flag around the write.** A warning raised *inside* the
+    log path (IP resolution, `$wpdb`, a deprecation in a core function it
+    calls) re-enters the handler and recurses until the stack dies. The
+    `try/catch` does not help — warnings are not `Throwable`. The guard
+    wraps only the logging; the chain to `$previous_handler` always runs.
+  - **A per-request `$seen` set keyed on action+file+line.** Occasion
+    grouping collapses the *rows* but still costs a SELECT + UPDATE per
+    occurrence, so a warning in a hot loop is thousands of queries in one
+    page load. Consequence to know: `repeat_count` on these rows counts
+    requests, not raw occurrences.
+
+  Contrast `AM_Logger_Fatal_Errors`, which needs none of this — a shutdown
+  handler fires once, after everything is already over.
 - **A logger sets its own level, and there is no per-event-type default
   table.** `AM_Event_Writer::log()` defaults `level` to `AM_Log_Levels::INFO`
   flat; anything that isn't routine passes `'level'` explicitly. There *was* an
@@ -268,7 +308,7 @@ with formatting/doc-block sniffs excluded — this codebase doesn't conform to
 WPCS's structured doc-block or whitespace style, and that's a style choice,
 not a defect.
 
-**`phpcs` runs clean as of 2.4.4, and is meant to stay that way** — a run with
+**`phpcs` runs clean as of 2.4.6, and is meant to stay that way** — a run with
 findings in it can't tell you which are new. If a genuinely new finding is a
 plugin-constant table name interpolated into SQL text (not a placeholder),
 that's accepted project-wide; suppress it rather than touching the ruleset.
@@ -293,7 +333,12 @@ both in `includes/`:
 Name the *right* sniff, too: an ignore citing a sniff that isn't firing reads as
 handled and isn't. `Generic.Files.LineLength` was cited for an empty `catch`
 (the sniff is `Generic.CodeAnalysis.EmptyStatement.DetectedCatch`) and survived
-that way for several versions.
+that way for several versions. **Never write the sniff name from memory** — get
+it from `--report=csv` (or `=json`), which prints the exact `source`. The 2.4.6
+`error_reporting()` gate was first annotated with a plausible-looking invented
+name and suppressed nothing; it also turned out to trip *two* sniffs in
+different categories, which one guess could never have covered. A comma-separated
+list on one `phpcs:ignore` handles that.
 
 `phpcs.xml.dist`'s `minimum_supported_wp_version` feeds the deprecation sniffs
 and has to track `Requires at least:` — it was still 5.3 two versions after the

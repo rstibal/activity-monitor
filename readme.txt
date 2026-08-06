@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, event log
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.4.5
+Stable tag: 2.4.6
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -68,6 +68,11 @@ Yes. Settings → Privacy offers full addresses, anonymised addresses (the last 
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
 
 == Changelog ==
+
+= 2.4.6 =
+* Fixed: PHP warnings that the code deliberately silences with the `@` operator are no longer recorded. WordPress itself silences a great many of these on purpose — a file that might not exist, an image that might not be readable — and logging them filled the Debug Log with warnings from code working exactly as intended. The new behaviour also respects whatever error reporting level your host has configured.
+* Fixed: a warning raised while the plugin was in the middle of recording a warning could send it into an endless loop, ending in a crashed page request. Recording is now skipped for the duration of a write, so a warning from inside the logger can't retrigger it.
+* Fixed: a warning firing thousands of times in a single page load no longer costs a pair of database queries every time. The same warning is now recorded once per page load; repeats across separate requests still collapse into one row as before.
 
 = 2.4.5 =
 * New Debug Log screen, alongside Activity Log and Settings: a filtered view of core/plugin/theme updates and PHP errors/warnings, separate from the day-to-day audit trail.
