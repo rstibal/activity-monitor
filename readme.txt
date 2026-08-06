@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, event log
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.4.7
+Stable tag: 2.4.8
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -68,6 +68,9 @@ Yes. Settings → Privacy offers full addresses, anonymised addresses (the last 
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
 
 == Changelog ==
+
+= 2.4.8 =
+* Changed: the scheduled email digest now counts every event, including PHP errors. 2.4.7 left them out of its totals and its "notable events" list, which made the digest the one place in the plugin where some entries silently didn't count — a number you couldn't reconcile against the log it links to. If PHP errors crowd out your digest, turn that event source off under Settings → Event Sources, or fix whatever is emitting them; either way you can see what you changed and what it did.
 
 = 2.4.7 =
 * Changed: the Debug Log screen added in 2.4.5 is gone, and everything it showed is back on the Activity Log. It was the same table with a fixed filter over it, and keeping two screens meant two places to look for one answer. To get the old view, pick "System" from the event type dropdown — PHP errors, warnings and notices now appear there alongside every other type.

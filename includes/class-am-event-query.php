@@ -9,29 +9,6 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  */
 class AM_Event_Query {
 
-	/**
-	 * Actions under `event_type = 'system'` that are PHP error capture
-	 * rather than audit trail.
-	 *
-	 * These are ordinary log entries like any other and show on the
-	 * Activity Log alongside everything else -- the separate Debug Log
-	 * screen that briefly owned them was folded back in (see AM_Admin).
-	 * The list survives for one narrow job: keeping them out of the email
-	 * digest. See the period-summary queries at the bottom of this class.
-	 */
-	const PHP_ERROR_ACTIONS = array( 'fatal_error', 'php_warning', 'php_notice', 'php_deprecated' );
-
-	/**
-	 * WHERE fragment excluding the above. Built from a class constant with
-	 * no caller input anywhere in it, so it is a literal as far as the
-	 * query is concerned -- there is nothing here to parameterize.
-	 */
-	private static function not_php_error_sql(): string {
-		return "NOT ( event_type = 'system' AND action IN ('"
-			. implode( "','", self::PHP_ERROR_ACTIONS )
-			. "') )";
-	}
-
 	/** Argument defaults shared by get_events() and get_level_counts(). */
 	private static function query_defaults(): array {
 		return array(
@@ -282,11 +259,15 @@ class AM_Event_Query {
 
 	// ── Period-summary queries (email digest) ──────────────────────────────
 	//
-	// All three exclude PHP errors, same as get_events(): the digest
-	// summarizes the audit trail, and a total or a top-types breakdown that
-	// counted PHP warnings would disagree with the Activity Log the digest
-	// links to -- while saying more about one noisy plugin than about the
-	// site. The Debug Log is not summarized by email.
+	// These summarize the whole log, with nothing filtered out. 2.4.7 had
+	// them excluding PHP errors so one noisy plugin couldn't fill the
+	// notable-events list; 2.4.8 dropped that, because it left the digest
+	// as the only place in the plugin where some event types silently
+	// didn't count, invisible from the UI and impossible to reconcile
+	// against the screen it links to. If PHP errors dominate a digest, the
+	// answer is to turn that event source off in Settings -> Event Sources,
+	// or fix the plugin emitting them -- both of which are visible actions
+	// with visible effects, unlike a hidden WHERE clause.
 	//
 	// These take $days (7/14/30 typical) and query only am_events -- none
 	// of this needs am_event_context. Each returns plain arrays/counts
@@ -305,25 +286,22 @@ class AM_Event_Query {
 	 */
 	public static function get_totals_for_period( int $days ): array {
 		global $wpdb;
-		$table         = $wpdb->prefix . AM_Schema::EVENTS_TABLE;
-		$not_php_error = self::not_php_error_sql();
+		$table = $wpdb->prefix . AM_Schema::EVENTS_TABLE;
 
 		$current = (int) $wpdb->get_var( $wpdb->prepare(
-			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant; $not_php_error is built from a class constant.
-			"SELECT COUNT(*) FROM `{$table}` WHERE {$not_php_error} AND date >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL %d DAY)",
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant.
+			"SELECT COUNT(*) FROM `{$table}` WHERE date >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL %d DAY)",
 			$days
 		) );
 
-		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant; $not_php_error is built from a class constant.
 		$previous = (int) $wpdb->get_var( $wpdb->prepare(
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant.
 			"SELECT COUNT(*) FROM `{$table}`
-			 WHERE {$not_php_error}
-			   AND date >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL %d DAY)
+			 WHERE date >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL %d DAY)
 			   AND date <  DATE_SUB(UTC_TIMESTAMP(), INTERVAL %d DAY)",
 			$days * 2,
 			$days
 		) );
-		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
 		return array( 'current' => $current, 'previous' => $previous );
 	}
@@ -335,15 +313,13 @@ class AM_Event_Query {
 	 */
 	public static function get_breakdown_by_event_type( int $days, int $limit = 10 ): array {
 		global $wpdb;
-		$table         = $wpdb->prefix . AM_Schema::EVENTS_TABLE;
-		$not_php_error = self::not_php_error_sql();
+		$table = $wpdb->prefix . AM_Schema::EVENTS_TABLE;
 
-		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant; $not_php_error is built from a class constant.
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant.
 		$rows = $wpdb->get_results( $wpdb->prepare(
 			"SELECT event_type, COUNT(*) AS total
 			 FROM `{$table}`
-			 WHERE {$not_php_error}
-			   AND date >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL %d DAY)
+			 WHERE date >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL %d DAY)
 			 GROUP BY event_type
 			 ORDER BY total DESC
 			 LIMIT %d",
@@ -380,17 +356,10 @@ class AM_Event_Query {
 		// never from input; the level values themselves travel in $query_args. The
 		// placeholder-count sniff can't see through the single-array form of
 		// prepare() and reads the one argument as one replacement.
-		// PHP errors are excluded here for a sharper reason than on the
-		// other period queries: php_warning is WARNING and fatal_error is
-		// ERROR, so both clear this threshold, and a single noisy plugin
-		// would fill all ten slots and push the security events this
-		// section exists to surface off the bottom.
-		$not_php_error = self::not_php_error_sql();
-
 		// phpcs:ignore WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- see above.
 		return $wpdb->get_results( $wpdb->prepare(
-			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant, $not_php_error is built from a class constant; see above.
-			"SELECT * FROM `{$table}` WHERE level IN ({$placeholders}) AND {$not_php_error}
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant; see above.
+			"SELECT * FROM `{$table}` WHERE level IN ({$placeholders})
 			   AND date >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL %d DAY)
 			 ORDER BY date DESC
 			 LIMIT %d",

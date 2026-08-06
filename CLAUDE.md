@@ -91,15 +91,18 @@ action) while the log excluded four *named* actions — so a new
 second list. **If a proposed screen is the existing one with a fixed filter
 over it, it's a filter, not a screen.** Ship it as a dropdown option.
 
-The remaining seam is `AM_Event_Query::PHP_ERROR_ACTIONS` (`fatal_error`,
-`php_warning`, `php_notice`, `php_deprecated`), which now has exactly one
-job: keeping PHP errors out of the **email digest**. `get_events()` has no
-hidden exclusion — what it returns is what the screen shows and the export
-writes. The digest is different because `get_notable_events()` selects
-WARNING-and-above, and `php_warning` is WARNING while `fatal_error` is
-ERROR, so one repetitive warning fills all ten slots and pushes out the
-security events that section exists to surface. Totals and the by-type
-breakdown exclude them too, so the digest can't disagree with itself.
+**Nothing is filtered out of anything any more.** No query in
+`AM_Event_Query` excludes an event type — the screen, the export, and all
+three digest period queries see the whole table. 2.4.7 kept a
+`PHP_ERROR_ACTIONS` exclusion on the digest alone (`get_notable_events()`
+selects WARNING-and-above, and `php_warning` is WARNING while
+`fatal_error` is ERROR, so one repetitive warning could fill all ten
+slots); 2.4.8 deleted it. The concern was real, but it made the digest the
+one place where some rows silently didn't count, invisible from the UI and
+irreconcilable against the screen the digest links to. **Volume is a
+settings problem, not a query problem** — Settings → Event Sources turns a
+logger off, visibly, and `am_occasion_window_seconds` collapses repeats. A
+hidden `WHERE` is neither.
 
 **`get_events()` and `get_level_counts()` share `build_where()`**, which
 takes a `$skip` list; the counts query passes `array( 'level' )`, since a
@@ -337,7 +340,7 @@ with formatting/doc-block sniffs excluded — this codebase doesn't conform to
 WPCS's structured doc-block or whitespace style, and that's a style choice,
 not a defect.
 
-**`phpcs` runs clean as of 2.4.7, and is meant to stay that way** — a run with
+**`phpcs` runs clean as of 2.4.8, and is meant to stay that way** — a run with
 findings in it can't tell you which are new. If a genuinely new finding is a
 plugin-constant table name interpolated into SQL text (not a placeholder),
 that's accepted project-wide; suppress it rather than touching the ruleset.
