@@ -9,11 +9,32 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  */
 class AM_Event_Query {
 
-	public static function get_events( array $args = array() ) {
-		global $wpdb;
-		$table = $wpdb->prefix . AM_Schema::EVENTS_TABLE;
+	/**
+	 * Actions under `event_type = 'system'` that are PHP error capture
+	 * rather than audit trail.
+	 *
+	 * These are ordinary log entries like any other and show on the
+	 * Activity Log alongside everything else -- the separate Debug Log
+	 * screen that briefly owned them was folded back in (see AM_Admin).
+	 * The list survives for one narrow job: keeping them out of the email
+	 * digest. See the period-summary queries at the bottom of this class.
+	 */
+	const PHP_ERROR_ACTIONS = array( 'fatal_error', 'php_warning', 'php_notice', 'php_deprecated' );
 
-		$defaults = array(
+	/**
+	 * WHERE fragment excluding the above. Built from a class constant with
+	 * no caller input anywhere in it, so it is a literal as far as the
+	 * query is concerned -- there is nothing here to parameterize.
+	 */
+	private static function not_php_error_sql(): string {
+		return "NOT ( event_type = 'system' AND action IN ('"
+			. implode( "','", self::PHP_ERROR_ACTIONS )
+			. "') )";
+	}
+
+	/** Argument defaults shared by get_events() and get_level_counts(). */
+	private static function query_defaults(): array {
+		return array(
 			'per_page'  => 50,
 			'page'      => 1,
 			'level'     => '',
@@ -28,13 +49,26 @@ class AM_Event_Query {
 			'order'     => 'DESC',
 			'no_limit'  => false, // export mode: ignore per_page/page, return every matching row
 		);
-		$args   = wp_parse_args( $args, $defaults );
-		$offset = ( absint( $args['page'] ) - 1 ) * absint( $args['per_page'] );
+	}
+
+	/**
+	 * Build the WHERE clause shared by get_events() and get_level_counts().
+	 *
+	 * $skip names filters to leave out. get_level_counts() passes 'level',
+	 * because a count *per level* has to be taken across everything the
+	 * other filters allow -- applying the level filter to its own tally
+	 * would return one row every time.
+	 *
+	 * @return array{sql: string, values: array} SQL with %s placeholders,
+	 *         and the values to feed $wpdb->prepare() in the same order.
+	 */
+	private static function build_where( array $args, array $skip = array() ): array {
+		global $wpdb;
 
 		$where  = array( '1=1' );
 		$values = array();
 
-		if ( '' !== $args['level'] && AM_Log_Levels::is_valid( $args['level'] ) ) {
+		if ( ! in_array( 'level', $skip, true ) && '' !== $args['level'] && AM_Log_Levels::is_valid( $args['level'] ) ) {
 			$where[]  = 'level = %s';
 			$values[] = $args['level'];
 		}
@@ -74,12 +108,33 @@ class AM_Event_Query {
 			$values[] = $like;
 		}
 
+		return array(
+			'sql'    => implode( ' AND ', $where ),
+			'values' => $values,
+		);
+	}
+
+	/**
+	 * The log. Every event type is reachable from here, PHP errors
+	 * included -- there is no hidden exclusion, and what this returns is
+	 * exactly what the Activity Log screen shows and the export writes.
+	 */
+	public static function get_events( array $args = array() ) {
+		global $wpdb;
+		$table = $wpdb->prefix . AM_Schema::EVENTS_TABLE;
+
+		$args   = wp_parse_args( $args, self::query_defaults() );
+		$offset = ( absint( $args['page'] ) - 1 ) * absint( $args['per_page'] );
+
+		$built  = self::build_where( $args );
+		$values = $built['values'];
+
 		$allowed_order   = array( 'ASC', 'DESC' );
 		$allowed_orderby = array( 'date', 'level', 'event_type', 'user_login', 'id' );
 		$order   = in_array( strtoupper( $args['order'] ), $allowed_order, true ) ? strtoupper( $args['order'] ) : 'DESC';
 		$orderby = in_array( $args['orderby'], $allowed_orderby, true ) ? $args['orderby'] : 'date';
 
-		$where_sql = implode( ' AND ', $where );
+		$where_sql = $built['sql'];
 		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table/column names are plugin constants.
 		$count_sql = "SELECT COUNT(*) FROM `{$table}` WHERE {$where_sql}";
 		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table/column names are plugin constants.
@@ -105,88 +160,55 @@ class AM_Event_Query {
 	}
 
 	/**
-	 * Events for the Debug Log screen: system/technical events only, not a
-	 * generic filter. Fixed whitelist rather than an argument, because it's
-	 * an OR across event_type/action pairs that get_events()'s single
-	 * event_type + action fields (ANDed with everything else) can't express:
-	 *   - event_type = 'system'                      (fatal errors, PHP
-	 *     warnings/notices, mail failures -- any action)
-	 *   - event_type = 'core'   AND action = 'updated'
-	 *   - event_type = 'plugin' AND action IN ('updated', 'installed')
-	 *   - event_type = 'theme'  AND action = 'updated'
-	 * Deliberately not level-based: ordinary audit events (failed logins,
-	 * password resets, plugin/theme deletions) already use WARNING, so a
-	 * level >= warning filter would pull normal audit noise onto this
-	 * screen instead of narrowing to system/technical events.
+	 * Row counts per level, for the Activity Log's status links.
+	 *
+	 * Takes the same $args as get_events() and honours all of them *except*
+	 * level, so the numbers describe what the currently-applied type,
+	 * initiator, user, date and search filters actually contain. That is
+	 * what makes the links trustworthy: a level with no rows under the
+	 * current filters is dropped from the list entirely rather than
+	 * offering a click that lands on "No activity found."
+	 *
+	 * Filter-aware rather than site-wide on purpose. A site-wide tally is
+	 * one cheaper query, but then the counts and the screen disagree the
+	 * moment any other filter is on -- the list would advertise
+	 * "Warning (40)" while the filtered view holds three.
+	 *
+	 * @return array<string, int> level => count, only levels with rows,
+	 *         ordered by AM_Log_Levels::ORDER.
 	 */
-	public static function get_debug_events( array $args = array() ) {
+	public static function get_level_counts( array $args = array() ): array {
 		global $wpdb;
 		$table = $wpdb->prefix . AM_Schema::EVENTS_TABLE;
 
-		$defaults = array(
-			'per_page'  => 50,
-			'page'      => 1,
-			'date_from' => '',
-			'date_to'   => '',
-			'search'    => '',
-			'orderby'   => 'date',
-			'order'     => 'DESC',
-			'no_limit'  => false,
-		);
-		$args   = wp_parse_args( $args, $defaults );
-		$offset = ( absint( $args['page'] ) - 1 ) * absint( $args['per_page'] );
+		$args  = wp_parse_args( $args, self::query_defaults() );
+		$built = self::build_where( $args, array( 'level' ) );
 
-		$where  = array(
-			"( event_type = 'system'"
-			. " OR ( event_type = 'core' AND action = 'updated' )"
-			. " OR ( event_type = 'plugin' AND action IN ('updated', 'installed') )"
-			. " OR ( event_type = 'theme' AND action = 'updated' ) )",
-		);
-		$values = array();
+		$where_sql = $built['sql'];
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant; $where_sql is built by build_where(), where every caller value is a %s placeholder carried in $built['values'].
+		$sql = "SELECT level, COUNT(*) AS total FROM `{$table}` WHERE {$where_sql} GROUP BY level";
 
-		if ( '' !== $args['date_from'] && false !== strtotime( $args['date_from'] ) ) {
-			$where[]  = 'date >= %s';
-			$values[] = gmdate( 'Y-m-d 00:00:00', strtotime( $args['date_from'] ) );
-		}
-		if ( '' !== $args['date_to'] && false !== strtotime( $args['date_to'] ) ) {
-			$where[]  = 'date <= %s';
-			$values[] = gmdate( 'Y-m-d 23:59:59', strtotime( $args['date_to'] ) );
-		}
-		if ( '' !== $args['search'] ) {
-			$like     = '%' . $wpdb->esc_like( $args['search'] ) . '%';
-			$where[]  = '( message LIKE %s OR object_name LIKE %s )';
-			$values[] = $like;
-			$values[] = $like;
-		}
-
-		$allowed_order   = array( 'ASC', 'DESC' );
-		$allowed_orderby = array( 'date', 'level', 'event_type', 'id' );
-		$order   = in_array( strtoupper( $args['order'] ), $allowed_order, true ) ? strtoupper( $args['order'] ) : 'DESC';
-		$orderby = in_array( $args['orderby'], $allowed_orderby, true ) ? $args['orderby'] : 'date';
-
-		$where_sql = implode( ' AND ', $where );
-		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table/column names are plugin constants.
-		$count_sql = "SELECT COUNT(*) FROM `{$table}` WHERE {$where_sql}";
-		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table/column names are plugin constants.
-		$data_sql  = "SELECT * FROM `{$table}` WHERE {$where_sql} ORDER BY {$orderby} {$order}";
-		if ( ! $args['no_limit'] ) {
-			$data_sql .= ' LIMIT %d OFFSET %d';
-		}
-
-		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- $count_sql/$data_sql are built above from plugin constants plus a fixed set of literal WHERE fragments; every caller-supplied value travels separately in $values as a %s placeholder.
-		if ( $args['no_limit'] ) {
-			$total = empty( $values ) ? (int) $wpdb->get_var( $count_sql ) : (int) $wpdb->get_var( $wpdb->prepare( $count_sql, $values ) );
-			$items = empty( $values ) ? $wpdb->get_results( $data_sql ) : $wpdb->get_results( $wpdb->prepare( $data_sql, $values ) );
-		} elseif ( ! empty( $values ) ) {
-			$total = (int) $wpdb->get_var( $wpdb->prepare( $count_sql, $values ) );
-			$items = $wpdb->get_results( $wpdb->prepare( $data_sql, array_merge( $values, array( absint( $args['per_page'] ), $offset ) ) ) );
-		} else {
-			$total = (int) $wpdb->get_var( $count_sql );
-			$items = $wpdb->get_results( $wpdb->prepare( $data_sql, absint( $args['per_page'] ), $offset ) );
-		}
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- see above.
+		$rows = empty( $built['values'] )
+			? $wpdb->get_results( $sql, ARRAY_A )
+			: $wpdb->get_results( $wpdb->prepare( $sql, $built['values'] ), ARRAY_A );
 		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
 
-		return compact( 'items', 'total' );
+		$counts = array();
+		foreach ( (array) $rows as $row ) {
+			$counts[ (string) $row['level'] ] = (int) $row['total'];
+		}
+
+		// Reordered into severity order, and silently dropping any level
+		// string in the table that AM_Log_Levels no longer knows about --
+		// the status links can only render levels that have a label.
+		$ordered = array();
+		foreach ( AM_Log_Levels::ORDER as $level ) {
+			if ( ! empty( $counts[ $level ] ) ) {
+				$ordered[ $level ] = $counts[ $level ];
+			}
+		}
+		return $ordered;
 	}
 
 	public static function get_context( int $event_id ): array {
@@ -217,6 +239,11 @@ class AM_Event_Query {
 	 * action = '' -- for them the category and the specific event are
 	 * the same thing, and the caller renders one option rather than a
 	 * group.
+	 *
+	 * Everything in the table is offered, PHP errors included: the dropdown
+	 * is built from what is actually stored, so it can only ever offer a
+	 * filter that matches something. Selecting the "System" group is what
+	 * replaced the separate Debug Log screen.
 	 *
 	 * @return array<array{event_type:string, action:string}>
 	 */
@@ -255,6 +282,12 @@ class AM_Event_Query {
 
 	// ── Period-summary queries (email digest) ──────────────────────────────
 	//
+	// All three exclude PHP errors, same as get_events(): the digest
+	// summarizes the audit trail, and a total or a top-types breakdown that
+	// counted PHP warnings would disagree with the Activity Log the digest
+	// links to -- while saying more about one noisy plugin than about the
+	// site. The Debug Log is not summarized by email.
+	//
 	// These take $days (7/14/30 typical) and query only am_events -- none
 	// of this needs am_event_context. Each returns plain arrays/counts
 	// ready for AM_Digest::build_html() to render directly, and the digest
@@ -272,22 +305,25 @@ class AM_Event_Query {
 	 */
 	public static function get_totals_for_period( int $days ): array {
 		global $wpdb;
-		$table = $wpdb->prefix . AM_Schema::EVENTS_TABLE;
+		$table         = $wpdb->prefix . AM_Schema::EVENTS_TABLE;
+		$not_php_error = self::not_php_error_sql();
 
 		$current = (int) $wpdb->get_var( $wpdb->prepare(
-			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant.
-			"SELECT COUNT(*) FROM `{$table}` WHERE date >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL %d DAY)",
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant; $not_php_error is built from a class constant.
+			"SELECT COUNT(*) FROM `{$table}` WHERE {$not_php_error} AND date >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL %d DAY)",
 			$days
 		) );
 
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant; $not_php_error is built from a class constant.
 		$previous = (int) $wpdb->get_var( $wpdb->prepare(
-			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant.
 			"SELECT COUNT(*) FROM `{$table}`
-			 WHERE date >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL %d DAY)
+			 WHERE {$not_php_error}
+			   AND date >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL %d DAY)
 			   AND date <  DATE_SUB(UTC_TIMESTAMP(), INTERVAL %d DAY)",
 			$days * 2,
 			$days
 		) );
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
 		return array( 'current' => $current, 'previous' => $previous );
 	}
@@ -299,13 +335,15 @@ class AM_Event_Query {
 	 */
 	public static function get_breakdown_by_event_type( int $days, int $limit = 10 ): array {
 		global $wpdb;
-		$table = $wpdb->prefix . AM_Schema::EVENTS_TABLE;
+		$table         = $wpdb->prefix . AM_Schema::EVENTS_TABLE;
+		$not_php_error = self::not_php_error_sql();
 
-		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant.
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant; $not_php_error is built from a class constant.
 		$rows = $wpdb->get_results( $wpdb->prepare(
 			"SELECT event_type, COUNT(*) AS total
 			 FROM `{$table}`
-			 WHERE date >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL %d DAY)
+			 WHERE {$not_php_error}
+			   AND date >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL %d DAY)
 			 GROUP BY event_type
 			 ORDER BY total DESC
 			 LIMIT %d",
@@ -342,10 +380,17 @@ class AM_Event_Query {
 		// never from input; the level values themselves travel in $query_args. The
 		// placeholder-count sniff can't see through the single-array form of
 		// prepare() and reads the one argument as one replacement.
+		// PHP errors are excluded here for a sharper reason than on the
+		// other period queries: php_warning is WARNING and fatal_error is
+		// ERROR, so both clear this threshold, and a single noisy plugin
+		// would fill all ten slots and push the security events this
+		// section exists to surface off the bottom.
+		$not_php_error = self::not_php_error_sql();
+
 		// phpcs:ignore WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- see above.
 		return $wpdb->get_results( $wpdb->prepare(
-			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant; see above.
-			"SELECT * FROM `{$table}` WHERE level IN ({$placeholders})
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant, $not_php_error is built from a class constant; see above.
+			"SELECT * FROM `{$table}` WHERE level IN ({$placeholders}) AND {$not_php_error}
 			   AND date >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL %d DAY)
 			 ORDER BY date DESC
 			 LIMIT %d",

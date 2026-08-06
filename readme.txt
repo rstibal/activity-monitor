@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, event log
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.4.6
+Stable tag: 2.4.7
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -20,7 +20,7 @@ Activity Monitor is a WordPress audit log plugin that records what happens on yo
 * Content: posts, pages, and custom post types (with before/after change details), media uploads and edits, comments, categories and tags, navigation menus, widgets
 * Site management: plugin activation/deactivation/updates/deletion, theme switches and updates, Customizer saves, WordPress core updates
 * Security: unauthorized access attempts to restricted admin pages, multisite site creation and deletion
-* Site health: PHP fatal errors, theme/plugin file editor use, maintenance mode, and failed outgoing email
+* Site health: PHP fatal errors, warnings, notices and deprecation notices, theme/plugin file editor use, maintenance mode, and failed outgoing email
 
 = Noise control, not noise =
 
@@ -68,6 +68,12 @@ Yes. Settings → Privacy offers full addresses, anonymised addresses (the last 
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
 
 == Changelog ==
+
+= 2.4.7 =
+* Changed: the Debug Log screen added in 2.4.5 is gone, and everything it showed is back on the Activity Log. It was the same table with a fixed filter over it, and keeping two screens meant two places to look for one answer. To get the old view, pick "System" from the event type dropdown — PHP errors, warnings and notices now appear there alongside every other type.
+* Changed: the severity links across the top (All, Debug, Info, Notice…) now list only the levels your log actually contains, with a count on each, and carry your other filters with them instead of clearing them. Previously all eight were shown on every site, so most of them led to an empty table.
+* Changed: the scheduled email digest still leaves PHP errors out of its totals and its "notable events" list. This is now the only place they're treated differently, and it's deliberate: a single repetitive warning could otherwise fill that list and push the security events it exists to surface off the bottom.
+* Nothing was deleted from your log, and no entry became unreachable — this only changes where things are shown.
 
 = 2.4.6 =
 * Fixed: PHP warnings that the code deliberately silences with the `@` operator are no longer recorded. WordPress itself silences a great many of these on purpose — a file that might not exist, an image that might not be readable — and logging them filled the Debug Log with warnings from code working exactly as intended. The new behaviour also respects whatever error reporting level your host has configured.

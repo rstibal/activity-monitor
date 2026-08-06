@@ -21,7 +21,6 @@ class AM_Admin {
 	 *  into it -- the digest email, the plain-text alert, any bookmark --
 	 *  keep working unchanged. */
 	const PAGE_LOG      = 'activity-monitor';
-	const PAGE_DEBUG    = 'activity-monitor-debug';
 	const PAGE_SETTINGS = 'activity-monitor-settings';
 
 	/** Option group posted to options.php by the Settings screen. */
@@ -117,15 +116,6 @@ class AM_Admin {
 
 		self::$screen_hooks[] = add_submenu_page(
 			self::PAGE_LOG,
-			__( 'Debug Log', 'activity-monitor' ),
-			__( 'Debug Log', 'activity-monitor' ),
-			'manage_options',
-			self::PAGE_DEBUG,
-			array( $this, 'render_page_debug' )
-		);
-
-		self::$screen_hooks[] = add_submenu_page(
-			self::PAGE_LOG,
 			__( 'Settings', 'activity-monitor' ),
 			__( 'Settings', 'activity-monitor' ),
 			'manage_options',
@@ -202,13 +192,14 @@ class AM_Admin {
 	}
 
 	/**
-	 * One am_events row as a <tr>, shared by the Activity Log and Debug Log
-	 * screens -- both render the identical row shape from the same table,
-	 * so this is the one place that escaping logic lives rather than two
-	 * copies drifting apart. Echoes directly rather than returning a string,
-	 * matching every other render_*() method on this class.
+	 * One am_events row as a <tr>. Extracted in 2.4.5 when a second screen
+	 * rendered the same shape; that screen was folded back into the log in
+	 * 2.4.7 and this now has a single caller, but it stays split out to keep
+	 * the row's escaping in one readable block rather than buried in the
+	 * middle of render_log_screen(). Echoes directly rather than returning a
+	 * string, matching every other render_*() method on this class.
 	 *
-	 * Sits inside each screen's #am-filter-form, so the Details button below
+	 * Sits inside the screen's #am-filter-form, so the Details button below
 	 * needs its explicit type="button" -- see the class doc for why.
 	 */
 	private static function render_event_row( $row ) {
@@ -1183,15 +1174,6 @@ class AM_Admin {
 		$this->render_screen_close();
 	}
 
-	public function render_page_debug() {
-		if ( ! current_user_can( 'manage_options' ) ) {
-			return;
-		}
-		$this->render_screen_open( __( 'Debug Log', 'activity-monitor' ) );
-		$this->render_debug_screen();
-		$this->render_screen_close();
-	}
-
 	public function render_page_settings() {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			return;
@@ -1261,7 +1243,12 @@ class AM_Admin {
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- read-only display filters, see above.
 		$per_page   = self::per_page();
 		$page       = max( 1, absint( $_GET['paged'] ?? 1 ) );
+		// Normalized to '' when it isn't a real level, matching what
+		// AM_Event_Query does with it anyway. Without this, ?am_level=xyz
+		// leaves a value that filters nothing yet still counts as "not
+		// All", so the status links highlight neither All nor anything else.
 		$level      = sanitize_key( $_GET['am_level'] ?? '' );
+		$level      = AM_Log_Levels::is_valid( $level ) ? $level : '';
 		$initiator  = sanitize_key( $_GET['am_initiator'] ?? '' );
 
 		// The Type filter carries either a category ('media') or one
@@ -1328,10 +1315,40 @@ class AM_Admin {
 			admin_url( 'admin.php' )
 		);
 
-		$level_options = array();
-		foreach ( AM_Log_Levels::ORDER as $lvl ) {
-			$level_options[ $lvl ] = AM_Log_Levels::label( $lvl );
+		// Status links are built from what the table actually holds under
+		// the *other* active filters, not from AM_Log_Levels::ORDER. Eight
+		// PSR-3 levels rendered unconditionally meant a row of eight links
+		// on a site whose log was three levels deep, five of them landing
+		// on "No activity found." -- offering a filter that cannot match
+		// anything is worse than not offering it.
+		$level_counts = AM_Event_Query::get_level_counts(
+			compact( 'initiator', 'event_type', 'action', 'user', 'date_from', 'date_to', 'search' )
+		);
+		$level_total  = array_sum( $level_counts );
+
+		// The selected level stays listed even when the other filters leave
+		// it empty. It is the one link that must not disappear: dropping it
+		// would strand the screen showing "No activity found." with nothing
+		// marked current and no visible way back. Appended at zero rather
+		// than reordered, since it's the exception to the list's own rule.
+		if ( '' !== $level && ! isset( $level_counts[ $level ] ) ) {
+			$level_counts[ $level ] = 0;
 		}
+
+		// Every status link carries the other filters forward. Without this
+		// they rebuild from $base_url alone, so narrowing to one event type
+		// and then clicking a level silently drops the type -- and the
+		// counts, which *are* filter-aware, would disagree with what you
+		// landed on.
+		$level_link_args = array_filter( array(
+			'am_initiator' => $initiator,
+			'am_type'      => $type_filter,
+			'am_user'      => $user,
+			'am_from'      => $date_from,
+			'am_to'        => $date_to,
+			'am_search'    => $search,
+		) );
+		$level_base_url  = add_query_arg( $level_link_args, $base_url );
 
 		$initiator_options = array();
 		foreach ( AM_Initiator_Detector::all() as $init ) {
@@ -1368,27 +1385,36 @@ class AM_Admin {
 
 		<?php
 		// Level filter as core's own status-link list -- the same control
-		// the Plugins screen uses for All / Active / Inactive. Was a row of
-		// colored pills; the severity colors still carry meaning in the
-		// table's own Level badges, where they mark actual rows rather than
-		// filter buttons.
+		// the Plugins screen uses for All / Active / Inactive, counts
+		// included. Was a row of colored pills; the severity colors still
+		// carry meaning in the table's own Level badges, where they mark
+		// actual rows rather than filter buttons.
+		//
+		// Suppressed entirely when one level or none is present: a lone
+		// "All (12)" next to nothing is a control with no choice in it.
+		// Always shown while a level filter is on, though, or turning it
+		// on could remove the only control that turns it back off.
+		if ( count( $level_counts ) > 1 || '' !== $level ) :
 		?>
 		<ul class="subsubsub">
 			<li>
-				<a href="<?php echo esc_url( remove_query_arg( 'am_level', $base_url ) ); ?>"
+				<a href="<?php echo esc_url( $level_base_url ); ?>"
 				   class="<?php echo '' === $level ? 'current' : ''; ?>">
 					<?php esc_html_e( 'All', 'activity-monitor' ); ?>
+					<span class="count">(<?php echo esc_html( number_format_i18n( $level_total ) ); ?>)</span>
 				</a>
 			</li>
-			<?php foreach ( $level_options as $lvl_val => $lvl_label ) : ?>
+			<?php foreach ( $level_counts as $lvl_val => $lvl_count ) : ?>
 				<li>
-					| <a href="<?php echo esc_url( add_query_arg( 'am_level', $lvl_val, $base_url ) ); ?>"
+					| <a href="<?php echo esc_url( add_query_arg( 'am_level', $lvl_val, $level_base_url ) ); ?>"
 					     class="<?php echo ( $lvl_val === $level ) ? 'current' : ''; ?>">
-						<?php echo esc_html( $lvl_label ); ?>
+						<?php echo esc_html( AM_Log_Levels::label( $lvl_val ) ); ?>
+						<span class="count">(<?php echo esc_html( number_format_i18n( $lvl_count ) ); ?>)</span>
 					</a>
 				</li>
 			<?php endforeach; ?>
 		</ul>
+		<?php endif; ?>
 
 		<form method="get" action="" id="am-filter-form">
 			<input type="hidden" name="page" value="<?php echo esc_attr( self::PAGE_LOG ); ?>">
@@ -1599,134 +1625,6 @@ class AM_Admin {
 	 */
 	private static function sanitize_type_filter( $raw ): string {
 		return preg_replace( '/[^a-z0-9_.|\-]/', '', strtolower( (string) $raw ) );
-	}
-
-	// ── Screen: Debug Log ──────────────────────────────────────────────────
-	//
-	// System/technical events only -- automatic updates and PHP
-	// errors/warnings -- via AM_Event_Query::get_debug_events(), whose fixed
-	// whitelist is documented there. No Type/Initiator/User filters or
-	// export: the whitelist already narrows the screen to one purpose, and
-	// there's nothing here the Activity Log's own export can't already
-	// cover. Reuses render_event_row() for identical row markup, and the
-	// same #am-filter-form + Details-modal wiring as the Activity Log.
-
-	private function render_debug_screen() {
-		// Read-only display filters, same reasoning as render_log_screen().
-		// phpcs:disable WordPress.Security.NonceVerification.Recommended
-		$per_page  = self::per_page();
-		$page      = max( 1, absint( $_GET['paged'] ?? 1 ) );
-		$date_from = sanitize_text_field( $_GET['am_from'] ?? '' );
-		$date_to   = sanitize_text_field( $_GET['am_to'] ?? '' );
-		$search    = sanitize_text_field( $_GET['am_search'] ?? '' );
-		// phpcs:enable WordPress.Security.NonceVerification.Recommended
-
-		$data      = AM_Event_Query::get_debug_events( compact( 'per_page', 'page', 'date_from', 'date_to', 'search' ) );
-		$items     = $data['items'];
-		$total     = $data['total'];
-		$num_pages = (int) ceil( $total / $per_page );
-
-		$base_url = add_query_arg(
-			array( 'page' => self::PAGE_DEBUG ),
-			admin_url( 'admin.php' )
-		);
-
-		$pagination_html = '';
-		if ( $num_pages > 1 ) {
-			$pagination_html = wp_kses_post( paginate_links( array(
-				'base'      => add_query_arg( 'paged', '%#%' ),
-				'format'    => '',
-				'prev_text' => '&laquo;',
-				'next_text' => '&raquo;',
-				'total'     => $num_pages,
-				'current'   => $page,
-			) ) );
-		}
-		$displaying_num_html = sprintf(
-			/* translators: %s: formatted number of matching debug log entries */
-			esc_html( _n( '%s item', '%s items', $total, 'activity-monitor' ) ),
-			number_format_i18n( $total )
-		);
-		?>
-
-		<?php if ( 0 === $total && '' === $date_from && '' === $date_to && '' === $search ) : ?>
-			<div class="notice notice-info inline">
-				<p>
-					<?php esc_html_e( 'No system events recorded yet -- this screen fills in when there is a core/plugin/theme update, or a PHP error or warning.', 'activity-monitor' ); ?>
-				</p>
-			</div>
-		<?php endif; ?>
-
-		<form method="get" action="" id="am-filter-form">
-			<input type="hidden" name="page" value="<?php echo esc_attr( self::PAGE_DEBUG ); ?>">
-
-			<p class="search-box">
-				<label class="screen-reader-text" for="am-search-input"><?php esc_html_e( 'Search debug log:', 'activity-monitor' ); ?></label>
-				<input type="search" id="am-search-input" name="am_search" value="<?php echo esc_attr( $search ); ?>">
-				<?php submit_button( __( 'Search Log', 'activity-monitor' ), '', '', false, array( 'id' => 'search-submit' ) ); ?>
-			</p>
-
-			<div class="tablenav top">
-				<div class="alignleft actions">
-					<label class="screen-reader-text" for="am-filter-from"><?php esc_html_e( 'From date', 'activity-monitor' ); ?></label>
-					<input type="date" id="am-filter-from" name="am_from" value="<?php echo esc_attr( $date_from ); ?>">
-					<label class="screen-reader-text" for="am-filter-to"><?php esc_html_e( 'To date', 'activity-monitor' ); ?></label>
-					<input type="date" id="am-filter-to" name="am_to" value="<?php echo esc_attr( $date_to ); ?>">
-
-					<?php submit_button( __( 'Filter', 'activity-monitor' ), '', '', false, array( 'id' => 'am-filter-submit' ) ); ?>
-
-					<?php if ( $date_from || $date_to || $search ) : ?>
-						<a href="<?php echo esc_url( $base_url ); ?>" class="button"><?php esc_html_e( 'Reset', 'activity-monitor' ); ?></a>
-					<?php endif; ?>
-				</div>
-
-				<div class="tablenav-pages<?php echo $num_pages > 1 ? '' : ' one-page'; ?>">
-					<span class="displaying-num"><?php echo $displaying_num_html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- built via esc_html() above. ?></span>
-					<?php if ( $num_pages > 1 ) : ?>
-						<span class="pagination-links"><?php echo $pagination_html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- already wp_kses_post()'d above. ?></span>
-					<?php endif; ?>
-				</div>
-				<br class="clear">
-			</div>
-
-			<div class="am-table-scroll">
-			<table class="wp-list-table widefat striped am-log-table">
-				<thead>
-					<tr>
-						<th><?php esc_html_e( 'Level',      'activity-monitor' ); ?></th>
-						<th><?php esc_html_e( 'Type',       'activity-monitor' ); ?></th>
-						<th><?php esc_html_e( 'Date',       'activity-monitor' ); ?></th>
-						<th><?php esc_html_e( 'Initiator',  'activity-monitor' ); ?></th>
-						<th><?php esc_html_e( 'User',       'activity-monitor' ); ?></th>
-						<th><?php esc_html_e( 'IP Address', 'activity-monitor' ); ?></th>
-						<th><?php esc_html_e( 'Message',    'activity-monitor' ); ?></th>
-						<th><?php esc_html_e( 'Actions',    'activity-monitor' ); ?></th>
-					</tr>
-				</thead>
-				<tbody>
-					<?php if ( empty( $items ) ) : ?>
-						<tr class="no-items">
-							<td class="colspanchange" colspan="8"><?php esc_html_e( 'No debug events found.', 'activity-monitor' ); ?></td>
-						</tr>
-					<?php endif; ?>
-					<?php foreach ( $items as $row ) : ?>
-						<?php self::render_event_row( $row ); ?>
-					<?php endforeach; ?>
-				</tbody>
-			</table>
-			</div><!-- .am-table-scroll -->
-
-			<div class="tablenav bottom">
-				<div class="tablenav-pages<?php echo $num_pages > 1 ? '' : ' one-page'; ?>">
-					<span class="displaying-num"><?php echo $displaying_num_html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- built via esc_html() above. ?></span>
-					<?php if ( $num_pages > 1 ) : ?>
-						<span class="pagination-links"><?php echo $pagination_html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- already wp_kses_post()'d above. ?></span>
-					<?php endif; ?>
-				</div>
-				<br class="clear">
-			</div>
-		</form>
-		<?php
 	}
 
 	// ── Screen: Settings ──────────────────────────────────────────────────

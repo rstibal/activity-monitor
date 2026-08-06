@@ -72,19 +72,39 @@ Core: `AM_Schema`, `AM_Event_Writer`, `AM_Event_Query`, `AM_Log_Levels`
 (8 PSR-3 levels), `AM_Initiator_Detector`, `AM_Logger_Manager` plus one
 `AM_Logger_*` per domain, `AM_Event_Labels`, `AM_Date_Format`.
 
-Admin screens: three submenu pages under one top-level menu — Activity Log
-(`activity-monitor`, the default), Debug Log (`activity-monitor-debug`, added
-in 2.4.5) and Settings (`activity-monitor-settings`). The tabbed single page
-they replaced went in 2.2.1; `am_tab` no longer means anything and old links
-carrying it just land on the log.
+Admin screens: two submenu pages under one top-level menu — Activity Log
+(`activity-monitor`, the default) and Settings (`activity-monitor-settings`).
+The tabbed single page they replaced went in 2.2.1; `am_tab` no longer means
+anything and old links carrying it just land on the log.
 
-**The Debug Log is the same table, narrowed** — `AM_Event_Query::get_debug_events()`
-carries a fixed whitelist (`event_type = 'system'` any action, plus
-`core.updated`, `plugin.updated|installed`, `theme.updated`), which is an OR
-across type/action pairs that `get_events()`'s single ANDed `event_type` +
-`action` fields can't express. Both screens render rows through the shared
-`AM_Admin::render_event_row()`, so escaping logic lives in one place; the
-Debug Log has no Type/Initiator/User filters and no export of its own.
+**There was briefly a third screen, and folding it back is the lesson.**
+2.4.5 added a Debug Log (`activity-monitor-debug`) for system/technical
+events; 2.4.7 deleted it. It was never a different view — same table, same
+`render_event_row()`, same modal, same form wiring, differing only in its
+`WHERE`. Measured before removal: `get_debug_events()` was 69 lines against
+`get_events()`'s 94, of which ~114 across the pair were byte-identical, and
+`render_debug_screen()` was a 117-line strict subset of the 335-line
+`render_log_screen()`. Worse, 2.4.7 had briefly defined the split in *two
+opposite directions* — the screen included `event_type = 'system'` (any
+action) while the log excluded four *named* actions — so a new
+`system.php_*` event would have appeared on both until someone updated the
+second list. **If a proposed screen is the existing one with a fixed filter
+over it, it's a filter, not a screen.** Ship it as a dropdown option.
+
+The remaining seam is `AM_Event_Query::PHP_ERROR_ACTIONS` (`fatal_error`,
+`php_warning`, `php_notice`, `php_deprecated`), which now has exactly one
+job: keeping PHP errors out of the **email digest**. `get_events()` has no
+hidden exclusion — what it returns is what the screen shows and the export
+writes. The digest is different because `get_notable_events()` selects
+WARNING-and-above, and `php_warning` is WARNING while `fatal_error` is
+ERROR, so one repetitive warning fills all ten slots and pushes out the
+security events that section exists to surface. Totals and the by-type
+breakdown exclude them too, so the digest can't disagree with itself.
+
+**`get_events()` and `get_level_counts()` share `build_where()`**, which
+takes a `$skip` list; the counts query passes `array( 'level' )`, since a
+tally *per level* has to run across everything the other filters allow.
+Keep new filters in `build_where()` so both stay in step.
 
 Session management (the Active Sessions screen, per-session revoke, the
 concurrent-session limit, Revoke Expired, Emergency Lockdown, and `AM_Sessions`
@@ -192,13 +212,22 @@ while a different warning still gets its own row.
 
 ## Decisions worth not re-litigating
 
-- **The Debug Log filters on an event-type whitelist, not a level
-  threshold.** `level >= WARNING` looks like the obvious implementation and
-  is wrong here: ordinary audit events (failed logins, password resets,
-  plugin/theme deletions) already use WARNING, so a level filter drags the
-  day-to-day audit trail onto a screen whose whole purpose is being separate
-  from it. If a new system-ish event should appear there, add its
-  type/action to the whitelist in `AM_Event_Query::get_debug_events()`.
+- **The Activity Log's status links are built from the data, not from
+  `AM_Log_Levels::ORDER`.** `AM_Event_Query::get_level_counts()` returns
+  only levels that actually have rows *under the other active filters*,
+  with counts, and the list renders in core's `.subsubsub` shape. Rendering
+  all eight PSR-3 levels unconditionally meant most sites showed five links
+  that led to an empty table. Two consequences that look like bugs but are
+  load-bearing: the links carry the other filters forward (otherwise
+  filter-aware counts would disagree with where the click lands), and the
+  *currently selected* level stays listed even at zero (otherwise selecting
+  it removes the only control that unselects it). The whole list is hidden
+  when there's one level or fewer — unless a level filter is on.
+- **Severity is not a proxy for "technical".** Any future attempt to split
+  or filter this log by `level >= WARNING` will be wrong for the same
+  reason the Debug Log's whitelist was written to avoid it: ordinary audit
+  events (failed logins, password resets, plugin/theme deletions) already
+  use WARNING. Level says how much it matters, not what kind of thing it is.
 - **`AM_Logger_Php_Warnings` is the only logger that has to defend itself
   against its own logging.** It runs on `set_error_handler()`, called
   synchronously mid-request, so three things that are non-issues elsewhere
@@ -308,7 +337,7 @@ with formatting/doc-block sniffs excluded — this codebase doesn't conform to
 WPCS's structured doc-block or whitespace style, and that's a style choice,
 not a defect.
 
-**`phpcs` runs clean as of 2.4.6, and is meant to stay that way** — a run with
+**`phpcs` runs clean as of 2.4.7, and is meant to stay that way** — a run with
 findings in it can't tell you which are new. If a genuinely new finding is a
 plugin-constant table name interpolated into SQL text (not a placeholder),
 that's accepted project-wide; suppress it rather than touching the ruleset.
