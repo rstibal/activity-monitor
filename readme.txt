@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, event log
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.4.9
+Stable tag: 2.4.10
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -68,6 +68,10 @@ Yes. Settings → Privacy offers full addresses, anonymised addresses (the last 
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
 
 == Changelog ==
+
+= 2.4.10 =
+* Changed: the Activity Log and Settings screens are both headed "Activity Monitor" instead of repeating the screen name, and the left-hand menu no longer lists "Activity Log" as its own item — the top-level "Activity Monitor" link still goes straight to the log, Settings is unchanged.
+* Changed: the log table's "User" column is now "Username" and shows the login name instead of the display name, matching what the column is actually named. The Details popup for an event still shows both.
 
 = 2.4.9 =
 * Changed: the user details popup is tidier. It's now titled "User Details" rather than repeating the person's name, the avatar-and-name banner across the top is gone, and the display name is a labelled row in the table with everything else — so every field about the user reads the same way instead of one of them being a heading.

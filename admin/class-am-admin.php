@@ -100,20 +100,6 @@ class AM_Admin {
 			add_action( 'load-' . $log_hook, array( $this, 'add_screen_options' ) );
 		}
 
-		// Registering a child with the same slug as the parent renames the
-		// item WordPress auto-creates for the top-level page, which would
-		// otherwise repeat the menu title. "Activity Log" rather than
-		// "Activity Monitor" so the child names what the screen is instead
-		// of echoing its parent.
-		self::$screen_hooks[] = add_submenu_page(
-			self::PAGE_LOG,
-			__( 'Activity Log', 'activity-monitor' ),
-			__( 'Activity Log', 'activity-monitor' ),
-			'manage_options',
-			self::PAGE_LOG,
-			array( $this, 'render_page_log' )
-		);
-
 		self::$screen_hooks[] = add_submenu_page(
 			self::PAGE_LOG,
 			__( 'Settings', 'activity-monitor' ),
@@ -213,8 +199,7 @@ class AM_Admin {
 			<td><span class="am-badge am-init-<?php echo esc_attr( $row->initiator ); ?>"><?php echo esc_html( AM_Initiator_Detector::label( $row->initiator ) ); ?></span></td>
 			<td>
 				<?php if ( (int) $row->user_id > 0 && '' !== $row->user_login ) : ?>
-					<?php // Display name only -- the username is a row in the profile modal this links to. ?>
-					<a href="#" class="am-user-profile-link" data-user-id="<?php echo esc_attr( (int) $row->user_id ); ?>"><strong><?php echo esc_html( '' !== $row->user_display_name ? $row->user_display_name : $row->user_login ); ?></strong></a>
+					<a href="#" class="am-user-profile-link" data-user-id="<?php echo esc_attr( (int) $row->user_id ); ?>"><strong><?php echo esc_html( $row->user_login ); ?></strong></a>
 				<?php else : ?>
 					<?php echo esc_html( '' !== $row->user_login ? $row->user_login : '—' ); ?>
 				<?php endif; ?>
@@ -1169,7 +1154,7 @@ class AM_Admin {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			return;
 		}
-		$this->render_screen_open( __( 'Activity Log', 'activity-monitor' ) );
+		$this->render_screen_open( __( 'Activity Monitor', 'activity-monitor' ) );
 		$this->render_log_screen();
 		$this->render_screen_close();
 	}
@@ -1178,7 +1163,7 @@ class AM_Admin {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			return;
 		}
-		$this->render_screen_open( __( 'Settings', 'activity-monitor' ) );
+		$this->render_screen_open( __( 'Activity Monitor', 'activity-monitor' ) );
 		$this->render_settings_screen();
 		$this->render_screen_close();
 	}
@@ -1552,7 +1537,7 @@ class AM_Admin {
 						<th><?php esc_html_e( 'Type',       'activity-monitor' ); ?></th>
 						<th><?php esc_html_e( 'Date',       'activity-monitor' ); ?></th>
 						<th><?php esc_html_e( 'Initiator',  'activity-monitor' ); ?></th>
-						<th><?php esc_html_e( 'User',       'activity-monitor' ); ?></th>
+						<th><?php esc_html_e( 'Username',   'activity-monitor' ); ?></th>
 						<th><?php esc_html_e( 'IP Address', 'activity-monitor' ); ?></th>
 						<th><?php esc_html_e( 'Message',    'activity-monitor' ); ?></th>
 						<th><?php esc_html_e( 'Actions',    'activity-monitor' ); ?></th>

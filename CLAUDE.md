@@ -35,10 +35,10 @@ workflow disappears.
   `user_login`** — never first/last name (`AM_Admin::real_name()` was removed
   — those fields are frequently blank). Which of the two to show depends on
   the context, and as of 2.4.2 they are no longer always stacked together:
-  the Activity Log's **User column shows `display_name` alone**, linking to the
-  profile modal, where both are their own rows — **Username** (`user_login`)
-  then **Display Name** — under User ID; the login was repeated on every row
-  and earned none of that width. That modal is titled a flat "User Details"
+  the Activity Log's **Username column shows `user_login` alone** (as of
+  2.4.10; it showed `display_name` through 2.4.9), linking to the profile
+  modal, where both are their own rows — **Username** (`user_login`) then
+  **Display Name** — under User ID. That modal is titled a flat "User Details"
   and has no avatar/name header: it was one in 2.4.9, and dropping it is why
   `display_name` needs a row of its own, or the modal would show every field
   about a user except the name it was previously headed with. The event
