@@ -30,14 +30,6 @@ class AM_Logger_Fatal_Errors extends AM_Logger_Base {
 
 	const FATAL_ERROR_TYPES = array( E_ERROR, E_PARSE, E_COMPILE_ERROR, E_CORE_ERROR, E_USER_ERROR );
 
-	public function slug(): string {
-		return 'fatal_errors';
-	}
-
-	public function label(): string {
-		return __( 'PHP fatal errors', 'activity-monitor' );
-	}
-
 	public function register_hooks() {
 		register_shutdown_function( array( $this, 'on_shutdown' ) );
 	}

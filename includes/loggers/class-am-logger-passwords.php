@@ -13,14 +13,6 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  */
 class AM_Logger_Passwords extends AM_Logger_Base {
 
-	public function slug(): string {
-		return 'passwords';
-	}
-
-	public function label(): string {
-		return __( 'Password changes', 'activity-monitor' );
-	}
-
 	public function register_hooks() {
 		add_action( 'password_reset', array( $this, 'on_password_reset' ), 10, 2 );
 		add_action( 'retrieve_password', array( $this, 'on_password_retrieve' ) );

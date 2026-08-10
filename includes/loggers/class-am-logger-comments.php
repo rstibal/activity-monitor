@@ -15,14 +15,6 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  */
 class AM_Logger_Comments extends AM_Logger_Base {
 
-	public function slug(): string {
-		return 'comments';
-	}
-
-	public function label(): string {
-		return __( 'Comments', 'activity-monitor' );
-	}
-
 	public function register_hooks() {
 		add_action( 'wp_insert_comment', array( $this, 'on_comment_insert' ), 10, 2 );
 		add_action( 'edit_comment', array( $this, 'on_comment_edit' ) );

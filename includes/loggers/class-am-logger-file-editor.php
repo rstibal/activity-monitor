@@ -45,14 +45,6 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  */
 class AM_Logger_File_Editor extends AM_Logger_Base {
 
-	public function slug(): string {
-		return 'file_editor';
-	}
-
-	public function label(): string {
-		return __( 'Theme/plugin file editor usage', 'activity-monitor' );
-	}
-
 	public function register_hooks() {
 		add_action( 'admin_init', array( $this, 'on_admin_init' ) );
 	}

@@ -16,14 +16,6 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  */
 class AM_Logger_Sites extends AM_Logger_Base {
 
-	public function slug(): string {
-		return 'sites';
-	}
-
-	public function label(): string {
-		return __( 'Multisite network sites', 'activity-monitor' );
-	}
-
 	public function register_hooks() {
 		if ( ! is_multisite() ) {
 			return;

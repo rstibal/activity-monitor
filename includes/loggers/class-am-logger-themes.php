@@ -21,14 +21,6 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  */
 class AM_Logger_Themes extends AM_Logger_Base {
 
-	public function slug(): string {
-		return 'themes';
-	}
-
-	public function label(): string {
-		return __( 'Themes', 'activity-monitor' );
-	}
-
 	public function register_hooks() {
 		add_action( 'switch_theme', array( $this, 'on_theme_switch' ), 10, 3 );
 		add_action( 'customize_save_after', array( $this, 'on_customizer_save' ) );

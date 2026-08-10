@@ -265,9 +265,8 @@ class AM_Event_Query {
 	// as the only place in the plugin where some event types silently
 	// didn't count, invisible from the UI and impossible to reconcile
 	// against the screen it links to. If PHP errors dominate a digest, the
-	// answer is to turn that event source off in Settings -> Event Sources,
-	// or fix the plugin emitting them -- both of which are visible actions
-	// with visible effects, unlike a hidden WHERE clause.
+	// answer is to fix the plugin emitting them -- a visible action with a
+	// visible effect, unlike a hidden WHERE clause.
 	//
 	// These take $days (7/14/30 typical) and query only am_events -- none
 	// of this needs am_event_context. Each returns plain arrays/counts

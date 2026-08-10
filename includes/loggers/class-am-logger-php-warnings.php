@@ -31,14 +31,6 @@ class AM_Logger_Php_Warnings extends AM_Logger_Base {
 	/** @var array<string,true> Keys already written this request. See maybe_log(). */
 	private $seen = array();
 
-	public function slug(): string {
-		return 'php_warnings';
-	}
-
-	public function label(): string {
-		return __( 'PHP warnings & notices', 'activity-monitor' );
-	}
-
 	public function register_hooks() {
 		$this->previous_handler = set_error_handler( array( $this, 'on_error' ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions -- this *is* the logging mechanism, not leftover debugging.
 	}

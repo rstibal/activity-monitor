@@ -26,14 +26,6 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  */
 class AM_Logger_Plugins extends AM_Logger_Base {
 
-	public function slug(): string {
-		return 'plugins';
-	}
-
-	public function label(): string {
-		return __( 'Plugins', 'activity-monitor' );
-	}
-
 	public function register_hooks() {
 		add_action( 'activated_plugin', array( $this, 'on_plugin_activated' ) );
 		add_action( 'deactivated_plugin', array( $this, 'on_plugin_deactivated' ) );

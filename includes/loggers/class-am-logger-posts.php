@@ -22,14 +22,6 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  */
 class AM_Logger_Posts extends AM_Logger_Base {
 
-	public function slug(): string {
-		return 'posts';
-	}
-
-	public function label(): string {
-		return __( 'Posts, pages & custom post types', 'activity-monitor' );
-	}
-
 	public function register_hooks() {
 		add_action( 'post_updated', array( $this, 'on_post_updated' ), 10, 3 );
 		add_action( 'transition_post_status', array( $this, 'on_post_status_change' ), 10, 3 );

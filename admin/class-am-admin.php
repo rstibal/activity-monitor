@@ -201,7 +201,7 @@ class AM_Admin {
 				<?php if ( (int) $row->user_id > 0 && '' !== $row->user_login ) : ?>
 					<a href="#" class="am-user-profile-link" data-user-id="<?php echo esc_attr( (int) $row->user_id ); ?>"><strong><?php echo esc_html( $row->user_login ); ?></strong></a>
 				<?php else : ?>
-					<?php echo esc_html( '' !== $row->user_login ? $row->user_login : '—' ); ?>
+					<?php echo esc_html( $row->user_login ); ?>
 				<?php endif; ?>
 			</td>
 			<td class="am-ip-cell" title="<?php echo esc_attr( $row->ip_address ); ?>"><?php echo self::ip_cell_html( (string) $row->ip_address ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped per-part in ip_cell_html(). ?></td>
@@ -258,11 +258,6 @@ class AM_Admin {
 	}
 
 	private function register_options() {
-		register_setting( self::SETTINGS_GROUP, 'am_disabled_loggers', array(
-			'sanitize_callback' => array( $this, 'sanitize_disabled_loggers' ),
-			'default'           => array(),
-		) );
-
 		register_setting( self::SETTINGS_GROUP, 'am_retention_days', array(
 			'type'              => 'integer',
 			'sanitize_callback' => array( $this, 'sanitize_retention_days' ),
@@ -305,7 +300,6 @@ class AM_Admin {
 			array( $this, 'section_intro_logging' ),
 			self::PAGE_SETTINGS
 		);
-		add_settings_field( 'am_field_event_sources', __( 'Event sources', 'activity-monitor' ), array( $this, 'field_event_sources' ), self::PAGE_SETTINGS, 'am_logging' );
 		add_settings_field( 'am_field_retention', __( 'Keep entries for', 'activity-monitor' ), array( $this, 'field_retention' ), self::PAGE_SETTINGS, 'am_logging' );
 		add_settings_field( 'am_field_grouping', __( 'Group repeat events', 'activity-monitor' ), array( $this, 'field_grouping' ), self::PAGE_SETTINGS, 'am_logging' );
 
@@ -343,49 +337,6 @@ class AM_Admin {
 	}
 
 	// ── Setting sanitizers ───────────────────────────────────────────────
-
-	/**
-	 * Inverts the Event sources checkboxes into the stored option.
-	 *
-	 * The boxes read as "record this" and are submitted as the *enabled*
-	 * slugs, but the option stores the *disabled* ones, so a logger added
-	 * in a later version is on by default on every existing site without a
-	 * migration -- which is what AM_Logger_Base::is_enabled() assumes.
-	 *
-	 * The hidden 'submitted' marker exists because an all-unchecked
-	 * fieldset posts nothing at all: without it, "disable every source"
-	 * and "this form never carried the field" would be indistinguishable,
-	 * and the Settings API hands a missing option's callback null either
-	 * way. Only slugs matching a registered logger are kept, so a stale or
-	 * hand-crafted one can't accumulate in the option.
-	 *
-	 * Registering this as a sanitize_callback means it runs on *every*
-	 * update_option() for the option, not just the settings form's -- so
-	 * it also has to recognize the stored shape (a plain list of disabled
-	 * slugs) rather than turning a WP-CLI or programmatic write into a
-	 * silent no-op.
-	 */
-	public function sanitize_disabled_loggers( $input ): array {
-		$known = array_keys( AM_Logger_Manager::all() );
-
-		if ( is_array( $input ) && isset( $input['submitted'] ) ) {
-			$enabled = ( isset( $input['enabled'] ) && is_array( $input['enabled'] ) )
-				? array_map( 'sanitize_key', $input['enabled'] )
-				: array();
-
-			return array_values( array_diff( $known, $enabled ) );
-		}
-
-		if ( is_array( $input ) ) {
-			return array_values( array_intersect( $known, array_map( 'sanitize_key', $input ) ) );
-		}
-
-		// null -- the Settings API's "this option wasn't in the POST at
-		// all". Keeping the current value is the safe reading; the
-		// alternative is disabling every source because a form didn't
-		// render.
-		return (array) get_option( 'am_disabled_loggers', array() );
-	}
 
 	/** Whitelisted against the offered choices -- 0 means "keep forever". */
 	public function sanitize_retention_days( $input ): int {
@@ -1660,39 +1611,6 @@ class AM_Admin {
 
 	public function section_intro_privacy() {
 		echo '<p>' . esc_html__( 'The activity log necessarily records who did what. These control how much of that is about the person rather than the action.', 'activity-monitor' ) . '</p>';
-	}
-
-	public function field_event_sources() {
-		$all_loggers      = AM_Logger_Manager::all();
-		$disabled_loggers = (array) get_option( 'am_disabled_loggers', array() );
-
-		if ( empty( $all_loggers ) ) {
-			echo '<p class="description">' . esc_html__( 'No event sources are registered.', 'activity-monitor' ) . '</p>';
-			return;
-		}
-		?>
-		<fieldset>
-			<legend class="screen-reader-text"><span><?php esc_html_e( 'Event sources', 'activity-monitor' ); ?></span></legend>
-
-			<?php // See sanitize_disabled_loggers() for why an all-unchecked form needs this marker. ?>
-			<input type="hidden" name="am_disabled_loggers[submitted]" value="1">
-
-			<div class="am-logger-grid">
-				<?php foreach ( $all_loggers as $logger_slug => $logger ) : ?>
-					<label>
-						<input type="checkbox" name="am_disabled_loggers[enabled][]"
-						       value="<?php echo esc_attr( $logger_slug ); ?>"
-						       <?php checked( ! in_array( $logger_slug, $disabled_loggers, true ) ); ?>>
-						<?php echo esc_html( $logger->label() ); ?>
-					</label>
-				<?php endforeach; ?>
-			</div>
-
-			<p class="description">
-				<?php esc_html_e( 'Unticking a source stops it being recorded from that point on. Entries already in the log are kept, and stay visible and exportable.', 'activity-monitor' ); ?>
-			</p>
-		</fieldset>
-		<?php
 	}
 
 	public function field_retention() {

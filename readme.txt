@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, event log
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.4.10
+Stable tag: 2.4.11
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -68,6 +68,10 @@ Yes. Settings → Privacy offers full addresses, anonymised addresses (the last 
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
 
 == Changelog ==
+
+= 2.4.11 =
+* Changed: the Activity Log's Username cell is now blank rather than an em dash for events with no logged-in user, such as an anonymous failed login.
+* Removed: the "Event sources" checkboxes on Settings, which let you stop recording an entire category (posts, users, plugins, and so on). Every event source is now always recorded; nothing else on that screen changed.
 
 = 2.4.10 =
 * Changed: the Activity Log and Settings screens are both headed "Activity Monitor" instead of repeating the screen name, and the left-hand menu no longer lists "Activity Log" as its own item — the top-level "Activity Monitor" link still goes straight to the log, Settings is unchanged.

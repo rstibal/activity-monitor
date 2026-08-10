@@ -10,14 +10,6 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  */
 class AM_Logger_Menus extends AM_Logger_Base {
 
-	public function slug(): string {
-		return 'menus';
-	}
-
-	public function label(): string {
-		return __( 'Navigation menus', 'activity-monitor' );
-	}
-
 	public function register_hooks() {
 		add_action( 'wp_update_nav_menu', array( $this, 'on_menu_update' ) );
 		add_action( 'wp_delete_nav_menu', array( $this, 'on_menu_delete' ) );

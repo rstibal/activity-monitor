@@ -19,14 +19,6 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  */
 class AM_Logger_Media extends AM_Logger_Base {
 
-	public function slug(): string {
-		return 'media';
-	}
-
-	public function label(): string {
-		return __( 'Media library', 'activity-monitor' );
-	}
-
 	public function register_hooks() {
 		add_action( 'add_attachment', array( $this, 'on_attachment_add' ) );
 		add_action( 'attachment_updated', array( $this, 'on_attachment_updated' ), 10, 3 );

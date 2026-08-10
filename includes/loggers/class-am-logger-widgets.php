@@ -14,14 +14,6 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  */
 class AM_Logger_Widgets extends AM_Logger_Base {
 
-	public function slug(): string {
-		return 'widgets';
-	}
-
-	public function label(): string {
-		return __( 'Widgets', 'activity-monitor' );
-	}
-
 	public function register_hooks() {
 		add_action( 'sidebar_admin_setup', array( $this, 'on_widget_save' ) );
 	}

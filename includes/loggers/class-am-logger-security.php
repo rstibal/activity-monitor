@@ -25,14 +25,6 @@ class AM_Logger_Security extends AM_Logger_Base {
 		'plugins.php',
 	);
 
-	public function slug(): string {
-		return 'security';
-	}
-
-	public function label(): string {
-		return __( 'Unauthorized access attempts', 'activity-monitor' );
-	}
-
 	public function register_hooks() {
 		add_action( 'admin_init', array( $this, 'on_admin_access' ) );
 	}

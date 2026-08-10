@@ -3,7 +3,7 @@
  * Plugin Name: Activity Monitor
  * Plugin URI:  https://robstibal.com
  * Description: Comprehensive WordPress audit log – tracks logins, content changes, settings updates, security events, and more.
- * Version:     2.4.10
+ * Version:     2.4.11
  * Author:      Rob Stibal
  * Author URI:  http://robstibal.com
  * License:     GPL v2 or later
@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'AM_VERSION', '2.4.10' );
+define( 'AM_VERSION', '2.4.11' );
 define( 'AM_FILE',    __FILE__ );
 define( 'AM_DIR',     plugin_dir_path( __FILE__ ) );
 define( 'AM_URL',     plugin_dir_url( __FILE__ ) );
@@ -172,6 +172,13 @@ function am_run_upgrade_cleanup() {
 	// out. Deleting those would log every user on the site out.
 	if ( version_compare( $done, '2.4.0', '<' ) ) {
 		delete_option( 'am_session_concurrent_limit' );
+	}
+
+	// 2.4.11 -- the per-logger Event Sources toggle removed. Every logger
+	// runs unconditionally now; a stale disabled-list would otherwise sit
+	// in wp_options forever with nothing left to read it.
+	if ( version_compare( $done, '2.4.11', '<' ) ) {
+		delete_option( 'am_disabled_loggers' );
 	}
 
 	update_option( 'am_cleanup_version', AM_VERSION );

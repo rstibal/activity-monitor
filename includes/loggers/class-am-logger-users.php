@@ -23,14 +23,6 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  */
 class AM_Logger_Users extends AM_Logger_Base {
 
-	public function slug(): string {
-		return 'users';
-	}
-
-	public function label(): string {
-		return __( 'Users & authentication', 'activity-monitor' );
-	}
-
 	public function register_hooks() {
 		add_action( 'wp_login', array( $this, 'on_login' ), 10, 2 );
 		add_action( 'wp_login_failed', array( $this, 'on_login_failed' ) );

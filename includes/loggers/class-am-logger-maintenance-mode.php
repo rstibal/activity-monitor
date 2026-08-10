@@ -26,14 +26,6 @@ class AM_Logger_Maintenance_Mode extends AM_Logger_Base {
 
 	const STATE_OPTION = 'am_maintenance_mode_last_state';
 
-	public function slug(): string {
-		return 'maintenance_mode';
-	}
-
-	public function label(): string {
-		return __( 'Maintenance mode', 'activity-monitor' );
-	}
-
 	public function register_hooks() {
 		add_action( 'admin_init', array( $this, 'on_admin_init' ) );
 	}

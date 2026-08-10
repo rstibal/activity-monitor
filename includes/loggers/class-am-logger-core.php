@@ -22,14 +22,6 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  */
 class AM_Logger_Core extends AM_Logger_Base {
 
-	public function slug(): string {
-		return 'core';
-	}
-
-	public function label(): string {
-		return __( 'WordPress core updates', 'activity-monitor' );
-	}
-
 	public function register_hooks() {
 		add_action( 'upgrader_process_complete', array( $this, 'on_upgrader_complete' ), 10, 2 );
 	}

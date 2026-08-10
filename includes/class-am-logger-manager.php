@@ -3,18 +3,13 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 /**
  * AM_Logger_Manager — instantiates every registered logger and wires up
- * its hooks, but only if that logger is enabled (per-logger toggle,
- * settings key `am_disabled_loggers`).
+ * its hooks.
  *
  * Add new loggers to REGISTERED_LOGGER_CLASSES below. Each entry is a
  * class name extending AM_Logger_Base; registering one is the whole of
- * what's needed, since the Settings screen's Event sources list is built
- * from all() and a logger absent from am_disabled_loggers is on.
+ * what's needed.
  */
 class AM_Logger_Manager {
-
-	/** @var AM_Logger_Base[] */
-	private static $loggers = array();
 
 	const REGISTERED_LOGGER_CLASSES = array(
 		'AM_Logger_Posts',
@@ -43,15 +38,7 @@ class AM_Logger_Manager {
 				continue;
 			}
 			$logger = new $class();
-			if ( $logger->is_enabled() ) {
-				$logger->register_hooks();
-			}
-			self::$loggers[ $logger->slug() ] = $logger;
+			$logger->register_hooks();
 		}
-	}
-
-	/** @return AM_Logger_Base[] All registered loggers, for the settings UI. */
-	public static function all(): array {
-		return self::$loggers;
 	}
 }

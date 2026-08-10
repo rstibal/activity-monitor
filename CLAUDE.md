@@ -104,9 +104,10 @@ selects WARNING-and-above, and `php_warning` is WARNING while
 slots); 2.4.8 deleted it. The concern was real, but it made the digest the
 one place where some rows silently didn't count, invisible from the UI and
 irreconcilable against the screen the digest links to. **Volume is a
-settings problem, not a query problem** — Settings → Event Sources turns a
-logger off, visibly, and `am_occasion_window_seconds` collapses repeats. A
-hidden `WHERE` is neither.
+settings problem, not a query problem** — `am_occasion_window_seconds`
+collapses repeats. A hidden `WHERE` is neither. (There used to be a
+per-logger Event Sources toggle alongside that; it was removed in 2.4.11 —
+see the note below.)
 
 **`get_events()` and `get_level_counts()` share `build_where()`**, which
 takes a `$skip` list; the counts query passes `array( 'level' )`, since a
@@ -162,15 +163,16 @@ the Save button — everything above it is a field, everything below carries its
 own control. Clear Log stays an `admin_post` action for the same reason, and
 sits last because it's destructive. Don't fold either into the form.
 
-**`sanitize_disabled_loggers()` is inverted on purpose.** The checkboxes read
-"record this" and post the *enabled* slugs under
-`am_disabled_loggers[enabled][]`; the option stores the *disabled* ones so a
-logger added later is on by default with no migration. The hidden
-`am_disabled_loggers[submitted]` marker is load-bearing: an all-unchecked
-fieldset posts nothing, and without it "disable everything" is
-indistinguishable from "this field wasn't on the page". The callback also
-accepts the plain stored shape, because a `sanitize_callback` runs on every
-`update_option()`, not just the form's.
+**The per-logger Event Sources toggle was removed in 2.4.11.** Every
+registered logger's `register_hooks()` now runs unconditionally in
+`AM_Logger_Manager::init()`; there is no `is_enabled()`, no
+`am_disabled_loggers` option, and `AM_Logger_Base` no longer declares
+`slug()`/`label()` (they existed solely to key and label that UI). It was
+never used and its inverted-storage logic (`sanitize_disabled_loggers()`,
+deleted with it) was one of the more fragile corners of the settings form.
+If per-logger noise control is ever wanted back, it needs its own slug/label
+contract reintroduced on `AM_Logger_Base` — don't resurrect it as a
+half-measure grafted onto something else.
 
 **Rows per page is a Screen Option, not a setting** — `am_log_per_page`, via
 `add_screen_option()` on the log's `load-` hook. It's per-user, which is the
@@ -318,13 +320,10 @@ list of distinct `event_type` values in the database.
 
 ## Known issues
 
-None currently tracked. Both long-standing entries were resolved in 2.2.1: the
+None currently tracked. The one long-standing entry was resolved in 2.2.1: the
 user filter now renders a removable chip in the filter bar (it's still set only
 from the profile modal, never from a visible input, which is why the chip
-matters), and Settings → Activity Log → Event Sources writes the
-`am_disabled_loggers` option that `AM_Logger_Base::is_enabled()` has always
-read. That option stores the *disabled* slugs, not the enabled ones, so a
-logger added later is on by default without a migration — keep it that way.
+matters).
 
 ## Verifying changes
 

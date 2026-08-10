@@ -12,14 +12,6 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  */
 class AM_Logger_Terms extends AM_Logger_Base {
 
-	public function slug(): string {
-		return 'terms';
-	}
-
-	public function label(): string {
-		return __( 'Categories, tags & taxonomies', 'activity-monitor' );
-	}
-
 	public function register_hooks() {
 		add_action( 'created_term', array( $this, 'on_term_created' ), 10, 3 );
 		add_action( 'edited_term', array( $this, 'on_term_edited' ), 10, 3 );
