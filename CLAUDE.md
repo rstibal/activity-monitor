@@ -42,9 +42,13 @@ workflow disappears.
   and has no avatar/name header: it was one in 2.4.9, and dropping it is why
   `display_name` needs a row of its own, or the modal would show every field
   about a user except the name it was previously headed with. The event
-  detail modal still stacks both (`display_name` bold over `user_login` in a
-  `small.am-role`), since there it's the row's own stored snapshot of who acted
-  rather than a live lookup. Single-line contexts (Slack/email) stay
+  detail modal's **Username row shows `user_login` alone** as of 2.4.12,
+  linking to the same profile modal as the Username column (`display_name`
+  isn't shown there — through 2.4.11 it stacked `display_name` bold over
+  `user_login` in a `small.am-role`, on the reasoning that it was the row's
+  own stored snapshot rather than a live lookup, but that made it the one
+  place inconsistent with the Username column's login-only convention).
+  Single-line contexts (Slack/email) stay
   `"display_name (user_login)"`. `display_name` is read live
   via `get_userdata()`/`WP_User` where the user still exists, or from the
   `am_events.user_display_name` snapshot column otherwise (populated

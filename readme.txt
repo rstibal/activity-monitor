@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, event log
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.4.11
+Stable tag: 2.4.12
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -68,6 +68,9 @@ Yes. Settings → Privacy offers full addresses, anonymised addresses (the last 
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
 
 == Changelog ==
+
+= 2.4.12 =
+* Changed: the event Details popup's "User" row is now "Username" and shows just the login name, linked to the same User Details popup the Username column opens, instead of stacking the display name and login.
 
 = 2.4.11 =
 * Changed: the Activity Log's Username cell is now blank rather than an em dash for events with no logged-in user, such as an anonymous failed login.

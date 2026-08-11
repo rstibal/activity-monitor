@@ -699,18 +699,19 @@ class AM_Admin {
 					</span>
 				</td>
 			</tr>
+			<?php if ( '' !== $row->user_login ) : ?>
 			<tr>
-				<th><?php esc_html_e( 'User', 'activity-monitor' ); ?></th>
+				<th><?php esc_html_e( 'Username', 'activity-monitor' ); ?></th>
 				<td>
-					<?php if ( '' !== $row->user_login ) : ?>
-						<strong><?php echo esc_html( '' !== $row->user_display_name ? $row->user_display_name : $row->user_login ); ?></strong>
-						<br><small class="am-role"><?php echo esc_html( $row->user_login ); ?></small>
+					<?php if ( (int) $row->user_id > 0 ) : ?>
+						<a href="#" class="am-user-profile-link" data-user-id="<?php echo esc_attr( (int) $row->user_id ); ?>"><?php echo esc_html( $row->user_login ); ?></a>
 					<?php else : ?>
-						—
+						<?php echo esc_html( $row->user_login ); ?>
 					<?php endif; ?>
 					<?php if ( $row->user_role ) echo ' (' . esc_html( $row->user_role ) . ')'; ?>
 				</td>
 			</tr>
+			<?php endif; ?>
 			<tr><th><?php esc_html_e( 'IP Address', 'activity-monitor' ); ?></th><td><?php echo self::ip_cell_html( (string) $row->ip_address ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped per-part in ip_cell_html(). ?></td></tr>
 			<tr>
 				<th><?php esc_html_e( 'Object', 'activity-monitor' ); ?></th>
