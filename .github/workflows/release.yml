@@ -15,15 +15,32 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Determine version
+        id: version
+        run: |
+          # Read from the plugin header rather than the release tag -- it's
+          # the one place CLAUDE.md requires to be authoritative, and stays
+          # correct even for a workflow_dispatch run with no release tag.
+          VERSION="$(grep -oP "define\( 'AM_VERSION', '\K[0-9.]+" activity-monitor.php)"
+          if [ -z "$VERSION" ]; then
+            echo "::error::Could not read AM_VERSION from activity-monitor.php"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
       - name: Build plugin zip
+        env:
+          ZIP_NAME: activity-monitor-${{ steps.version.outputs.version }}.zip
         run: |
           mkdir -p build/activity-monitor
           cp activity-monitor.php readme.txt uninstall.php build/activity-monitor/
           cp -r admin assets includes build/activity-monitor/
           cd build
-          zip -r ../activity-monitor.zip activity-monitor
+          zip -r "../$ZIP_NAME" activity-monitor
 
       - name: Verify zip uses forward-slash paths
+        env:
+          ZIP_NAME: activity-monitor-${{ steps.version.outputs.version }}.zip
         run: |
           # WordPress's uploader (both the ZipArchive and PclZip code paths)
           # only treats '/' as a directory separator inside a zip entry. A
@@ -32,9 +49,9 @@ jobs:
           # includes/class-foo.php -- this has broken an in-place upgrade
           # via the Plugins screen's Upload feature before. Fail the build
           # rather than ship a zip that can reproduce it.
-          if unzip -l activity-monitor.zip | awk 'NR>3 {print $4}' | grep -q '\\'; then
-            echo "::error::activity-monitor.zip contains backslash-separated paths -- this will corrupt an in-place upgrade via the WordPress Upload Plugin flow."
-            unzip -l activity-monitor.zip | awk 'NR>3 {print $4}' | grep '\\'
+          if unzip -l "$ZIP_NAME" | awk 'NR>3 {print $4}' | grep -q '\\'; then
+            echo "::error::$ZIP_NAME contains backslash-separated paths -- this will corrupt an in-place upgrade via the WordPress Upload Plugin flow."
+            unzip -l "$ZIP_NAME" | awk 'NR>3 {print $4}' | grep '\\'
             exit 1
           fi
 
@@ -42,10 +59,10 @@ jobs:
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
-          files: activity-monitor.zip
+          files: activity-monitor-${{ steps.version.outputs.version }}.zip
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: activity-monitor
-          path: activity-monitor.zip
+          name: activity-monitor-${{ steps.version.outputs.version }}
+          path: activity-monitor-${{ steps.version.outputs.version }}.zip
