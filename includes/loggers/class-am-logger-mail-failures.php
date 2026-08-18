@@ -3,15 +3,15 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 /**
  * AM_Logger_Mail_Failures — catches wp_mail() delivery failures via the
- * wp_mail_failed action, so a silently-failing notification/digest
- * email becomes visible in the Activity Log instead of just vanishing.
+ * wp_mail_failed action, so a silently-failing notification email
+ * becomes visible in the Activity Log instead of just vanishing.
  *
  * This exists because of a real, confirmed gap: wp_mail() returns
  * false on failure, but AM_Notifications::send_email() (the instant
  * per-event email alerts) never checked that return value at all --
  * meaning even a hard PHPMailer failure produced no record anywhere.
- * AM_Digest::send()/send_test() DO check the return value correctly,
- * but neither wp_mail() nor this plugin can tell the difference
+ * Even where the return value IS checked correctly, neither wp_mail()
+ * nor this plugin can tell the difference
  * between "actually delivered" and "handed off to the mail transport,
  * which then silently dropped/bounced/spam-filtered it" -- wp_mail()
  * returning true only means the handoff succeeded, not that the

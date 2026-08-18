@@ -105,9 +105,9 @@
 	-webkit-overflow-scrolling: touch;
 }
 
-/* Applied to the Activity Log table and to the Notification Channels and
-   Email Digest tables on Settings, all of which are plain core
-   .wp-list-table.striped. Only two behaviours differ from core's default:
+/* Applied to the Activity Log table and to the Notification Channels
+   table on Settings, both of which are plain core .wp-list-table.striped.
+   Only two behaviours differ from core's default:
    auto layout, because these columns vary far more in natural width than
    a fixed layout handles well, and nowrap cells, because a wrapped
    timestamp or IP is harder to scan than a truncated one. Everything
@@ -135,8 +135,8 @@
    something to defend against here. */
 .am-datetime-cell { white-space: nowrap; }
 
-/* Message column (Activity Log only -- Notification Channels/Digest
-   still use the shared .am-message-cell below, unchanged). No
+/* Message column (Activity Log only -- Notification Channels still uses
+   the shared .am-message-cell below, unchanged). No
    max-width: table-layout:auto already gives this column whatever
    space the other (mostly nowrap) columns don't need, so capping it
    here only wasted space. The clamp itself lives on the inner
@@ -226,9 +226,12 @@
 /* Destructive actions. Core has no "danger button", so this is one of
    the few genuinely additive rules here -- kept to a red label and
    border on core's own .button shape rather than a differently-shaped
-   control. */
-.am-btn-danger { color: #b32d2e; border-color: #b32d2e; }
-.am-btn-danger:hover, .am-btn-danger:focus { background: #b32d2e; color: #fff; border-color: #b32d2e; }
+   control. Selector is `.button.am-btn-danger`, not the bare class:
+   core's own `.wp-core-ui .button` rule is two classes deep (specificity
+   0,2,0), which outranks a single-class `.am-btn-danger` (0,1,0)
+   regardless of stylesheet order -- the red never actually painted. */
+.button.am-btn-danger { color: #b32d2e; border-color: #b32d2e; }
+.button.am-btn-danger:hover, .button.am-btn-danger:focus { background: #b32d2e; color: #fff; border-color: #b32d2e; }
 
 .am-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 100000; display: flex; align-items: center; justify-content: center; }
 .am-modal { background: #fff; border-radius: 6px; box-shadow: 0 8px 40px rgba(0,0,0,0.25); width: 660px; max-width: 95vw; max-height: 85vh; display: flex; flex-direction: column; }
@@ -253,7 +256,7 @@
 /* Settings screen. There is deliberately almost nothing here.
    Everything on that screen is now core furniture -- <h2> headings,
    .form-table rows built by the Settings API, .description paragraphs,
-   .wp-list-table for the channel/digest lists, submit_button() -- and
+   .wp-list-table for the channel list, submit_button() -- and
    core styles all of it. Until 2.4.3 this block reimplemented .postbox
    as .am-settings-section, added a small-caps group heading, a section
    divider rule and a red-bordered "danger zone", none of which core
@@ -274,25 +277,9 @@
 	margin: 0 0 10px 24px;
 }
 
-/* Digest preview. Hidden until the Preview button loads a document into
-   it (jQuery .show() sets the inline display that overrides this), then
-   framed like a document rather than left as a bare iframe. */
-.am-digest-preview {
-	display: none;
-	margin-top: 14px;
-	border: 1px solid #c3c4c7;
-	max-width: 900px;
-}
-.am-digest-preview iframe {
-	display: block;
-	width: 100%;
-	height: 500px;
-	border: 0;
-}
-
-/* Validation message inside the channel/digest modals. Core has no
-   inline form-error style to borrow, and this is the same red it uses
-   for destructive/error text elsewhere in wp-admin. */
+/* Validation message inside the channel modal. Core has no inline
+   form-error style to borrow, and this is the same red it uses for
+   destructive/error text elsewhere in wp-admin. */
 .am-modal-error {
 	color: #d63638;
 	margin: 12px 0 0;

@@ -5,8 +5,7 @@
  *
  * One top-level menu with two submenu pages:
  *   1. Activity Log  (the default screen, keeps the bare plugin slug)
- *   2. Settings      (notifications, digests, event sources, display,
- *                     clear-log)
+ *   2. Settings      (notifications, event sources, display, clear-log)
  *
  * @package ActivityMonitor
  */
@@ -18,8 +17,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 class AM_Admin {
 
 	/** Page slugs. The log keeps the bare plugin slug so existing links
-	 *  into it -- the digest email, the plain-text alert, any bookmark --
-	 *  keep working unchanged. */
+	 *  into it -- the plain-text alert, any bookmark -- keep working
+	 *  unchanged. */
 	const PAGE_LOG      = 'activity-monitor';
 	const PAGE_SETTINGS = 'activity-monitor-settings';
 
@@ -65,11 +64,6 @@ class AM_Admin {
 		// save-side hook at all.
 		add_action( 'admin_notices',                          array( $instance, 'show_notices' ) );
 		add_action( 'wp_ajax_am_get_v2_event_detail',         array( $instance, 'ajax_v2_event_detail' ) );
-		add_action( 'wp_ajax_am_digest_preview',              array( $instance, 'ajax_digest_preview' ) );
-		add_action( 'wp_ajax_am_digest_send_test',            array( $instance, 'ajax_digest_send_test' ) );
-		add_action( 'wp_ajax_am_digest_config_form',          array( $instance, 'ajax_digest_config_form' ) );
-		add_action( 'wp_ajax_am_save_digest_config',          array( $instance, 'ajax_save_digest_config' ) );
-		add_action( 'wp_ajax_am_delete_digest_config',        array( $instance, 'ajax_delete_digest_config' ) );
 		add_action( 'wp_ajax_am_ip_lookup',                   array( $instance, 'ajax_ip_lookup' ) );
 		add_action( 'wp_ajax_am_user_profile',                array( $instance, 'ajax_user_profile' ) );
 		add_action( 'wp_ajax_am_channel_form',                array( $instance, 'ajax_channel_form' ) );
@@ -246,11 +240,11 @@ class AM_Admin {
 	// own custom success notice, which is why the screen had four different
 	// save behaviours on it at once.
 	//
-	// What is deliberately NOT here: notification channels and digest
-	// configs. Those are lists of records, not fields -- they are added,
-	// edited and deleted one at a time through a modal that saves over AJAX
-	// immediately, so they have nothing to contribute to a page-level Save
-	// button. They render below it for that reason.
+	// What is deliberately NOT here: notification channels. Those are a
+	// list of records, not fields -- they are added, edited and deleted
+	// one at a time through a modal that saves over AJAX immediately, so
+	// they have nothing to contribute to a page-level Save button. They
+	// render below it for that reason.
 
 	public function register_settings() {
 		$this->register_options();
@@ -499,86 +493,6 @@ class AM_Admin {
 	}
 
 	/**
-	 * Returns the add/edit modal's form HTML for one digest config. For
-	 * "Add Digest" the request carries no id; for "Edit" it carries an
-	 * id, and the config's current stored values are looked up
-	 * server-side (not trusted from the client) to populate the form --
-	 * same pattern as ajax_channel_form().
-	 */
-	public function ajax_digest_config_form() {
-		check_ajax_referer( 'am_ajax', 'nonce' );
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_die( '-1' );
-		}
-
-		$id     = sanitize_text_field( wp_unslash( $_POST['id'] ?? '' ) );
-		$config = $id ? AM_Digest::get_config( $id ) : null;
-
-		ob_start();
-		$this->render_digest_modal_form( $config );
-		wp_send_json_success( array(
-			'html'  => ob_get_clean(),
-			'title' => $config ? __( 'Edit Digest', 'activity-monitor' ) : __( 'Add Digest', 'activity-monitor' ),
-		) );
-	}
-
-	/** Saves one digest config (add or edit) immediately, same AJAX-per-item pattern as notification channels. */
-	public function ajax_save_digest_config() {
-		check_ajax_referer( 'am_ajax', 'nonce' );
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_die( '-1' );
-		}
-
-		$id        = sanitize_text_field( wp_unslash( $_POST['id'] ?? '' ) );
-		$frequency = sanitize_key( wp_unslash( $_POST['frequency'] ?? '' ) );
-		if ( ! in_array( $frequency, array( 'daily', 'weekly', 'monthly' ), true ) ) {
-			wp_send_json_error( array( 'message' => __( 'Choose a frequency.', 'activity-monitor' ) ) );
-		}
-		$day_of_week = absint( wp_unslash( $_POST['day_of_week'] ?? 1 ) ) % 7;
-
-		$emails     = array_filter( array_map( 'trim', explode( ',', wp_unslash( $_POST['recipients'] ?? '' ) ) ) );
-		$recipients = implode( ', ', array_filter( $emails, 'is_email' ) );
-		if ( '' === $recipients ) {
-			wp_send_json_error( array( 'message' => __( 'Enter at least one valid email address.', 'activity-monitor' ) ) );
-		}
-
-		if ( $id && AM_Digest::get_config( $id ) ) {
-			AM_Digest::update_config( $id, $frequency, $day_of_week, $recipients );
-		} else {
-			AM_Digest::add_config( $frequency, $day_of_week, $recipients );
-		}
-
-		ob_start();
-		foreach ( AM_Digest::get_configs() as $config ) {
-			$this->render_digest_table_row( $config );
-		}
-		wp_send_json_success( array( 'html' => ob_get_clean() ) );
-	}
-
-	/** Deletes one digest config and returns the refreshed table body HTML. */
-	public function ajax_delete_digest_config() {
-		check_ajax_referer( 'am_ajax', 'nonce' );
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_die( '-1' );
-		}
-
-		$id = sanitize_text_field( wp_unslash( $_POST['id'] ?? '' ) );
-		if ( $id ) {
-			AM_Digest::delete_config( $id );
-		}
-
-		$configs = AM_Digest::get_configs();
-		ob_start();
-		foreach ( $configs as $config ) {
-			$this->render_digest_table_row( $config );
-		}
-		wp_send_json_success( array(
-			'html'  => ob_get_clean(),
-			'empty' => empty( $configs ),
-		) );
-	}
-
-	/**
 	 * Streams a file download -- reads the same am_* filter params the log
 	 * screen's filter form uses (see render_log_screen()) so export always
 	 * matches what's currently on screen. am_export_action maps to
@@ -621,41 +535,6 @@ class AM_Admin {
 	}
 
 	// ── AJAX ─────────────────────────────────────────────────────────────
-
-	public function ajax_digest_preview() {
-		check_ajax_referer( 'am_ajax', 'nonce' );
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_die( '-1' );
-		}
-
-		$frequency = sanitize_key( wp_unslash( $_POST['frequency'] ?? 'weekly' ) );
-		if ( ! in_array( $frequency, array( 'daily', 'weekly', 'monthly' ), true ) ) {
-			$frequency = 'weekly';
-		}
-		wp_send_json_success( array( 'html' => AM_Digest::build_html( $frequency, true ) ) );
-	}
-
-	public function ajax_digest_send_test() {
-		check_ajax_referer( 'am_ajax', 'nonce' );
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_die( '-1' );
-		}
-
-		$email = sanitize_email( wp_unslash( $_POST['email'] ?? '' ) );
-		if ( ! is_email( $email ) ) {
-			wp_send_json_error( array( 'message' => __( 'Enter a valid email address.', 'activity-monitor' ) ) );
-		}
-		$frequency = sanitize_key( wp_unslash( $_POST['frequency'] ?? 'weekly' ) );
-		if ( ! in_array( $frequency, array( 'daily', 'weekly', 'monthly' ), true ) ) {
-			$frequency = 'weekly';
-		}
-
-		$sent = AM_Digest::send_test( $email, $frequency );
-		if ( $sent ) {
-			wp_send_json_success( array( 'message' => __( 'Test email sent.', 'activity-monitor' ) ) );
-		}
-		wp_send_json_error( array( 'message' => __( 'Failed to send. Check your site\'s mail configuration.', 'activity-monitor' ) ) );
-	}
 
 	public function ajax_v2_event_detail() {
 		check_ajax_referer( 'am_ajax', 'nonce' );
@@ -1099,8 +978,8 @@ class AM_Admin {
 	// screen body in the shared chrome: the .wrap/header opener, and the
 	// modal overlay closer. The overlay markup has to be emitted on every
 	// screen, not just the log -- Settings opens modals into it too (IP
-	// lookup, digest and channel forms), and without it in the DOM those
-	// clicks do nothing.
+	// lookup and channel forms), and without it in the DOM those clicks
+	// do nothing.
 
 	public function render_page_log() {
 		if ( ! current_user_can( 'manage_options' ) ) {
@@ -1571,9 +1450,9 @@ class AM_Admin {
 	 *
 	 *   1. one options.php form holding every field (Logging, Display,
 	 *      Privacy, uninstall), ending in a single Save Changes button
-	 *   2. the two record lists -- notification channels and digests --
-	 *      which are added and edited through modals that save over AJAX
-	 *      as you go, so they have nothing to save at page level
+	 *   2. the notification channels list, added and edited through
+	 *      modals that save over AJAX as you go, so it has nothing to
+	 *      save at page level
 	 *   3. Clear Log, an action rather than a setting, last because it is
 	 *      destructive
 	 *
@@ -1600,7 +1479,6 @@ class AM_Admin {
 
 		<?php
 		$this->render_channels_section();
-		$this->render_digest_section();
 		$this->render_clear_log_section();
 	}
 
@@ -1820,81 +1698,6 @@ class AM_Admin {
 		<?php
 	}
 
-	// ── Email digests ────────────────────────────────────────────────────
-
-	private function render_digest_section() {
-		$configs  = AM_Digest::get_configs();
-		$next_run = wp_next_scheduled( AM_Digest::CRON_HOOK );
-		?>
-		<h2><?php esc_html_e( 'Email Digests', 'activity-monitor' ); ?></h2>
-		<p>
-			<?php esc_html_e( 'A scheduled summary of activity: totals, top event types, and notable events, with a link to the full log. Add as many as you need — say, a daily summary to one address and a weekly one to another. These save as you add or edit them too.', 'activity-monitor' ); ?>
-		</p>
-
-		<?php if ( empty( $configs ) ) : ?>
-			<p class="description"><?php esc_html_e( 'No digests configured yet.', 'activity-monitor' ); ?></p>
-		<?php else : ?>
-			<div class="am-table-scroll">
-				<table class="wp-list-table widefat striped am-log-table">
-					<thead>
-						<tr>
-							<th scope="col"><?php esc_html_e( 'Frequency', 'activity-monitor' ); ?></th>
-							<th scope="col"><?php esc_html_e( 'Recipients', 'activity-monitor' ); ?></th>
-							<th scope="col"><?php esc_html_e( 'Last Sent', 'activity-monitor' ); ?></th>
-							<th scope="col"><?php esc_html_e( 'Actions', 'activity-monitor' ); ?></th>
-						</tr>
-					</thead>
-					<tbody id="am-digest-table-body">
-						<?php foreach ( $configs as $config ) : ?>
-							<?php $this->render_digest_table_row( $config ); ?>
-						<?php endforeach; ?>
-					</tbody>
-				</table>
-			</div>
-			<?php if ( $next_run ) : ?>
-				<p class="description">
-					<?php
-					printf(
-						/* translators: %s: next scheduled check date/time */
-						esc_html__( 'Next check: %s. Each digest sends independently, once its own frequency is due.', 'activity-monitor' ),
-						esc_html( wp_date( AM_Date_Format::combined(), $next_run ) )
-					);
-					?>
-				</p>
-			<?php endif; ?>
-		<?php endif; ?>
-
-		<p>
-			<button type="button" class="button am-add-digest-btn">
-				<?php esc_html_e( 'Add Digest', 'activity-monitor' ); ?>
-			</button>
-		</p>
-
-		<h3><?php esc_html_e( 'Preview and test', 'activity-monitor' ); ?></h3>
-		<p>
-			<?php esc_html_e( 'Independent of the digests above — pick a frequency to see or send what that digest would contain.', 'activity-monitor' ); ?>
-		</p>
-		<p>
-			<label for="am-digest-preview-frequency"><?php esc_html_e( 'Frequency', 'activity-monitor' ); ?></label>
-			<select id="am-digest-preview-frequency">
-				<option value="daily"><?php esc_html_e( 'Daily', 'activity-monitor' ); ?></option>
-				<option value="weekly" selected><?php esc_html_e( 'Weekly', 'activity-monitor' ); ?></option>
-				<option value="monthly"><?php esc_html_e( 'Monthly', 'activity-monitor' ); ?></option>
-			</select>
-			<button type="button" class="button" id="am-digest-preview"><?php esc_html_e( 'Preview', 'activity-monitor' ); ?></button>
-		</p>
-		<p>
-			<label for="am-digest-test-email"><?php esc_html_e( 'Send a test to', 'activity-monitor' ); ?></label>
-			<input type="email" id="am-digest-test-email" placeholder="<?php esc_attr_e( 'test@example.com', 'activity-monitor' ); ?>" class="regular-text">
-			<button type="button" class="button" id="am-digest-send-test"><?php esc_html_e( 'Send Test Email', 'activity-monitor' ); ?></button>
-		</p>
-		<p id="am-digest-test-result" class="description"></p>
-		<div id="am-digest-preview-frame-wrap" class="am-digest-preview">
-			<iframe id="am-digest-preview-frame" title="<?php esc_attr_e( 'Digest preview', 'activity-monitor' ); ?>"></iframe>
-		</div>
-		<?php
-	}
-
 	// ── Clear log ────────────────────────────────────────────────────────
 
 	private function render_clear_log_section() {
@@ -1908,119 +1711,6 @@ class AM_Admin {
 			<?php wp_nonce_field( 'am_clear_log' ); ?>
 			<input type="hidden" name="action" value="am_clear_log">
 			<?php submit_button( __( 'Clear Entire Log', 'activity-monitor' ), 'am-btn-danger', 'submit', true ); ?>
-		</form>
-		<?php
-	}
-
-	/** One row in the Email Digest table (display only — editing happens in the modal). */
-	private function render_digest_table_row( array $config ) {
-		$frequency  = $config['frequency'] ?? 'weekly';
-		$last_sent  = $config['last_sent'] ?? '';
-		$freq_labels = array(
-			'daily'   => __( 'Daily', 'activity-monitor' ),
-			'weekly'  => __( 'Weekly', 'activity-monitor' ),
-			'monthly' => __( 'Monthly', 'activity-monitor' ),
-		);
-		$freq_label = $freq_labels[ $frequency ] ?? ucfirst( $frequency );
-		if ( 'weekly' === $frequency ) {
-			$days = array(
-				0 => __( 'Sunday', 'activity-monitor' ), 1 => __( 'Monday', 'activity-monitor' ),
-				2 => __( 'Tuesday', 'activity-monitor' ), 3 => __( 'Wednesday', 'activity-monitor' ),
-				4 => __( 'Thursday', 'activity-monitor' ), 5 => __( 'Friday', 'activity-monitor' ),
-				6 => __( 'Saturday', 'activity-monitor' ),
-			);
-			$day_name = $days[ absint( $config['day_of_week'] ?? 1 ) ] ?? '';
-			/* translators: 1: frequency label, 2: day of week */
-			$freq_label = sprintf( __( '%1$s (%2$s)', 'activity-monitor' ), $freq_label, $day_name );
-		}
-		?>
-		<tr data-digest-id="<?php echo esc_attr( $config['id'] ); ?>">
-			<td><?php echo esc_html( $freq_label ); ?></td>
-			<td class="am-message-cell" title="<?php echo esc_attr( $config['recipients'] ?? '' ); ?>"><?php echo esc_html( $config['recipients'] ?? '' ); ?></td>
-			<td>
-				<?php
-				echo esc_html(
-					$last_sent
-						? wp_date( AM_Date_Format::combined(), strtotime( $last_sent . ' UTC' ) )
-						: __( 'Never', 'activity-monitor' )
-				);
-				?>
-			</td>
-			<td>
-				<button type="button" class="button button-small am-edit-digest-btn" data-id="<?php echo esc_attr( $config['id'] ); ?>">
-					<?php esc_html_e( 'Edit', 'activity-monitor' ); ?>
-				</button>
-			</td>
-		</tr>
-		<?php
-	}
-
-	/**
-	 * The add/edit modal's form fields for one digest config. Shared by
-	 * add-mode (null $config) and edit-mode (populated $config), same
-	 * pattern as render_channel_modal_form().
-	 */
-	private function render_digest_modal_form( ?array $config ) {
-		$frequency   = $config['frequency'] ?? 'weekly';
-		$day         = absint( $config['day_of_week'] ?? 1 );
-		$recipients  = $config['recipients'] ?? '';
-		$days = array(
-			0 => __( 'Sunday', 'activity-monitor' ), 1 => __( 'Monday', 'activity-monitor' ),
-			2 => __( 'Tuesday', 'activity-monitor' ), 3 => __( 'Wednesday', 'activity-monitor' ),
-			4 => __( 'Thursday', 'activity-monitor' ), 5 => __( 'Friday', 'activity-monitor' ),
-			6 => __( 'Saturday', 'activity-monitor' ),
-		);
-		?>
-		<form id="am-digest-modal-form">
-			<input type="hidden" name="id" value="<?php echo esc_attr( $config['id'] ?? '' ); ?>">
-
-			<div class="am-channel-fields">
-				<div class="am-field-row">
-					<label>
-						<?php esc_html_e( 'Frequency', 'activity-monitor' ); ?>
-						<select name="frequency" id="am-digest-modal-frequency">
-							<option value="daily"   <?php selected( $frequency, 'daily' ); ?>><?php esc_html_e( 'Daily', 'activity-monitor' ); ?></option>
-							<option value="weekly"  <?php selected( $frequency, 'weekly' ); ?>><?php esc_html_e( 'Weekly', 'activity-monitor' ); ?></option>
-							<option value="monthly" <?php selected( $frequency, 'monthly' ); ?>><?php esc_html_e( 'Monthly', 'activity-monitor' ); ?></option>
-						</select>
-					</label>
-				</div>
-
-				<div class="am-field-row" id="am-digest-modal-day-row" <?php echo 'weekly' === $frequency ? '' : 'style="display:none;"'; ?>>
-					<label>
-						<?php esc_html_e( 'Day of week', 'activity-monitor' ); ?>
-						<select name="day_of_week">
-							<?php foreach ( $days as $val => $label ) : ?>
-								<option value="<?php echo esc_attr( $val ); ?>" <?php selected( $day, $val ); ?>><?php echo esc_html( $label ); ?></option>
-							<?php endforeach; ?>
-						</select>
-					</label>
-				</div>
-
-				<div class="am-field-row am-field-full">
-					<label>
-						<?php esc_html_e( 'Recipients', 'activity-monitor' ); ?>
-						<input type="text" name="recipients"
-						       value="<?php echo esc_attr( $recipients ); ?>"
-						       placeholder="<?php esc_attr_e( 'admin@example.com, other@example.com', 'activity-monitor' ); ?>"
-						       class="large-text">
-						<p class="description"><?php esc_html_e( 'Separate multiple addresses with commas.', 'activity-monitor' ); ?></p>
-					</label>
-				</div>
-			</div>
-
-			<p id="am-digest-modal-error" class="am-modal-error" style="display:none;"></p>
-
-			<div class="am-modal-actions">
-				<?php if ( ! empty( $config['id'] ) ) : ?>
-					<button type="button" class="button am-btn-danger" id="am-digest-delete-btn" data-id="<?php echo esc_attr( $config['id'] ); ?>">
-						<?php esc_html_e( 'Delete Digest', 'activity-monitor' ); ?>
-					</button>
-				<?php endif; ?>
-				<button type="submit" class="button button-primary" id="am-digest-save-btn">
-					<?php esc_html_e( 'Save Digest', 'activity-monitor' ); ?>
-				</button>
-			</div>
 		</form>
 		<?php
 	}

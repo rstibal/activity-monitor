@@ -3,7 +3,7 @@
  * Plugin Name: Activity Monitor
  * Plugin URI:  https://robstibal.com
  * Description: Comprehensive WordPress audit log – tracks logins, content changes, settings updates, security events, and more.
- * Version:     2.4.12
+ * Version:     2.5.0
  * Author:      Rob Stibal
  * Author URI:  http://robstibal.com
  * License:     GPL v2 or later
@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'AM_VERSION', '2.4.12' );
+define( 'AM_VERSION', '2.5.0' );
 define( 'AM_FILE',    __FILE__ );
 define( 'AM_DIR',     plugin_dir_path( __FILE__ ) );
 define( 'AM_URL',     plugin_dir_url( __FILE__ ) );
@@ -39,7 +39,6 @@ require_once AM_DIR . 'includes/class-am-initiator-detector.php';
 require_once AM_DIR . 'includes/class-am-event-writer.php';
 require_once AM_DIR . 'includes/class-am-event-query.php';
 require_once AM_DIR . 'includes/class-am-notifications.php';
-require_once AM_DIR . 'includes/class-am-digest.php';
 require_once AM_DIR . 'includes/class-am-export.php';
 require_once AM_DIR . 'includes/loggers/class-am-logger-base.php';
 require_once AM_DIR . 'includes/loggers/class-am-logger-posts.php';
@@ -74,16 +73,6 @@ function am_init() {
 	am_run_upgrade_cleanup();
 	AM_Logger_Manager::init();
 	AM_Admin::init();
-	AM_Digest::init();
-
-	// Cheap idempotent check -- wp_next_scheduled() is a single option
-	// read, so safe on every load. Ensures a config change from the
-	// settings modal (which already calls reschedule() directly) is
-	// also caught if it was ever changed by any other means (WP-CLI,
-	// direct DB edit, etc.).
-	if ( ! wp_next_scheduled( AM_Digest::CRON_HOOK ) && ! empty( AM_Digest::get_configs() ) ) {
-		AM_Digest::reschedule();
-	}
 }
 add_action( 'plugins_loaded', 'am_init' );
 
@@ -179,6 +168,27 @@ function am_run_upgrade_cleanup() {
 	// in wp_options forever with nothing left to read it.
 	if ( version_compare( $done, '2.4.11', '<' ) ) {
 		delete_option( 'am_disabled_loggers' );
+	}
+
+	// 2.5.0 -- email digest removed entirely (AM_Digest, its settings UI,
+	// and the am_send_digest cron tick). Options and the scheduled event
+	// would otherwise sit around forever with nothing left to read or fire
+	// them.
+	if ( version_compare( $done, '2.5.0', '<' ) ) {
+		foreach ( array(
+			'am_digest_configs',
+			'am_digest_frequency',
+			'am_digest_day_of_week',
+			'am_digest_recipients',
+			'am_digest_last_sent',
+		) as $am_digest_option ) {
+			delete_option( $am_digest_option );
+		}
+
+		$am_digest_timestamp = wp_next_scheduled( 'am_send_digest' );
+		if ( $am_digest_timestamp ) {
+			wp_unschedule_event( $am_digest_timestamp, 'am_send_digest' );
+		}
 	}
 
 	update_option( 'am_cleanup_version', AM_VERSION );

@@ -4,11 +4,11 @@ Tags: activity log, audit log, security, user activity, event log
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.4.12
+Stable tag: 2.5.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-A complete activity log for WordPress: track logins, content changes, plugin/theme updates, settings, and security-relevant events, with alerts and scheduled email digests.
+A complete activity log for WordPress: track logins, content changes, plugin/theme updates, settings, and security-relevant events, with alerts and export.
 
 == Description ==
 
@@ -26,9 +26,8 @@ Activity Monitor is a WordPress audit log plugin that records what happens on yo
 
 Repeated events (a burst of failed logins, rapid comment status churn) are automatically grouped into a single log entry with a repeat count, instead of flooding your log with duplicates. Every event is tagged with a severity level and an initiator (was this a logged-in user, an anonymous visitor, WP-Cron, WP-CLI, an unattended auto-update, a REST API call, or WordPress itself?) so you can filter down to exactly what you're looking for.
 
-= Digests and exports =
+= Exports =
 
-* An optional scheduled email digest (daily, weekly, or monthly) summarizes recent activity and flags anything at warning level or above. Multiple digests can be configured independently, each with its own schedule and recipients
 * Export the log — filtered by date range, user, event type, or action — as CSV, JSON, HTML, or plain text
 
 = Alerts =
@@ -68,6 +67,10 @@ Yes. Settings → Privacy offers full addresses, anonymised addresses (the last 
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
 
 == Changelog ==
+
+= 2.5.0 =
+* Removed: the scheduled email digest, in full — the Settings screen's Email Digests list plus its Preview and test send controls, the underlying AM_Digest class, and the daily cron tick that sent it. Activity Monitor is now purely an activity log, with alerts and export.
+* Fixed: the "Clear Entire Log" button on Settings is now actually red. Its danger-button CSS rule was a single class, which core's own `.wp-core-ui .button` rule (two classes) always outranked regardless of stylesheet order, so the red never painted.
 
 = 2.4.12 =
 * Changed: the event Details popup's "User" row is now "Username" and shows just the login name, linked to the same User Details popup the Username column opens, instead of stacking the display name and login.

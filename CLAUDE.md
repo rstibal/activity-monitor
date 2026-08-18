@@ -1,6 +1,6 @@
 # Activity Monitor — project notes
 
-Custom WordPress plugin: audit logging, with alerts, digests, and export.
+Custom WordPress plugin: audit logging, with alerts and export.
 Being built toward a wordpress.org release.
 
 **The repo root is the plugin root.** `.github/workflows/claude.yml` and
@@ -100,14 +100,14 @@ second list. **If a proposed screen is the existing one with a fixed filter
 over it, it's a filter, not a screen.** Ship it as a dropdown option.
 
 **Nothing is filtered out of anything any more.** No query in
-`AM_Event_Query` excludes an event type — the screen, the export, and all
-three digest period queries see the whole table. 2.4.7 kept a
-`PHP_ERROR_ACTIONS` exclusion on the digest alone (`get_notable_events()`
-selects WARNING-and-above, and `php_warning` is WARNING while
-`fatal_error` is ERROR, so one repetitive warning could fill all ten
-slots); 2.4.8 deleted it. The concern was real, but it made the digest the
-one place where some rows silently didn't count, invisible from the UI and
-irreconcilable against the screen the digest links to. **Volume is a
+`AM_Event_Query` excludes an event type — the screen and the export both
+see the whole table. This was tested hardest by the email digest (removed
+entirely in 2.5.0): 2.4.7 kept a `PHP_ERROR_ACTIONS` exclusion on its
+`get_notable_events()` query alone (it selected WARNING-and-above, and
+`php_warning` is WARNING while `fatal_error` is ERROR, so one repetitive
+warning could fill all ten slots); 2.4.8 deleted it, because it made the
+digest the one place where some rows silently didn't count, invisible from
+the UI and irreconcilable against the screen it linked to. **Volume is a
 settings problem, not a query problem** — `am_occasion_window_seconds`
 collapses repeats. A hidden `WHERE` is neither. (There used to be a
 per-logger Event Sources toggle alongside that; it was removed in 2.4.11 —
@@ -127,8 +127,8 @@ which would log out every user on the site. The `session.*` entries in
 `AM_Event_Labels` are deliberately kept: upgraded sites still have those rows
 in `am_events` and they have to keep rendering.
 
-**The log keeps the bare `activity-monitor` slug** because the digest email and
-plain-text alert both link to it. Don't rename it.
+**The log keeps the bare `activity-monitor` slug** because the plain-text
+alert email links to it. Don't rename it.
 
 `AM_Admin::$screen_hooks` collects the return values of `add_menu_page()` /
 `add_submenu_page()`, and both `enqueue_assets()` and `show_notices()` test
@@ -160,12 +160,23 @@ no handler, no nonce, no redirect, no notice. Before this there were three
 `admin_post_` handlers with three redirects and three custom notices; if you
 find yourself adding a fourth, you want a settings field instead.
 
-**Two things on that screen are deliberately not settings fields.**
-Notification channels and digest configs are *lists of records*, added and
-edited through modals that save over AJAX immediately, so they render *below*
-the Save button — everything above it is a field, everything below carries its
-own control. Clear Log stays an `admin_post` action for the same reason, and
+**One thing on that screen is deliberately not a settings field.**
+Notification channels are a *list of records*, added and edited through
+modals that save over AJAX immediately, so it renders *below* the Save
+button — everything above it is a field, everything below carries its own
+control. Clear Log stays an `admin_post` action for the same reason, and
 sits last because it's destructive. Don't fold either into the form.
+
+**The scheduled email digest was removed entirely in 2.5.0** — `AM_Digest`,
+its Settings UI (the config list plus the Preview and test-send controls),
+the AJAX handlers, and the daily `am_send_digest` cron tick. It was the
+digest configs' list-of-records entry that used to sit alongside
+notification channels in the paragraph above. `AM_Event_Query`'s three
+period-summary queries (`get_totals_for_period()`,
+`get_breakdown_by_event_type()`, `get_notable_events()`) went with it —
+the digest was their only caller. Options are cleaned up in
+`am_run_upgrade_cleanup()`'s 2.5.0 block and were already listed in
+`uninstall.php`.
 
 **The per-logger Event Sources toggle was removed in 2.4.11.** Every
 registered logger's `register_hooks()` now runs unconditionally in
@@ -212,7 +223,7 @@ Page traffic was removed in 2.2.0 — `AM_Traffic*`, the Traffic tab, and the
 subsystem — if the forensic value is ever wanted back, the audit-relevant
 subset (404 storms, `wp-login.php`/`xmlrpc.php` probing, anonymous hits on
 restricted paths) belongs in a logger writing through `AM_Event_Writer`, where
-it inherits the existing filters, grouping, export, and digest.
+it inherits the existing filters, grouping, and export.
 
 `AM_Event_Writer` collapses repeat events within a window keyed on
 `event_type` + `action` + `object_id` + `initiator`. The window is
