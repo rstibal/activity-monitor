@@ -328,3 +328,46 @@
 	background: transparent;
 	color: #646970;
 }
+
+/* Visitor Stats screen. A summary stat row and a side-by-side breakdown
+   layout are both things core has no list-table equivalent for -- the
+   tables themselves are plain .wp-list-table.widefat.striped and need
+   nothing here. */
+.am-stats-totals {
+	display: flex;
+	gap: 32px;
+	margin: 16px 0;
+	font-size: 14px;
+}
+.am-stats-totals li {
+	list-style: none;
+	margin: 0;
+}
+.am-stats-totals strong {
+	display: block;
+	font-size: 24px;
+	line-height: 1.3;
+}
+.am-stats-breakdowns {
+	display: flex;
+	gap: 24px;
+	flex-wrap: wrap;
+}
+.am-stats-breakdowns > div {
+	flex: 1 1 260px;
+	min-width: 260px;
+}
+
+/* Title/URL cells on the Top Pages table. am-log-table (shared with the
+   Activity Log) forces nowrap on every cell in these tables; without a cap
+   a long post title or path would push the row's width out rather than
+   truncating, which is what the log's own Type column caps against. Same
+   idea, applied as an inline-block span rather than a td max-width so it
+   doesn't fight the table's auto layout. */
+.am-stats-truncate {
+	display: inline-block;
+	max-width: 320px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	vertical-align: middle;
+}

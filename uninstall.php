@@ -35,6 +35,14 @@ AM_Schema::uninstall();
 $wpdb->query( "DROP TABLE IF EXISTS `{$wpdb->prefix}am_installs`" );
 delete_option( 'am_installs_db_version' );
 
+// Visitor/traffic stats subsystem (added 2.6.0). Kept in its own tables,
+// never merged into am_events -- see AM_Stats_Schema's class doc.
+require_once __DIR__ . '/includes/stats/class-am-stats-schema.php';
+AM_Stats_Schema::uninstall();
+delete_option( 'am_stats_enable_tracking' );
+delete_option( 'am_stats_exclude_roles' );
+delete_option( 'am_stats_retention_days' );
+
 // Page traffic was removed in 2.2.0, which drops these on upgrade via
 // am_run_upgrade_cleanup(). Repeated here because uninstall must not
 // assume that ran: a site deleting the plugin without ever loading the
@@ -96,4 +104,8 @@ if ( $hub_checkin_timestamp ) {
 $traffic_rollup_timestamp = wp_next_scheduled( 'am_traffic_rollup' );
 if ( $traffic_rollup_timestamp ) {
 	wp_unschedule_event( $traffic_rollup_timestamp, 'am_traffic_rollup' );
+}
+$stats_prune_timestamp = wp_next_scheduled( 'am_stats_prune' );
+if ( $stats_prune_timestamp ) {
+	wp_unschedule_event( $stats_prune_timestamp, 'am_stats_prune' );
 }

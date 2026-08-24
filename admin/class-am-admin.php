@@ -21,6 +21,7 @@ class AM_Admin {
 	 *  unchanged. */
 	const PAGE_LOG      = 'activity-monitor';
 	const PAGE_SETTINGS = 'activity-monitor-settings';
+	const PAGE_STATS    = 'activity-monitor-stats';
 
 	/** Option group posted to options.php by the Settings screen. */
 	const SETTINGS_GROUP = 'am_settings';
@@ -93,6 +94,15 @@ class AM_Admin {
 		if ( $log_hook ) {
 			add_action( 'load-' . $log_hook, array( $this, 'add_screen_options' ) );
 		}
+
+		self::$screen_hooks[] = add_submenu_page(
+			self::PAGE_LOG,
+			__( 'Visitor Stats', 'activity-monitor' ),
+			__( 'Visitor Stats', 'activity-monitor' ),
+			'manage_options',
+			self::PAGE_STATS,
+			array( $this, 'render_page_stats' )
+		);
 
 		self::$screen_hooks[] = add_submenu_page(
 			self::PAGE_LOG,
@@ -285,6 +295,23 @@ class AM_Admin {
 			'sanitize_callback' => array( $this, 'sanitize_checkbox' ),
 			'default'           => 1,
 		) );
+
+		register_setting( self::SETTINGS_GROUP, 'am_stats_enable_tracking', array(
+			'type'              => 'boolean',
+			'sanitize_callback' => array( $this, 'sanitize_checkbox' ),
+			'default'           => 1,
+		) );
+
+		register_setting( self::SETTINGS_GROUP, 'am_stats_exclude_roles', array(
+			'sanitize_callback' => array( $this, 'sanitize_stats_exclude_roles' ),
+			'default'           => array( 'administrator' ),
+		) );
+
+		register_setting( self::SETTINGS_GROUP, 'am_stats_retention_days', array(
+			'type'              => 'integer',
+			'sanitize_callback' => array( $this, 'sanitize_retention_days' ),
+			'default'           => 90,
+		) );
 	}
 
 	private function register_sections_and_fields() {
@@ -320,6 +347,16 @@ class AM_Admin {
 		);
 		add_settings_field( 'am_field_ip_storage', __( 'IP addresses', 'activity-monitor' ), array( $this, 'field_ip_storage' ), self::PAGE_SETTINGS, 'am_privacy' );
 		add_settings_field( 'am_field_ip_lookup', __( 'IP address lookups', 'activity-monitor' ), array( $this, 'field_ip_lookup' ), self::PAGE_SETTINGS, 'am_privacy' );
+
+		add_settings_section(
+			'am_stats',
+			__( 'Visitor Stats', 'activity-monitor' ),
+			array( $this, 'section_intro_stats' ),
+			self::PAGE_SETTINGS
+		);
+		add_settings_field( 'am_field_stats_enable', __( 'Tracking', 'activity-monitor' ), array( $this, 'field_stats_enable' ), self::PAGE_SETTINGS, 'am_stats' );
+		add_settings_field( 'am_field_stats_exclude_roles', __( 'Exclude roles', 'activity-monitor' ), array( $this, 'field_stats_exclude_roles' ), self::PAGE_SETTINGS, 'am_stats' );
+		add_settings_field( 'am_field_stats_retention', __( 'Keep stats for', 'activity-monitor' ), array( $this, 'field_stats_retention' ), self::PAGE_SETTINGS, 'am_stats' );
 
 		add_settings_section(
 			'am_data',
@@ -362,6 +399,13 @@ class AM_Admin {
 	/** Unchecked boxes post nothing, which reaches this as null. */
 	public function sanitize_checkbox( $input ): int {
 		return empty( $input ) ? 0 : 1;
+	}
+
+	/** Whitelisted against roles that actually exist on this site. */
+	public function sanitize_stats_exclude_roles( $input ): array {
+		$known = array_keys( wp_roles()->get_names() );
+		$roles = array_map( 'sanitize_key', (array) $input );
+		return array_values( array_intersect( $roles, $known ) );
 	}
 
 	/** Retention periods offered, keyed by days. 0 = keep forever. */
@@ -999,6 +1043,15 @@ class AM_Admin {
 		$this->render_screen_close();
 	}
 
+	public function render_page_stats() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+		$this->render_screen_open( __( 'Activity Monitor', 'activity-monitor' ) );
+		$this->render_stats_screen();
+		$this->render_screen_close();
+	}
+
 	/**
 	 * Opens the shared page chrome, following wp-admin's own page header
 	 * convention: an .wp-heading-inline <h1> naming just this screen (the
@@ -1443,6 +1496,153 @@ class AM_Admin {
 		return preg_replace( '/[^a-z0-9_.|\-]/', '', strtolower( (string) $raw ) );
 	}
 
+	// ── Screen: Visitor Stats ────────────────────────────────────────────
+	//
+	// Reads from the am_stats_* tables through AM_Stats_Query -- entirely
+	// separate from am_events / AM_Event_Query. Plain wp-admin list tables,
+	// no charting library, matching how the rest of this plugin builds on
+	// core's own furniture rather than restyling it.
+
+	/** Date-range choices for the stats screen, keyed by days back. */
+	private static function stats_range_choices(): array {
+		return array(
+			1   => __( 'Today', 'activity-monitor' ),
+			7   => __( 'Last 7 days', 'activity-monitor' ),
+			30  => __( 'Last 30 days', 'activity-monitor' ),
+			90  => __( 'Last 90 days', 'activity-monitor' ),
+			365 => __( 'Last 12 months', 'activity-monitor' ),
+		);
+	}
+
+	private function render_stats_screen() {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only display filter, sanitized below.
+		$days = absint( $_GET['am_range'] ?? 30 );
+		if ( ! array_key_exists( $days, self::stats_range_choices() ) ) {
+			$days = 30;
+		}
+
+		if ( ! (bool) get_option( 'am_stats_enable_tracking', 1 ) ) {
+			echo '<div class="notice notice-warning inline"><p>' . esc_html__( 'Tracking is currently turned off in Settings → Visitor Stats. Figures below reflect only what was already recorded.', 'activity-monitor' ) . '</p></div>';
+		}
+		?>
+		<form method="get" id="am-stats-filter-form">
+			<input type="hidden" name="page" value="<?php echo esc_attr( self::PAGE_STATS ); ?>">
+			<select name="am_range" onchange="this.form.submit()">
+				<?php foreach ( self::stats_range_choices() as $value => $label ) : ?>
+					<option value="<?php echo esc_attr( $value ); ?>" <?php selected( $value, $days ); ?>><?php echo esc_html( $label ); ?></option>
+				<?php endforeach; ?>
+			</select>
+			<noscript><button type="submit" class="button"><?php esc_html_e( 'Apply', 'activity-monitor' ); ?></button></noscript>
+		</form>
+
+		<?php
+		$totals = AM_Stats_Query::get_totals( $days );
+		?>
+		<ul class="am-stats-totals">
+			<li><strong><?php echo esc_html( number_format_i18n( $totals['visits'] ) ); ?></strong> <?php esc_html_e( 'visits', 'activity-monitor' ); ?></li>
+			<li><strong><?php echo esc_html( number_format_i18n( $totals['unique_visitors'] ) ); ?></strong> <?php esc_html_e( 'unique visitors', 'activity-monitor' ); ?></li>
+		</ul>
+
+		<h2><?php esc_html_e( 'Top Pages', 'activity-monitor' ); ?></h2>
+		<?php $this->render_stats_table(
+			AM_Stats_Query::get_top_urls( $days ),
+			array( __( 'Title', 'activity-monitor' ), __( 'URL', 'activity-monitor' ), __( 'Visits', 'activity-monitor' ), __( 'Unique Visitors', 'activity-monitor' ) ),
+			static function ( $row ) {
+				// am-log-table forces nowrap on every cell, same as the
+				// Activity Log -- Title/URL are the two columns here that
+				// can run long, so they get the same title-attribute +
+				// truncate-with-ellipsis treatment as the log's Type/
+				// Message columns rather than overflowing the row.
+				return array(
+					'<span class="am-stats-truncate" title="' . esc_attr( $row->title ) . '">' . esc_html( $row->title ?: '—' ) . '</span>',
+					'<span class="am-stats-truncate" title="' . esc_attr( $row->url ) . '">' . esc_html( $row->url ) . '</span>',
+					esc_html( number_format_i18n( (int) $row->visits ) ),
+					esc_html( number_format_i18n( (int) $row->unique_visitors ) ),
+				);
+			}
+		); ?>
+
+		<h2><?php esc_html_e( 'Referrers', 'activity-monitor' ); ?></h2>
+		<?php $this->render_stats_table(
+			AM_Stats_Query::get_referrers( $days ),
+			array( __( 'Host', 'activity-monitor' ), __( 'Visits', 'activity-monitor' ) ),
+			static function ( $row ) {
+				return array(
+					esc_html( $row->referrer_host ),
+					esc_html( number_format_i18n( (int) $row->visits ) ),
+				);
+			}
+		); ?>
+
+		<div class="am-stats-breakdowns">
+			<div>
+				<h2><?php esc_html_e( 'Browsers', 'activity-monitor' ); ?></h2>
+				<?php $this->render_breakdown_table( AM_Stats_Query::get_breakdown( 'browser', $days ) ); ?>
+			</div>
+			<div>
+				<h2><?php esc_html_e( 'Operating Systems', 'activity-monitor' ); ?></h2>
+				<?php $this->render_breakdown_table( AM_Stats_Query::get_breakdown( 'os', $days ) ); ?>
+			</div>
+			<div>
+				<h2><?php esc_html_e( 'Devices', 'activity-monitor' ); ?></h2>
+				<?php $this->render_breakdown_table( AM_Stats_Query::get_breakdown( 'device_type', $days ) ); ?>
+			</div>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Renders one $rows result set as a wp-list-table, in the exact same
+	 * shape as the Activity Log's grid: same wrapper (am-table-scroll),
+	 * same table classes (widefat striped am-log-table -- auto layout,
+	 * nowrap cells), same core styling for borders/header weight/row
+	 * striping. $columns are the header labels; $row_cells maps one row
+	 * object to an array of already-escaped cell HTML, in the same order
+	 * as $columns.
+	 */
+	private function render_stats_table( array $rows, array $columns, callable $row_cells ) {
+		if ( empty( $rows ) ) {
+			echo '<p>' . esc_html__( 'No data yet for this range.', 'activity-monitor' ) . '</p>';
+			return;
+		}
+		?>
+		<div class="am-table-scroll">
+			<table class="wp-list-table widefat striped am-log-table">
+				<thead>
+					<tr>
+						<?php foreach ( $columns as $column ) : ?>
+							<th><?php echo esc_html( $column ); ?></th>
+						<?php endforeach; ?>
+					</tr>
+				</thead>
+				<tbody>
+					<?php foreach ( $rows as $row ) : ?>
+						<tr>
+							<?php foreach ( $row_cells( $row ) as $cell ) : ?>
+								<td><?php echo $cell; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- pre-escaped by the caller's $row_cells callback. ?></td>
+							<?php endforeach; ?>
+						</tr>
+					<?php endforeach; ?>
+				</tbody>
+			</table>
+		</div>
+		<?php
+	}
+
+	/** @param array<int, object{value:string,visits:int}> $rows */
+	private function render_breakdown_table( array $rows ) {
+		$this->render_stats_table(
+			$rows,
+			array( __( 'Value', 'activity-monitor' ), __( 'Visits', 'activity-monitor' ) ),
+			static function ( $row ) {
+				return array(
+					esc_html( $row->value ?: __( 'Other', 'activity-monitor' ) ),
+					esc_html( number_format_i18n( (int) $row->visits ) ),
+				);
+			}
+		);
+	}
+
 	// ── Screen: Settings ──────────────────────────────────────────────────
 
 	/**
@@ -1651,6 +1851,57 @@ class AM_Admin {
 				<?php esc_html_e( 'Deactivating never deletes anything. Deleting the plugin from the Plugins screen does — untick this to leave the log and its settings in the database instead, so reinstalling picks up where it left off.', 'activity-monitor' ); ?>
 			</p>
 		</fieldset>
+		<?php
+	}
+
+	public function section_intro_stats() {
+		echo '<p>' . esc_html__( 'Real-time visitor/traffic stats — visits, top pages, referrers, and browser/OS/device breakdown. Kept in its own tables, separate from the activity log.', 'activity-monitor' ) . '</p>';
+	}
+
+	public function field_stats_enable() {
+		?>
+		<fieldset>
+			<legend class="screen-reader-text"><span><?php esc_html_e( 'Tracking', 'activity-monitor' ); ?></span></legend>
+			<label>
+				<input type="checkbox" name="am_stats_enable_tracking" value="1" <?php checked( (bool) get_option( 'am_stats_enable_tracking', 1 ) ); ?>>
+				<?php esc_html_e( 'Record visits to the front end of this site', 'activity-monitor' ); ?>
+			</label>
+			<p class="description">
+				<?php esc_html_e( 'No cookies are set and no IP address is stored — visitors are identified only by a one-way hash that rotates daily.', 'activity-monitor' ); ?>
+			</p>
+		</fieldset>
+		<?php
+	}
+
+	public function field_stats_exclude_roles() {
+		$excluded = (array) get_option( 'am_stats_exclude_roles', array( 'administrator' ) );
+		?>
+		<fieldset>
+			<legend class="screen-reader-text"><span><?php esc_html_e( 'Exclude roles', 'activity-monitor' ); ?></span></legend>
+			<?php foreach ( wp_roles()->get_names() as $role_slug => $role_label ) : ?>
+				<label style="display:block;">
+					<input type="checkbox" name="am_stats_exclude_roles[]" value="<?php echo esc_attr( $role_slug ); ?>" <?php checked( in_array( $role_slug, $excluded, true ) ); ?>>
+					<?php echo esc_html( translate_user_role( $role_label ) ); ?>
+				</label>
+			<?php endforeach; ?>
+			<p class="description">
+				<?php esc_html_e( 'Logged-in users with a checked role are never recorded — useful for keeping your own admin visits out of the numbers.', 'activity-monitor' ); ?>
+			</p>
+		</fieldset>
+		<?php
+	}
+
+	public function field_stats_retention() {
+		$current = (int) get_option( 'am_stats_retention_days', 90 );
+		?>
+		<select id="am_stats_retention_days" name="am_stats_retention_days">
+			<?php foreach ( self::retention_choices() as $days => $label ) : ?>
+				<option value="<?php echo esc_attr( $days ); ?>" <?php selected( $days, $current ); ?>>
+					<?php echo esc_html( $label ); ?>
+				</option>
+			<?php endforeach; ?>
+		</select>
+		<p class="description"><?php esc_html_e( 'Separate from the activity log’s own retention setting above — visit data is far higher volume and lower forensic value, so it doesn’t need to be kept as long.', 'activity-monitor' ); ?></p>
 		<?php
 	}
 

@@ -4,11 +4,11 @@ Tags: activity log, audit log, security, user activity, event log
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.5.0
+Stable tag: 2.6.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-A complete activity log for WordPress: track logins, content changes, plugin/theme updates, settings, and security-relevant events, with alerts and export.
+A complete activity log for WordPress: track logins, content changes, plugin/theme updates, settings, and security-relevant events, with alerts and export — plus real-time visitor/traffic stats.
 
 == Description ==
 
@@ -33,6 +33,10 @@ Repeated events (a burst of failed logins, rapid comment status churn) are autom
 = Alerts =
 
 Configure one or more notification channels — email or Slack — each with its own minimum severity threshold, to get notified the moment something notable happens.
+
+= Visitor Stats =
+
+Real-time front-end traffic: visits, unique visitors, top pages, referrers, and a browser/OS/device breakdown, on its own screen kept separate from the activity log. No cookies, and no IP address is ever stored — visitors are identified only by a one-way hash that rotates daily. Tracking can be turned off, restricted by role, and given its own retention period under Settings → Visitor Stats.
 
 == Installation ==
 
@@ -67,6 +71,9 @@ Yes. Settings → Privacy offers full addresses, anonymised addresses (the last 
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
 
 == Changelog ==
+
+= 2.6.0 =
+* Added: Visitor Stats, a new screen showing real-time front-end traffic — visits, unique visitors, top pages, referrers, and a browser/OS/device breakdown — in its own tables, entirely separate from the activity log. No cookies are set and no IP address is ever stored; visitors are identified only by a one-way hash that rotates daily. Configurable under Settings → Visitor Stats: turn tracking off, exclude specific roles (administrators are excluded by default), and set its own retention period independent of the activity log's. Geolocation (visits by country) is not included in this release.
 
 = 2.5.0 =
 * Removed: the scheduled email digest, in full — the Settings screen's Email Digests list plus its Preview and test send controls, the underlying AM_Digest class, and the daily cron tick that sent it. Activity Monitor is now purely an activity log, with alerts and export.

@@ -2,8 +2,8 @@
 /**
  * Plugin Name: Activity Monitor
  * Plugin URI:  https://robstibal.com
- * Description: Comprehensive WordPress audit log – tracks logins, content changes, settings updates, security events, and more.
- * Version:     2.5.0
+ * Description: Comprehensive WordPress audit log – tracks logins, content changes, settings updates, security events, and more. Includes real-time visitor/traffic stats.
+ * Version:     2.6.0
  * Author:      Rob Stibal
  * Author URI:  http://robstibal.com
  * License:     GPL v2 or later
@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'AM_VERSION', '2.5.0' );
+define( 'AM_VERSION', '2.6.0' );
 define( 'AM_FILE',    __FILE__ );
 define( 'AM_DIR',     plugin_dir_path( __FILE__ ) );
 define( 'AM_URL',     plugin_dir_url( __FILE__ ) );
@@ -62,16 +62,27 @@ require_once AM_DIR . 'includes/loggers/class-am-logger-mail-failures.php';
 require_once AM_DIR . 'includes/class-am-logger-manager.php';
 require_once AM_DIR . 'admin/class-am-admin.php';
 
+// ── Visitor/traffic stats ─────────────────────────────────────────────────
+// A subsystem deliberately kept separate from the schema above -- see
+// AM_Stats_Schema's class doc. Never writes to am_events.
+require_once AM_DIR . 'includes/stats/class-am-stats-schema.php';
+require_once AM_DIR . 'includes/stats/class-am-stats-ua-parser.php';
+require_once AM_DIR . 'includes/stats/class-am-stats-tracker.php';
+require_once AM_DIR . 'includes/stats/class-am-stats-query.php';
+
 // ── Activation / deactivation ────────────────────────────────────────────
 register_activation_hook( AM_FILE, array( 'AM_Schema', 'install' ) );
+register_activation_hook( AM_FILE, array( 'AM_Stats_Schema', 'install' ) );
 // No deactivation cleanup needed -- v2.0 data is intentionally kept on
 // deactivation (only uninstall.php removes it), same policy v1.x had.
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────
 function am_init() {
 	AM_Schema::maybe_upgrade();
+	AM_Stats_Schema::maybe_upgrade();
 	am_run_upgrade_cleanup();
 	AM_Logger_Manager::init();
+	AM_Stats_Tracker::init();
 	AM_Admin::init();
 }
 add_action( 'plugins_loaded', 'am_init' );
@@ -214,3 +225,18 @@ function am_run_prune() {
 	AM_Schema::prune( absint( get_option( 'am_retention_days', 90 ) ) );
 }
 add_action( 'am_log_prune', 'am_run_prune' );
+
+// ── Stats retention cron ─────────────────────────────────────────────────
+// Separate cron/option/prune from the audit log's: high-volume, low
+// forensic-value data doesn't belong on the same retention clock.
+function am_schedule_stats_prune() {
+	if ( ! wp_next_scheduled( 'am_stats_prune' ) ) {
+		wp_schedule_event( time(), 'daily', 'am_stats_prune' );
+	}
+}
+add_action( 'wp', 'am_schedule_stats_prune' );
+
+function am_run_stats_prune() {
+	AM_Stats_Schema::prune( absint( get_option( 'am_stats_retention_days', 90 ) ) );
+}
+add_action( 'am_stats_prune', 'am_run_stats_prune' );
