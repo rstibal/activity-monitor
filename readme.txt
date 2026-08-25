@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, event log
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.8.1
+Stable tag: 2.8.5
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -75,6 +75,18 @@ Yes. Settings → Privacy offers full addresses, anonymised addresses (the last 
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
 
 == Changelog ==
+
+= 2.8.5 =
+* Changed: the "Update Now" cooldown under Settings → Visitor Stats → Geolocation is now 5 minutes instead of 1 hour, and the "please wait" message says how much longer. The 1-hour version reset on every click regardless of whether the import actually succeeded, which made a genuine failure lock the button out for far longer than intended.
+
+= 2.8.4 =
+* Fixed: the GeoLite2 database import failed with "Download failed: HTTP 400". MaxMind's download endpoint redirects to a presigned Cloudflare storage URL; WordPress's HTTP API forwards the same Basic Auth header across that redirect by default, and the storage backend rejects a presigned URL that also carries an unexpected Authorization header. The redirect is now followed manually, with the auth header dropped once the request leaves MaxMind's own domain.
+
+= 2.8.3 =
+* Fixed: a successful "Update Now" click showed a red error notice reading just "1" instead of the intended success message. The click handler stored a PHP `true` in a transient to signal success, but WordPress's options storage stringifies scalars, so it came back as the string "1" and failed a strict boolean check on the way back out — read as an error instead of success. The GeoLite2 import itself was never affected; only the notice was wrong.
+
+= 2.8.2 =
+* Fixed: the "Update Now" button under Settings → Visitor Stats → Geolocation actually triggers the GeoLite2 import now. It was rendered as a `<form>` nested inside the Settings screen's own save form, which is invalid HTML — browsers collapse a nested form into the outer one, so clicking it saved settings and reloaded the page instead of starting the import. It's now its own form, same pattern the Clear Log button already used correctly.
 
 = 2.8.1 =
 * Changed: Visitor Stats screen layout — Recent Hits moved above Top Pages and reduced to 10 rows per page (was 50), Referrers and Countries now sit side by side in one row, Browsers/Operating Systems/Devices in the row below that.

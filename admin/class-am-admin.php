@@ -561,7 +561,15 @@ class AM_Admin {
 		$geo_notice = get_transient( $geo_key );
 		if ( false !== $geo_notice ) {
 			delete_transient( $geo_key );
-			if ( true === $geo_notice ) {
+			// An empty string means success here, matching
+			// AM_Stats_Geo_Updater::trigger_manual_update()'s return
+			// contract -- deliberately not a boolean check. A transient
+			// round-trips through wp_options, which stringifies scalars,
+			// so a stored boolean true would come back as the string "1"
+			// and fail a strict true-comparison, misreading success as an
+			// error (this is exactly what happened before that method's
+			// return type was changed).
+			if ( '' === $geo_notice ) {
 				echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'GeoLite2 import started. This runs in the background and can take a few minutes.', 'activity-monitor' ) . '</p></div>';
 			} else {
 				echo '<div class="notice notice-error is-dismissible"><p>' . esc_html( (string) $geo_notice ) . '</p></div>';
@@ -1862,6 +1870,7 @@ class AM_Admin {
 		</form>
 
 		<?php
+		$this->render_geo_update_now_section();
 		$this->render_channels_section();
 		$this->render_clear_log_section();
 	}
@@ -2168,13 +2177,35 @@ class AM_Admin {
 				<?php esc_html_e( 'No database imported yet.', 'activity-monitor' ); ?>
 			<?php endif; ?>
 		</p>
-		<?php if ( $status['configured'] && ! $status['in_progress'] ) : ?>
-			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-				<?php wp_nonce_field( 'am_stats_geo_update_now' ); ?>
-				<input type="hidden" name="action" value="am_stats_geo_update_now">
-				<?php submit_button( __( 'Update Now', 'activity-monitor' ), 'secondary', 'submit', false ); ?>
-			</form>
-		<?php endif; ?>
+		<?php
+		// No "Update Now" form here, deliberately: this field renders
+		// inside do_settings_sections(), which the Settings screen's own
+		// <form action="options.php"> already wraps. A second <form>
+		// nested inside it is invalid HTML -- the browser collapses it
+		// into the outer one, so the button submitted the whole settings
+		// form to options.php instead of posting to admin-post.php. See
+		// render_geo_update_now_section(), called after that form closes,
+		// same fix render_clear_log_section() already uses for Clear Log.
+	}
+
+	/**
+	 * "Update Now" button for GeoLite2, as its own top-level form -- see
+	 * field_stats_geo_status()'s comment on why it can't live inside a
+	 * settings field. Rendered right after the settings section it
+	 * logically belongs to (Geolocation is the last field on that
+	 * section), before Notification Channels.
+	 */
+	private function render_geo_update_now_section() {
+		$status = AM_Stats_Geo_Updater::status();
+		if ( ! $status['configured'] || $status['in_progress'] ) {
+			return;
+		}
+		?>
+		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+			<?php wp_nonce_field( 'am_stats_geo_update_now' ); ?>
+			<input type="hidden" name="action" value="am_stats_geo_update_now">
+			<?php submit_button( __( 'Update Now', 'activity-monitor' ), 'secondary', 'submit', false ); ?>
+		</form>
 		<?php
 	}
 

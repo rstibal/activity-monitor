@@ -35,6 +35,15 @@ class AM_Stats_Geo_Updater {
 	const BATCH_ROWS = 5000;
 	/** Rows per multi-row INSERT statement. */
 	const INSERT_CHUNK = 500;
+	/**
+	 * Minimum time between manual "Update Now" clicks. Protects the same
+	 * download quota the daily automatic check is designed around (see
+	 * class doc) without being so long that a failed attempt -- including
+	 * while diagnosing a real bug, not just an accidental double-click --
+	 * locks the button for the better part of an hour. 5 minutes still
+	 * caps manual triggers at 12/hour, comfortably under the 30/day quota.
+	 */
+	const MANUAL_TRIGGER_COOLDOWN = 5 * MINUTE_IN_SECONDS;
 
 	public static function init() {
 		add_action( self::CHECK_HOOK, array( __CLASS__, 'maybe_check_for_update' ) );
@@ -83,21 +92,64 @@ class AM_Stats_Geo_Updater {
 			return; // Don't start a fresh check on top of a running import.
 		}
 
-		$response = wp_remote_head( self::DOWNLOAD_URL, array(
-			'timeout' => 30,
-			'headers' => self::auth_header(),
-		) );
-
-		if ( is_wp_error( $response ) || 200 !== wp_remote_retrieve_response_code( $response ) ) {
+		try {
+			$resolved = self::resolve_download_url();
+		} catch ( Exception $e ) {
 			return; // Transient failure -- tomorrow's check will retry.
 		}
 
-		$last_modified = wp_remote_retrieve_header( $response, 'last-modified' );
-		$known         = (string) get_option( 'am_stats_geo_last_modified', '' );
-
-		if ( '' !== $last_modified && $last_modified !== $known ) {
+		$known = (string) get_option( 'am_stats_geo_last_modified', '' );
+		if ( '' !== $resolved['last_modified'] && $resolved['last_modified'] !== $known ) {
 			self::start_import();
 		}
+	}
+
+	/**
+	 * Resolves MaxMind's download URL down to the actual file location,
+	 * HEAD-only (no body transferred). MaxMind's endpoint 302s to a
+	 * presigned Cloudflare R2 storage URL that carries its own signed
+	 * query string; WP's default redirect-following resends every header,
+	 * including our Basic Auth, to that new host -- R2 then responds 400
+	 * Bad Request to a presigned URL that also carries an unexpected
+	 * Authorization header. Following the redirect manually and dropping
+	 * the header once the request leaves download.maxmind.com avoids it.
+	 *
+	 * @return array{url:string, last_modified:string}
+	 */
+	private static function resolve_download_url(): array {
+		$url     = self::DOWNLOAD_URL;
+		$headers = self::auth_header();
+
+		for ( $i = 0; $i < 5; $i++ ) {
+			$response = wp_remote_head( $url, array(
+				'timeout'     => 30,
+				'headers'     => $headers,
+				'redirection' => 0,
+			) );
+			if ( is_wp_error( $response ) ) {
+				throw new Exception( 'Could not resolve the download URL: ' . esc_html( $response->get_error_message() ) );
+			}
+
+			$code = (int) wp_remote_retrieve_response_code( $response );
+			if ( $code >= 300 && $code < 400 ) {
+				$location = wp_remote_retrieve_header( $response, 'location' );
+				if ( '' === $location ) {
+					throw new Exception( 'Redirect response had no Location header.' );
+				}
+				$url     = $location;
+				$headers = array(); // Not forwarded past the first hop -- see method doc.
+				continue;
+			}
+			if ( 200 === $code ) {
+				return array(
+					'url'           => $url,
+					'last_modified' => (string) wp_remote_retrieve_header( $response, 'last-modified' ),
+				);
+			}
+			throw new Exception( 'Unexpected response resolving the download URL: HTTP ' . esc_html( (string) $code ) );
+		}
+
+		throw new Exception( 'Too many redirects resolving the download URL.' );
 	}
 
 	/**
@@ -106,9 +158,15 @@ class AM_Stats_Geo_Updater {
 	 * button being merely hidden) stops an accidental double-click from
 	 * spending download quota twice.
 	 *
-	 * @return true|string true on success, or an error message.
+	 * Returns '' on success, never a bare boolean -- the caller round-trips
+	 * this through set_transient()/get_transient(), and WordPress's options
+	 * storage stringifies scalars, so a stored `true` comes back out as the
+	 * string "1", not boolean true. A strict `true === $result` check on
+	 * the far side would then fail and misread success as an error.
+	 *
+	 * @return string '' on success, or a non-empty error message.
 	 */
-	public static function trigger_manual_update() {
+	public static function trigger_manual_update(): string {
 		if ( ! self::has_credentials() ) {
 			return __( 'Enter a MaxMind account ID and license key first.', 'activity-monitor' );
 		}
@@ -116,13 +174,18 @@ class AM_Stats_Geo_Updater {
 			return __( 'An import is already in progress.', 'activity-monitor' );
 		}
 		$last_trigger = (int) get_option( 'am_stats_geo_last_manual_trigger', 0 );
-		if ( $last_trigger && ( time() - $last_trigger ) < HOUR_IN_SECONDS ) {
-			return __( 'Please wait before triggering another manual update.', 'activity-monitor' );
+		$elapsed      = time() - $last_trigger;
+		if ( $last_trigger && $elapsed < self::MANUAL_TRIGGER_COOLDOWN ) {
+			return sprintf(
+				/* translators: %d: number of seconds to wait */
+				__( 'Please wait %d seconds before triggering another manual update.', 'activity-monitor' ),
+				self::MANUAL_TRIGGER_COOLDOWN - $elapsed
+			);
 		}
 
 		update_option( 'am_stats_geo_last_manual_trigger', time(), false );
 		self::start_import();
-		return true;
+		return '';
 	}
 
 	private static function import_in_progress(): bool {
@@ -206,9 +269,48 @@ class AM_Stats_Geo_Updater {
 		wp_mkdir_p( $dir );
 		$zip_path = $dir . '/geolite2-country.zip';
 
-		$response = wp_remote_get( self::DOWNLOAD_URL, array(
+		// Resolves the redirect with a plain (unstreamed) GET first, not
+		// resolve_download_url()'s HEAD-based chain: a presigned storage
+		// URL commonly signs the HTTP method along with the URL itself
+		// (S3-compatible SigV4), so a URL resolved via HEAD can fail
+		// signature validation when actually fetched via GET. Resolving
+		// and fetching both via GET avoids that mismatch. The redirect
+		// response itself has a negligible body -- only the final 200 is
+		// the multi-MB file, which is why streaming only turns on for
+		// that last request.
+		$url     = self::DOWNLOAD_URL;
+		$headers = self::auth_header();
+		$response = null;
+
+		for ( $i = 0; $i < 5; $i++ ) {
+			$response = wp_remote_get( $url, array(
+				'timeout'     => 30,
+				'headers'     => $headers,
+				'redirection' => 0,
+			) );
+			if ( is_wp_error( $response ) ) {
+				throw new Exception( 'Download failed: ' . esc_html( $response->get_error_message() ) );
+			}
+			$code = (int) wp_remote_retrieve_response_code( $response );
+			if ( $code < 300 || $code >= 400 ) {
+				break; // Not a redirect -- 200 (unexpected here) or an error, either way stop resolving.
+			}
+			$location = wp_remote_retrieve_header( $response, 'location' );
+			if ( '' === $location ) {
+				throw new Exception( 'Redirect response had no Location header.' );
+			}
+			$url     = $location;
+			$headers = array(); // Not forwarded past the first hop -- see method doc.
+		}
+
+		if ( 200 !== (int) wp_remote_retrieve_response_code( $response ) ) {
+			throw new Exception( 'Download failed: HTTP ' . esc_html( (string) wp_remote_retrieve_response_code( $response ) ) );
+		}
+		$last_modified = (string) wp_remote_retrieve_header( $response, 'last-modified' );
+
+		$response = wp_remote_get( $url, array(
 			'timeout'  => 300,
-			'headers'  => self::auth_header(),
+			'headers'  => $headers,
 			'stream'   => true,
 			'filename' => $zip_path,
 		) );
@@ -222,7 +324,7 @@ class AM_Stats_Geo_Updater {
 
 		$progress['dir']           = $dir;
 		$progress['zip_path']      = $zip_path;
-		$progress['last_modified'] = wp_remote_retrieve_header( $response, 'last-modified' );
+		$progress['last_modified'] = $last_modified;
 		$progress['stage']         = 'extract';
 		return $progress;
 	}
