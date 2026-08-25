@@ -77,8 +77,19 @@ class AM_Stats_Tracker {
 			}
 		}
 
-		$ua_parts    = AM_Stats_UA_Parser::parse( $user_agent );
-		$visitor_hash = self::visitor_hash( $user_agent );
+		$ua_parts = AM_Stats_UA_Parser::parse( $user_agent );
+
+		// Resolved once and reused for both the visitor hash and the geo
+		// lookup below -- both already respect am_ip_storage the same way,
+		// so there's one IP-privacy decision per hit, not two.
+		$ip_storage   = (string) get_option( 'am_ip_storage', 'full' );
+		$ip           = 'none' === $ip_storage ? '' : AM_DB_Legacy_IP::resolve();
+		$visitor_hash = self::visitor_hash( $ip, $user_agent );
+
+		$country_code = '';
+		if ( '' !== $ip && (bool) get_option( 'am_stats_geo_enabled', 0 ) ) {
+			$country_code = AM_Stats_Geo::country_for( $ip );
+		}
 
 		global $wpdb;
 		$url_id = self::get_or_create_url_id( $url, $title );
@@ -92,6 +103,7 @@ class AM_Stats_Tracker {
 			'browser'       => $ua_parts['browser'],
 			'os'            => $ua_parts['os'],
 			'device_type'   => $ua_parts['device_type'],
+			'country_code'  => $country_code,
 			'user_id'       => $user_id,
 		) );
 
@@ -111,16 +123,12 @@ class AM_Stats_Tracker {
 	 * Cookieless, daily-rotating visitor identity: hash(ip . ua . day . salt).
 	 * No cookie, so no consent-banner obligation.
 	 *
-	 * Respects am_ip_storage the same way AM_Event_Writer does for the audit
-	 * log: 'none' means the site owner opted out of IP use entirely, so the
-	 * IP is dropped from the hash input rather than getting a second,
-	 * stats-only privacy toggle. The IP itself is never persisted either
-	 * way -- only this one-way hash is stored.
+	 * $ip is already '' when am_ip_storage is 'none' -- see handle_track(),
+	 * which resolves it once and respects that setting before either this
+	 * or the geo lookup ever see it. The IP itself is never persisted
+	 * either way -- only this one-way hash is stored.
 	 */
-	private static function visitor_hash( string $user_agent ): string {
-		$ip_storage = (string) get_option( 'am_ip_storage', 'full' );
-		$ip         = 'none' === $ip_storage ? '' : AM_DB_Legacy_IP::resolve();
-
+	private static function visitor_hash( string $ip, string $user_agent ): string {
 		return md5( $ip . '|' . $user_agent . '|' . gmdate( 'Ymd' ) . '|' . wp_salt() );
 	}
 

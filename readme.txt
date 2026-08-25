@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, event log
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.6.0
+Stable tag: 2.8.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -38,6 +38,10 @@ Configure one or more notification channels — email or Slack — each with its
 
 Real-time front-end traffic: visits, unique visitors, top pages, referrers, and a browser/OS/device breakdown, on its own screen kept separate from the activity log. No cookies, and no IP address is ever stored — visitors are identified only by a one-way hash that rotates daily. Tracking can be turned off, restricted by role, and given its own retention period under Settings → Visitor Stats.
 
+Optionally, Settings → Visitor Stats → Geolocation adds a Country breakdown. This uses a database of IP ranges downloaded from MaxMind (GeoLite2) using your own free account and stored on your server — every lookup happens locally, so no visitor's IP address is ever sent anywhere. The only outbound traffic is the plugin periodically checking MaxMind for a newer database, using the account credentials you provide.
+
+The Visitor Stats screen also includes a paginated Recent Hits table — every individual pageview in the selected range (page, browser, OS, device, and country if geolocation is on), newest first.
+
 == Installation ==
 
 1. Upload the plugin files to `/wp-content/plugins/activity-monitor`, or install directly through the WordPress plugins screen.
@@ -60,7 +64,7 @@ Yes. Settings → Logging → "Keep entries for" sets the retention period, from
 
 = Does the plugin send anything to a third party? =
 
-Only if you ask it to. Clicking an IP address in the log looks it up via ipinfo.io, which means sending that one address and nothing else; you can turn that off under Settings → Privacy. Slack alerts post to the webhook URL you configure. Nothing else leaves your site.
+Only if you ask it to. Clicking an IP address in the log looks it up via ipinfo.io, which means sending that one address and nothing else; you can turn that off under Settings → Privacy. Slack alerts post to the webhook URL you configure. If you turn on Visitor Stats' optional Geolocation feature, the plugin periodically contacts MaxMind to download an updated IP-to-country database using your own account credentials — no visitor IP address or other site data is ever included in that request; every actual visitor lookup happens locally against the downloaded copy. Nothing else leaves your site.
 
 = Can I stop the plugin recording IP addresses? =
 
@@ -71,6 +75,15 @@ Yes. Settings → Privacy offers full addresses, anonymised addresses (the last 
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
 
 == Changelog ==
+
+= 2.8.1 =
+* Changed: Visitor Stats screen layout — Recent Hits moved above Top Pages and reduced to 10 rows per page (was 50), Referrers and Countries now sit side by side in one row, Browsers/Operating Systems/Devices in the row below that.
+
+= 2.8.0 =
+* Added: a Recent Hits table on the Visitor Stats screen — every individual pageview in the selected range, newest first, paginated the same way the Activity Log paginates.
+
+= 2.7.0 =
+* Added: optional country-level geolocation for Visitor Stats. Settings → Visitor Stats → Geolocation, using a free MaxMind account — the IP-range database downloads to your own server and every visitor lookup happens locally there; no visitor IP address is ever sent to MaxMind or anyone else. The database updates automatically in the background (twice weekly, matching MaxMind's own release schedule) once configured, with a manual "Update Now" option.
 
 = 2.6.0 =
 * Added: Visitor Stats, a new screen showing real-time front-end traffic — visits, unique visitors, top pages, referrers, and a browser/OS/device breakdown — in its own tables, entirely separate from the activity log. No cookies are set and no IP address is ever stored; visitors are identified only by a one-way hash that rotates daily. Configurable under Settings → Visitor Stats: turn tracking off, exclude specific roles (administrators are excluded by default), and set its own retention period independent of the activity log's. Geolocation (visits by country) is not included in this release.

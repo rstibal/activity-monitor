@@ -2,8 +2,8 @@
 /**
  * Plugin Name: Activity Monitor
  * Plugin URI:  https://robstibal.com
- * Description: Comprehensive WordPress audit log – tracks logins, content changes, settings updates, security events, and more. Includes real-time visitor/traffic stats.
- * Version:     2.6.0
+ * Description: Comprehensive WordPress audit log – tracks logins, content changes, settings updates, security events, and more. Includes real-time visitor/traffic stats with optional country-level geolocation.
+ * Version:     2.8.1
  * Author:      Rob Stibal
  * Author URI:  http://robstibal.com
  * License:     GPL v2 or later
@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'AM_VERSION', '2.6.0' );
+define( 'AM_VERSION', '2.8.1' );
 define( 'AM_FILE',    __FILE__ );
 define( 'AM_DIR',     plugin_dir_path( __FILE__ ) );
 define( 'AM_URL',     plugin_dir_url( __FILE__ ) );
@@ -67,6 +67,8 @@ require_once AM_DIR . 'admin/class-am-admin.php';
 // AM_Stats_Schema's class doc. Never writes to am_events.
 require_once AM_DIR . 'includes/stats/class-am-stats-schema.php';
 require_once AM_DIR . 'includes/stats/class-am-stats-ua-parser.php';
+require_once AM_DIR . 'includes/stats/class-am-stats-geo.php';
+require_once AM_DIR . 'includes/stats/class-am-stats-geo-updater.php';
 require_once AM_DIR . 'includes/stats/class-am-stats-tracker.php';
 require_once AM_DIR . 'includes/stats/class-am-stats-query.php';
 
@@ -83,6 +85,7 @@ function am_init() {
 	am_run_upgrade_cleanup();
 	AM_Logger_Manager::init();
 	AM_Stats_Tracker::init();
+	AM_Stats_Geo_Updater::init();
 	AM_Admin::init();
 }
 add_action( 'plugins_loaded', 'am_init' );
@@ -240,3 +243,15 @@ function am_run_stats_prune() {
 	AM_Stats_Schema::prune( absint( get_option( 'am_stats_retention_days', 90 ) ) );
 }
 add_action( 'am_stats_prune', 'am_run_stats_prune' );
+
+// ── Geolocation update check ─────────────────────────────────────────────
+// Daily HEAD-only check, not a full download -- see AM_Stats_Geo_Updater's
+// class doc for the GeoLite free-account download quota this is designed
+// around. The actual import (AM_Stats_Geo_Updater::TICK_HOOK) schedules
+// itself chunk by chunk and isn't a recurring event.
+function am_schedule_stats_geo_check() {
+	if ( ! wp_next_scheduled( AM_Stats_Geo_Updater::CHECK_HOOK ) ) {
+		wp_schedule_event( time(), 'daily', AM_Stats_Geo_Updater::CHECK_HOOK );
+	}
+}
+add_action( 'wp', 'am_schedule_stats_geo_check' );

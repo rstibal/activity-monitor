@@ -68,7 +68,7 @@ class AM_Stats_Query {
 
 	/** @return array<int, object{value:string,visits:int}> */
 	public static function get_breakdown( string $column, int $days ): array {
-		if ( ! in_array( $column, array( 'browser', 'os', 'device_type' ), true ) ) {
+		if ( ! in_array( $column, array( 'browser', 'os', 'device_type', 'country_code' ), true ) ) {
 			return array();
 		}
 
@@ -88,6 +88,40 @@ class AM_Stats_Query {
 			 ORDER BY visits DESC",
 			$since
 		) );
+	}
+
+	/**
+	 * Raw hits, newest first -- one row per pageview, paginated. This is
+	 * the history view; get_top_urls() is the aggregated one.
+	 *
+	 * @return array{items: array<int, object{date:string,browser:string,os:string,device_type:string,country_code:string,referrer_host:string,url:string,title:string}>, total:int}
+	 */
+	public static function get_hits( int $days, int $page = 1, int $per_page = 50 ): array {
+		global $wpdb;
+		$hits_table = $wpdb->prefix . AM_Stats_Schema::HITS_TABLE;
+		$urls_table = $wpdb->prefix . AM_Stats_Schema::URLS_TABLE;
+		$since      = self::since( $days );
+		$page       = max( 1, $page );
+		$offset     = ( $page - 1 ) * $per_page;
+
+		$total = (int) $wpdb->get_var( $wpdb->prepare(
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant.
+			"SELECT COUNT(*) FROM `{$hits_table}` WHERE date >= %s",
+			$since
+		) );
+
+		$items = $wpdb->get_results( $wpdb->prepare(
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table names are plugin constants.
+			"SELECT h.date, h.browser, h.os, h.device_type, h.country_code, h.referrer_host, u.url, u.title FROM `{$hits_table}` h INNER JOIN `{$urls_table}` u ON u.id = h.url_id
+			 WHERE h.date >= %s
+			 ORDER BY h.id DESC
+			 LIMIT %d OFFSET %d",
+			$since,
+			$per_page,
+			$offset
+		) );
+
+		return array( 'items' => $items, 'total' => $total );
 	}
 
 	private static function since( int $days ): string {

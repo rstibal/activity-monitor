@@ -60,6 +60,7 @@ class AM_Admin {
 		add_action( 'admin_init',                             array( $instance, 'register_settings' ) );
 		add_action( 'admin_post_am_clear_log',                array( $instance, 'handle_clear_log' ) );
 		add_action( 'admin_post_am_export_log',               array( $instance, 'handle_export' ) );
+		add_action( 'admin_post_am_stats_geo_update_now',     array( $instance, 'handle_stats_geo_update_now' ) );
 		// Note there is no 'set-screen-option' filter here. See
 		// add_screen_options() for why the log's per-page option needs no
 		// save-side hook at all.
@@ -312,6 +313,22 @@ class AM_Admin {
 			'sanitize_callback' => array( $this, 'sanitize_retention_days' ),
 			'default'           => 90,
 		) );
+
+		register_setting( self::SETTINGS_GROUP, 'am_stats_geo_account_id', array(
+			'sanitize_callback' => array( $this, 'sanitize_stats_geo_account_id' ),
+			'default'           => '',
+		) );
+
+		register_setting( self::SETTINGS_GROUP, 'am_stats_geo_license_key', array(
+			'sanitize_callback' => array( $this, 'sanitize_stats_geo_license_key' ),
+			'default'           => '',
+		) );
+
+		register_setting( self::SETTINGS_GROUP, 'am_stats_geo_enabled', array(
+			'type'              => 'boolean',
+			'sanitize_callback' => array( $this, 'sanitize_checkbox' ),
+			'default'           => 0,
+		) );
 	}
 
 	private function register_sections_and_fields() {
@@ -357,6 +374,17 @@ class AM_Admin {
 		add_settings_field( 'am_field_stats_enable', __( 'Tracking', 'activity-monitor' ), array( $this, 'field_stats_enable' ), self::PAGE_SETTINGS, 'am_stats' );
 		add_settings_field( 'am_field_stats_exclude_roles', __( 'Exclude roles', 'activity-monitor' ), array( $this, 'field_stats_exclude_roles' ), self::PAGE_SETTINGS, 'am_stats' );
 		add_settings_field( 'am_field_stats_retention', __( 'Keep stats for', 'activity-monitor' ), array( $this, 'field_stats_retention' ), self::PAGE_SETTINGS, 'am_stats' );
+
+		add_settings_section(
+			'am_stats_geo',
+			__( 'Geolocation', 'activity-monitor' ),
+			array( $this, 'section_intro_stats_geo' ),
+			self::PAGE_SETTINGS
+		);
+		add_settings_field( 'am_field_stats_geo_account_id', __( 'MaxMind account ID', 'activity-monitor' ), array( $this, 'field_stats_geo_account_id' ), self::PAGE_SETTINGS, 'am_stats_geo' );
+		add_settings_field( 'am_field_stats_geo_license_key', __( 'MaxMind license key', 'activity-monitor' ), array( $this, 'field_stats_geo_license_key' ), self::PAGE_SETTINGS, 'am_stats_geo' );
+		add_settings_field( 'am_field_stats_geo_enabled', __( 'Country lookups', 'activity-monitor' ), array( $this, 'field_stats_geo_enabled' ), self::PAGE_SETTINGS, 'am_stats_geo' );
+		add_settings_field( 'am_field_stats_geo_status', __( 'Database status', 'activity-monitor' ), array( $this, 'field_stats_geo_status' ), self::PAGE_SETTINGS, 'am_stats_geo' );
 
 		add_settings_section(
 			'am_data',
@@ -406,6 +434,34 @@ class AM_Admin {
 		$known = array_keys( wp_roles()->get_names() );
 		$roles = array_map( 'sanitize_key', (array) $input );
 		return array_values( array_intersect( $roles, $known ) );
+	}
+
+	/**
+	 * These two credential fields render as empty password inputs (see
+	 * field_stats_geo_account_id()) -- a saved value never gets echoed back
+	 * into the page, so a blank submission means "leave it as-is", not
+	 * "clear it". Only the paired *_clear checkbox actually clears it.
+	 * Reading the sibling checkbox from $_POST here rather than through
+	 * register_setting() is safe: this callback only ever runs inside the
+	 * options.php POST that settings_fields() already nonce-protects.
+	 */
+	public function sanitize_stats_geo_account_id( $input ): string {
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- see method doc.
+		if ( ! empty( $_POST['am_stats_geo_account_id_clear'] ) ) {
+			return '';
+		}
+		$input = sanitize_text_field( (string) $input );
+		return '' !== $input ? $input : (string) get_option( 'am_stats_geo_account_id', '' );
+	}
+
+	/** See sanitize_stats_geo_account_id() -- same clear-checkbox pattern. */
+	public function sanitize_stats_geo_license_key( $input ): string {
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- see sanitize_stats_geo_account_id().
+		if ( ! empty( $_POST['am_stats_geo_license_key_clear'] ) ) {
+			return '';
+		}
+		$input = sanitize_text_field( (string) $input );
+		return '' !== $input ? $input : (string) get_option( 'am_stats_geo_license_key', '' );
 	}
 
 	/** Retention periods offered, keyed by days. 0 = keep forever. */
@@ -500,6 +556,17 @@ class AM_Admin {
 		if ( isset( $_GET['am_cleared'] ) ) {
 			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Activity log cleared.', 'activity-monitor' ) . '</p></div>';
 		}
+
+		$geo_key    = 'am_stats_geo_notice_' . get_current_user_id();
+		$geo_notice = get_transient( $geo_key );
+		if ( false !== $geo_notice ) {
+			delete_transient( $geo_key );
+			if ( true === $geo_notice ) {
+				echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'GeoLite2 import started. This runs in the background and can take a few minutes.', 'activity-monitor' ) . '</p></div>';
+			} else {
+				echo '<div class="notice notice-error is-dismissible"><p>' . esc_html( (string) $geo_notice ) . '</p></div>';
+			}
+		}
 	}
 
 	// ── Action handlers ──────────────────────────────────────────────────
@@ -576,6 +643,25 @@ class AM_Admin {
 
 		AM_Export::stream( $format, $filters );
 		// AM_Export::stream() exits internally after writing the response.
+	}
+
+	/**
+	 * "Update Now" on Settings -> Visitor Stats -> Geolocation. Result is
+	 * handed to show_notices() via a per-user transient rather than a query
+	 * arg, since the message is dynamic text (an error, or "started") and
+	 * not just a fixed flag like am_cleared.
+	 */
+	public function handle_stats_geo_update_now() {
+		check_admin_referer( 'am_stats_geo_update_now' );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Unauthorized.', 'activity-monitor' ) );
+		}
+
+		$result = AM_Stats_Geo_Updater::trigger_manual_update();
+		set_transient( 'am_stats_geo_notice_' . get_current_user_id(), $result, MINUTE_IN_SECONDS );
+
+		wp_safe_redirect( add_query_arg( array( 'page' => self::PAGE_SETTINGS ), admin_url( 'admin.php' ) ) );
+		exit;
 	}
 
 	// ── AJAX ─────────────────────────────────────────────────────────────
@@ -1543,6 +1629,8 @@ class AM_Admin {
 			<li><strong><?php echo esc_html( number_format_i18n( $totals['unique_visitors'] ) ); ?></strong> <?php esc_html_e( 'unique visitors', 'activity-monitor' ); ?></li>
 		</ul>
 
+		<?php $this->render_recent_hits_section( $days ); ?>
+
 		<h2><?php esc_html_e( 'Top Pages', 'activity-monitor' ); ?></h2>
 		<?php $this->render_stats_table(
 			AM_Stats_Query::get_top_urls( $days ),
@@ -1562,17 +1650,37 @@ class AM_Admin {
 			}
 		); ?>
 
-		<h2><?php esc_html_e( 'Referrers', 'activity-monitor' ); ?></h2>
-		<?php $this->render_stats_table(
-			AM_Stats_Query::get_referrers( $days ),
-			array( __( 'Host', 'activity-monitor' ), __( 'Visits', 'activity-monitor' ) ),
-			static function ( $row ) {
-				return array(
-					esc_html( $row->referrer_host ),
-					esc_html( number_format_i18n( (int) $row->visits ) ),
-				);
-			}
-		); ?>
+		<div class="am-stats-breakdowns">
+			<div>
+				<h2><?php esc_html_e( 'Referrers', 'activity-monitor' ); ?></h2>
+				<?php $this->render_stats_table(
+					AM_Stats_Query::get_referrers( $days ),
+					array( __( 'Host', 'activity-monitor' ), __( 'Visits', 'activity-monitor' ) ),
+					static function ( $row ) {
+						return array(
+							esc_html( $row->referrer_host ),
+							esc_html( number_format_i18n( (int) $row->visits ) ),
+						);
+					}
+				); ?>
+			</div>
+			<div>
+				<h2><?php esc_html_e( 'Countries', 'activity-monitor' ); ?></h2>
+				<?php if ( ! (bool) get_option( 'am_stats_geo_enabled', 0 ) ) : ?>
+					<p class="description">
+						<?php
+						printf(
+							/* translators: %s: link to Settings -> Visitor Stats */
+							esc_html__( 'Turn on geolocation under %s to see visits by country.', 'activity-monitor' ),
+							'<a href="' . esc_url( add_query_arg( array( 'page' => self::PAGE_SETTINGS ), admin_url( 'admin.php' ) ) ) . '">' . esc_html__( 'Settings', 'activity-monitor' ) . '</a>'
+						);
+						?>
+					</p>
+				<?php else : ?>
+					<?php $this->render_breakdown_table( AM_Stats_Query::get_breakdown( 'country_code', $days ), __( 'Country', 'activity-monitor' ) ); ?>
+				<?php endif; ?>
+			</div>
+		</div>
 
 		<div class="am-stats-breakdowns">
 			<div>
@@ -1587,6 +1695,82 @@ class AM_Admin {
 				<h2><?php esc_html_e( 'Devices', 'activity-monitor' ); ?></h2>
 				<?php $this->render_breakdown_table( AM_Stats_Query::get_breakdown( 'device_type', $days ) ); ?>
 			</div>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Recent Hits: the history view, shown first (above the aggregated
+	 * sections below it) since it's the most concrete answer to "what's
+	 * actually happening." Every recorded pageview in the selected range,
+	 * newest first, paginated the same way the Activity Log paginates --
+	 * same tablenav/page-numbers markup and CSS, just a plain GET link per
+	 * page rather than a filter form, since Recent Hits has nothing to
+	 * filter yet. Kept to 10 rows per page rather than the log's 50 --
+	 * this is a glance at the most recent activity, not a browsing tool.
+	 */
+	private function render_recent_hits_section( int $days ) {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only pagination link, sanitized below.
+		$page     = max( 1, absint( $_GET['am_hits_page'] ?? 1 ) );
+		$per_page = 10;
+		$data     = AM_Stats_Query::get_hits( $days, $page, $per_page );
+		$items    = $data['items'];
+		$total    = $data['total'];
+		$num_pages = (int) ceil( $total / $per_page );
+		$geo_enabled = (bool) get_option( 'am_stats_geo_enabled', 0 );
+
+		$pagination_html = '';
+		if ( $num_pages > 1 ) {
+			$pagination_html = wp_kses_post( paginate_links( array(
+				'base'      => add_query_arg( 'am_hits_page', '%#%' ),
+				'format'    => '',
+				'prev_text' => '&laquo;',
+				'next_text' => '&raquo;',
+				'total'     => $num_pages,
+				'current'   => $page,
+			) ) );
+		}
+		$displaying_num_html = sprintf(
+			/* translators: %s: formatted number of matching hits */
+			esc_html( _n( '%s hit', '%s hits', $total, 'activity-monitor' ) ),
+			number_format_i18n( $total )
+		);
+		?>
+		<h2><?php esc_html_e( 'Recent Hits', 'activity-monitor' ); ?></h2>
+		<?php
+		$columns = array( __( 'Date / Time', 'activity-monitor' ), __( 'Page', 'activity-monitor' ), __( 'Browser', 'activity-monitor' ), __( 'OS', 'activity-monitor' ), __( 'Device', 'activity-monitor' ) );
+		if ( $geo_enabled ) {
+			$columns[] = __( 'Country', 'activity-monitor' );
+		}
+		$columns[] = __( 'Referrer', 'activity-monitor' );
+
+		$this->render_stats_table(
+			$items,
+			$columns,
+			static function ( $row ) use ( $geo_enabled ) {
+				$cells = array(
+					esc_html( wp_date( AM_Date_Format::combined(), strtotime( $row->date . ' UTC' ) ) ),
+					'<span class="am-stats-truncate" title="' . esc_attr( $row->title ?: $row->url ) . '">' . esc_html( $row->title ?: $row->url ) . '</span>',
+					esc_html( $row->browser ),
+					esc_html( $row->os ),
+					esc_html( ucfirst( $row->device_type ) ),
+				);
+				if ( $geo_enabled ) {
+					$cells[] = esc_html( $row->country_code ?: '—' );
+				}
+				$cells[] = esc_html( $row->referrer_host ?: '—' );
+				return $cells;
+			}
+		);
+		?>
+		<div class="tablenav bottom">
+			<div class="tablenav-pages<?php echo $num_pages > 1 ? '' : ' one-page'; ?>">
+				<span class="displaying-num"><?php echo $displaying_num_html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- built via esc_html() above. ?></span>
+				<?php if ( $num_pages > 1 ) : ?>
+					<span class="pagination-links"><?php echo $pagination_html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- already wp_kses_post()'d above. ?></span>
+				<?php endif; ?>
+			</div>
+			<br class="clear">
 		</div>
 		<?php
 	}
@@ -1630,10 +1814,10 @@ class AM_Admin {
 	}
 
 	/** @param array<int, object{value:string,visits:int}> $rows */
-	private function render_breakdown_table( array $rows ) {
+	private function render_breakdown_table( array $rows, string $value_label = '' ) {
 		$this->render_stats_table(
 			$rows,
-			array( __( 'Value', 'activity-monitor' ), __( 'Visits', 'activity-monitor' ) ),
+			array( '' !== $value_label ? $value_label : __( 'Value', 'activity-monitor' ), __( 'Visits', 'activity-monitor' ) ),
 			static function ( $row ) {
 				return array(
 					esc_html( $row->value ?: __( 'Other', 'activity-monitor' ) ),
@@ -1902,6 +2086,95 @@ class AM_Admin {
 			<?php endforeach; ?>
 		</select>
 		<p class="description"><?php esc_html_e( 'Separate from the activity log’s own retention setting above — visit data is far higher volume and lower forensic value, so it doesn’t need to be kept as long.', 'activity-monitor' ); ?></p>
+		<?php
+	}
+
+	public function section_intro_stats_geo() {
+		?>
+		<p>
+			<?php
+			printf(
+				/* translators: %s: link to MaxMind's sign-up page */
+				esc_html__( 'Adds a Country column to Visitor Stats, resolved entirely on this server from a local database — no visitor IP is ever sent anywhere. Requires a free MaxMind account: %s.', 'activity-monitor' ),
+				'<a href="' . esc_url( 'https://www.maxmind.com/en/geolite2/signup' ) . '" target="_blank" rel="noopener noreferrer">maxmind.com/en/geolite2/signup</a>'
+			);
+			?>
+		</p>
+		<?php
+	}
+
+	public function field_stats_geo_account_id() {
+		$has_value = '' !== (string) get_option( 'am_stats_geo_account_id', '' );
+		?>
+		<input type="password" id="am_stats_geo_account_id" name="am_stats_geo_account_id" value="" autocomplete="off" class="regular-text"
+			placeholder="<?php echo $has_value ? esc_attr__( 'Saved — leave blank to keep it', 'activity-monitor' ) : ''; ?>">
+		<?php if ( $has_value ) : ?>
+			<label><input type="checkbox" name="am_stats_geo_account_id_clear" value="1"> <?php esc_html_e( 'Clear', 'activity-monitor' ); ?></label>
+		<?php endif; ?>
+		<?php
+	}
+
+	public function field_stats_geo_license_key() {
+		$has_value = '' !== (string) get_option( 'am_stats_geo_license_key', '' );
+		?>
+		<input type="password" id="am_stats_geo_license_key" name="am_stats_geo_license_key" value="" autocomplete="off" class="regular-text"
+			placeholder="<?php echo $has_value ? esc_attr__( 'Saved — leave blank to keep it', 'activity-monitor' ) : ''; ?>">
+		<?php if ( $has_value ) : ?>
+			<label><input type="checkbox" name="am_stats_geo_license_key_clear" value="1"> <?php esc_html_e( 'Clear', 'activity-monitor' ); ?></label>
+		<?php endif; ?>
+		<p class="description"><?php esc_html_e( 'Neither field is ever displayed again once saved, including here — only whether one is currently set.', 'activity-monitor' ); ?></p>
+		<?php
+	}
+
+	public function field_stats_geo_enabled() {
+		?>
+		<label>
+			<input type="checkbox" name="am_stats_geo_enabled" value="1" <?php checked( (bool) get_option( 'am_stats_geo_enabled', 0 ) ); ?>>
+			<?php esc_html_e( 'Resolve visits to a country', 'activity-monitor' ); ?>
+		</label>
+		<?php
+	}
+
+	public function field_stats_geo_status() {
+		$status = AM_Stats_Geo_Updater::status();
+		?>
+		<p>
+			<?php if ( ! $status['configured'] ) : ?>
+				<?php esc_html_e( 'Enter an account ID and license key above to enable database updates.', 'activity-monitor' ); ?>
+			<?php elseif ( $status['in_progress'] ) : ?>
+				<?php
+				printf(
+					/* translators: %s: current import stage, e.g. "blocks_ipv4" */
+					esc_html__( 'Import in progress (stage: %s) — this runs in the background across several page loads and can take a few minutes.', 'activity-monitor' ),
+					'<code>' . esc_html( $status['stage'] ) . '</code>'
+				);
+				?>
+			<?php elseif ( '' !== $status['error'] ) : ?>
+				<span style="color:#d63638;"><?php echo esc_html( sprintf(
+					/* translators: %s: error message */
+					__( 'Last import failed: %s', 'activity-monitor' ),
+					$status['error']
+				) ); ?></span>
+			<?php elseif ( $status['last_updated'] > 0 ) : ?>
+				<?php
+				printf(
+					/* translators: 1: number of ranges, 2: last updated date/time */
+					esc_html__( '%1$s IP ranges loaded, last updated %2$s.', 'activity-monitor' ),
+					esc_html( number_format_i18n( $status['row_count'] ) ),
+					esc_html( wp_date( AM_Date_Format::combined(), $status['last_updated'] ) )
+				);
+				?>
+			<?php else : ?>
+				<?php esc_html_e( 'No database imported yet.', 'activity-monitor' ); ?>
+			<?php endif; ?>
+		</p>
+		<?php if ( $status['configured'] && ! $status['in_progress'] ) : ?>
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+				<?php wp_nonce_field( 'am_stats_geo_update_now' ); ?>
+				<input type="hidden" name="action" value="am_stats_geo_update_now">
+				<?php submit_button( __( 'Update Now', 'activity-monitor' ), 'secondary', 'submit', false ); ?>
+			</form>
+		<?php endif; ?>
 		<?php
 	}
 

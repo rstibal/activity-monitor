@@ -43,6 +43,17 @@ delete_option( 'am_stats_enable_tracking' );
 delete_option( 'am_stats_exclude_roles' );
 delete_option( 'am_stats_retention_days' );
 
+// Geolocation (added on top of Visitor Stats). am_stats_geo_ranges itself
+// is already covered by AM_Stats_Schema::uninstall() above.
+delete_option( 'am_stats_geo_account_id' );
+delete_option( 'am_stats_geo_license_key' );
+delete_option( 'am_stats_geo_enabled' );
+delete_option( 'am_stats_geo_last_modified' );
+delete_option( 'am_stats_geo_last_updated' );
+delete_option( 'am_stats_geo_last_manual_trigger' );
+delete_option( 'am_stats_geo_import_progress' );
+delete_option( 'am_stats_geo_locations_map' );
+
 // Page traffic was removed in 2.2.0, which drops these on upgrade via
 // am_run_upgrade_cleanup(). Repeated here because uninstall must not
 // assume that ran: a site deleting the plugin without ever loading the
@@ -108,4 +119,12 @@ if ( $traffic_rollup_timestamp ) {
 $stats_prune_timestamp = wp_next_scheduled( 'am_stats_prune' );
 if ( $stats_prune_timestamp ) {
 	wp_unschedule_event( $stats_prune_timestamp, 'am_stats_prune' );
+}
+$geo_check_timestamp = wp_next_scheduled( 'am_stats_geo_check' );
+if ( $geo_check_timestamp ) {
+	wp_unschedule_event( $geo_check_timestamp, 'am_stats_geo_check' );
+}
+$geo_tick_timestamp = wp_next_scheduled( 'am_stats_geo_import_tick' );
+if ( $geo_tick_timestamp ) {
+	wp_unschedule_event( $geo_tick_timestamp, 'am_stats_geo_import_tick' );
 }

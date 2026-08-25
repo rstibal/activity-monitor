@@ -15,11 +15,12 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 class AM_Stats_Schema {
 
 	const DB_VERSION_OPTION = 'am_stats_db_version';
-	const CURRENT_VERSION   = '1.0.0';
+	const CURRENT_VERSION   = '1.1.0';
 
-	const URLS_TABLE     = 'am_stats_urls';
-	const HITS_TABLE     = 'am_stats_hits';
-	const VISITORS_TABLE = 'am_stats_visitors';
+	const URLS_TABLE        = 'am_stats_urls';
+	const HITS_TABLE        = 'am_stats_hits';
+	const VISITORS_TABLE    = 'am_stats_visitors';
+	const GEO_RANGES_TABLE  = 'am_stats_geo_ranges';
 
 	/** Registered on register_activation_hook(). */
 	public static function install() {
@@ -61,6 +62,7 @@ class AM_Stats_Schema {
 			browser       VARCHAR(40)          NOT NULL DEFAULT '',
 			os            VARCHAR(40)          NOT NULL DEFAULT '',
 			device_type   VARCHAR(20)          NOT NULL DEFAULT '',
+			country_code  CHAR(2)              NOT NULL DEFAULT '',
 			user_id       BIGINT(20) UNSIGNED  NOT NULL DEFAULT 0,
 			PRIMARY KEY (id),
 			KEY ix_date (date),
@@ -76,10 +78,26 @@ class AM_Stats_Schema {
 			PRIMARY KEY (visitor_hash)
 		) {$charset};";
 
+		// Built and swapped by AM_Stats_Geo_Updater, not written here directly
+		// -- this just guarantees the table exists (empty) so AM_Stats_Geo's
+		// lookup query never has to special-case a missing table before the
+		// first import has run.
+		$geo_ranges_table = $wpdb->prefix . self::GEO_RANGES_TABLE;
+		$sql_geo_ranges   = "CREATE TABLE {$geo_ranges_table} (
+			id           BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+			ip_version   TINYINT(3) UNSIGNED  NOT NULL,
+			start_ip     VARBINARY(16)        NOT NULL,
+			end_ip       VARBINARY(16)        NOT NULL,
+			country_code CHAR(2)              NOT NULL DEFAULT '',
+			PRIMARY KEY (id),
+			KEY ix_range (ip_version, start_ip)
+		) {$charset};";
+
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 		dbDelta( $sql_urls );
 		dbDelta( $sql_hits );
 		dbDelta( $sql_visitors );
+		dbDelta( $sql_geo_ranges );
 	}
 
 	/**
@@ -112,7 +130,19 @@ class AM_Stats_Schema {
 	/** Full removal — called from uninstall.php only. */
 	public static function uninstall() {
 		global $wpdb;
-		foreach ( array( self::URLS_TABLE, self::HITS_TABLE, self::VISITORS_TABLE ) as $table ) {
+		$tables = array(
+			self::URLS_TABLE,
+			self::HITS_TABLE,
+			self::VISITORS_TABLE,
+			self::GEO_RANGES_TABLE,
+			// Staging/backup tables from an import that never finished
+			// swapping -- see AM_Stats_Geo_Updater::run_import(). IF EXISTS
+			// makes these no-ops on the (normal) case where no import was
+			// interrupted mid-swap.
+			self::GEO_RANGES_TABLE . '_staging',
+			self::GEO_RANGES_TABLE . '_old',
+		);
+		foreach ( $tables as $table ) {
 			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant.
 			$wpdb->query( "DROP TABLE IF EXISTS `{$wpdb->prefix}{$table}`" );
 		}
