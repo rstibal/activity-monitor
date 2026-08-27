@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Determine version
         id: version
@@ -57,12 +57,12 @@ jobs:
 
       - name: Attach zip to release
         if: github.event_name == 'release'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: activity-monitor-${{ steps.version.outputs.version }}.zip
 
       - name: Upload build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: activity-monitor-${{ steps.version.outputs.version }}
           path: activity-monitor-${{ steps.version.outputs.version }}.zip
