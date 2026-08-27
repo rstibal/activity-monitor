@@ -373,9 +373,14 @@
    longest *word* -- so table-layout:auto is free to shrink the column
    to fit whatever room is actually available, same as the Activity
    Log's Message column. -webkit-line-clamp caps it at 2 lines instead
-   of growing the row indefinitely for a long title. Applied directly to
-   the <td> (see render_stats_table()'s $truncate_cols), not an inner
-   span. */
+   of growing the row indefinitely for a long title.
+   Applied to the inner <a>, never the <td> -- the -webkit-box display
+   the clamp needs overrides display: table-cell if put on the <td>
+   itself, which knocks that cell out of the table's row/column layout
+   entirely (it renders as a block instead, stacking under/over its
+   neighbors rather than sitting beside them). .am-log-message-clamp
+   above documents the same trap for the Activity Log's Message column,
+   which is why that one clamps a child span too instead of its <td>. */
 .am-stats-truncate {
 	white-space: normal !important;
 	max-width: 60ch;

@@ -1645,26 +1645,24 @@ class AM_Admin {
 			array( __( 'Title', 'activity-monitor' ), __( 'URL', 'activity-monitor' ), __( 'Visits', 'activity-monitor' ), __( 'Unique Visitors', 'activity-monitor' ) ),
 			static function ( $row ) {
 				// Title/URL are the two columns here that can run long, so
-				// the <td> itself gets the am-stats-truncate treatment
-				// (passed via $truncate_cols below) -- the same
-				// max-width/overflow/ellipsis technique the Activity Log
-				// uses on its IP column (.am-ip-cell), applied to the cell
-				// rather than an inner span. Both link to the live page in
-				// a new tab -- the stored title is shown stripped of its
-				// " » Site Name" suffix (see display_title()), while the
-				// stored title itself is left untouched since
+				// the anchor itself gets am-stats-truncate (wrap + 2-line
+				// clamp, same as the Activity Log's Message column) -- not
+				// the <td>, which the clamp's -webkit-box display would
+				// pull out of table-cell layout. Both link to the live
+				// page in a new tab -- the stored title is shown stripped
+				// of its " » Site Name" suffix (see display_title()),
+				// while the stored title itself is left untouched since
 				// AM_Stats_Tracker keeps it current with document.title
 				// verbatim.
 				$full_url = home_url( $row->url );
 				$title    = self::display_title( (string) $row->title );
 				return array(
-					'<a href="' . esc_url( $full_url ) . '" target="_blank" rel="noopener noreferrer" title="' . esc_attr( $title ) . '">' . esc_html( $title ?: '—' ) . '</a>',
-					'<a href="' . esc_url( $full_url ) . '" target="_blank" rel="noopener noreferrer" title="' . esc_attr( $row->url ) . '">' . esc_html( $row->url ) . '</a>',
+					'<a class="am-stats-truncate" href="' . esc_url( $full_url ) . '" target="_blank" rel="noopener noreferrer" title="' . esc_attr( $title ) . '">' . esc_html( $title ?: '—' ) . '</a>',
+					'<a class="am-stats-truncate" href="' . esc_url( $full_url ) . '" target="_blank" rel="noopener noreferrer" title="' . esc_attr( $row->url ) . '">' . esc_html( $row->url ) . '</a>',
 					esc_html( number_format_i18n( (int) $row->visits ) ),
 					esc_html( number_format_i18n( (int) $row->unique_visitors ) ),
 				);
-			},
-			array( 0, 1 )
+			}
 		); ?>
 
 		<div class="am-stats-breakdowns">
@@ -1769,7 +1767,7 @@ class AM_Admin {
 				$label    = self::display_title( (string) $row->title ) ?: $row->url;
 				$cells    = array(
 					esc_html( wp_date( AM_Date_Format::combined(), strtotime( $row->date . ' UTC' ) ) ),
-					'<a href="' . esc_url( $full_url ) . '" target="_blank" rel="noopener noreferrer" title="' . esc_attr( $label ) . '">' . esc_html( $label ) . '</a>',
+					'<a class="am-stats-truncate" href="' . esc_url( $full_url ) . '" target="_blank" rel="noopener noreferrer" title="' . esc_attr( $label ) . '">' . esc_html( $label ) . '</a>',
 					esc_html( $row->browser ),
 					esc_html( $row->os ),
 					esc_html( ucfirst( $row->device_type ) ),
@@ -1779,8 +1777,7 @@ class AM_Admin {
 				}
 				$cells[] = esc_html( $row->referrer_host ?: '—' );
 				return $cells;
-			},
-			array( 1 )
+			}
 		);
 		?>
 		<div class="tablenav bottom">
@@ -1823,12 +1820,13 @@ class AM_Admin {
 	 * nowrap cells), same core styling for borders/header weight/row
 	 * striping. $columns are the header labels; $row_cells maps one row
 	 * object to an array of already-escaped cell HTML, in the same order
-	 * as $columns. $truncate_cols is a list of 0-based column indexes that
-	 * get the am-stats-truncate treatment applied to the <td> itself --
-	 * the same technique the Activity Log's IP column uses via
-	 * .am-ip-cell, rather than a max-width on an inner span/anchor.
+	 * as $columns. A truncated cell's own markup carries the
+	 * am-stats-truncate class on an inner element (see the Top Pages/
+	 * Recent Hits callers) -- never on the <td> itself, which the
+	 * -webkit-box display the clamp needs would knock out of table-cell
+	 * layout entirely (see .am-stats-truncate's comment).
 	 */
-	private function render_stats_table( array $rows, array $columns, callable $row_cells, array $truncate_cols = array() ) {
+	private function render_stats_table( array $rows, array $columns, callable $row_cells ) {
 		if ( empty( $rows ) ) {
 			echo '<p>' . esc_html__( 'No data yet for this range.', 'activity-monitor' ) . '</p>';
 			return;
@@ -1846,8 +1844,8 @@ class AM_Admin {
 				<tbody>
 					<?php foreach ( $rows as $row ) : ?>
 						<tr>
-							<?php foreach ( $row_cells( $row ) as $i => $cell ) : ?>
-								<td<?php echo in_array( $i, $truncate_cols, true ) ? ' class="am-stats-truncate"' : ''; ?>><?php echo $cell; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- pre-escaped by the caller's $row_cells callback. ?></td>
+							<?php foreach ( $row_cells( $row ) as $cell ) : ?>
+								<td><?php echo $cell; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- pre-escaped by the caller's $row_cells callback. ?></td>
 							<?php endforeach; ?>
 						</tr>
 					<?php endforeach; ?>
