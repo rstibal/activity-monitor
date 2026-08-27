@@ -1648,10 +1648,17 @@ class AM_Admin {
 				// Activity Log -- Title/URL are the two columns here that
 				// can run long, so they get the same title-attribute +
 				// truncate-with-ellipsis treatment as the log's Type/
-				// Message columns rather than overflowing the row.
+				// Message columns rather than overflowing the row. Both
+				// link to the live page in a new tab -- the stored title
+				// is shown stripped of its " » Site Name" suffix (see
+				// display_title()), while the stored title itself is left
+				// untouched since AM_Stats_Tracker keeps it current with
+				// document.title verbatim.
+				$full_url = home_url( $row->url );
+				$title    = self::display_title( (string) $row->title );
 				return array(
-					'<span class="am-stats-truncate" title="' . esc_attr( $row->title ) . '">' . esc_html( $row->title ?: '—' ) . '</span>',
-					'<span class="am-stats-truncate" title="' . esc_attr( $row->url ) . '">' . esc_html( $row->url ) . '</span>',
+					'<a class="am-stats-truncate" href="' . esc_url( $full_url ) . '" target="_blank" rel="noopener noreferrer" title="' . esc_attr( $title ) . '">' . esc_html( $title ?: '—' ) . '</a>',
+					'<a class="am-stats-truncate" href="' . esc_url( $full_url ) . '" target="_blank" rel="noopener noreferrer" title="' . esc_attr( $row->url ) . '">' . esc_html( $row->url ) . '</a>',
 					esc_html( number_format_i18n( (int) $row->visits ) ),
 					esc_html( number_format_i18n( (int) $row->unique_visitors ) ),
 				);
@@ -1756,9 +1763,11 @@ class AM_Admin {
 			$items,
 			$columns,
 			static function ( $row ) use ( $geo_enabled ) {
-				$cells = array(
+				$full_url = home_url( $row->url );
+				$label    = self::display_title( (string) $row->title ) ?: $row->url;
+				$cells    = array(
 					esc_html( wp_date( AM_Date_Format::combined(), strtotime( $row->date . ' UTC' ) ) ),
-					'<span class="am-stats-truncate" title="' . esc_attr( $row->title ?: $row->url ) . '">' . esc_html( $row->title ?: $row->url ) . '</span>',
+					'<a class="am-stats-truncate" href="' . esc_url( $full_url ) . '" target="_blank" rel="noopener noreferrer" title="' . esc_attr( $label ) . '">' . esc_html( $label ) . '</a>',
 					esc_html( $row->browser ),
 					esc_html( $row->os ),
 					esc_html( ucfirst( $row->device_type ) ),
@@ -1781,6 +1790,27 @@ class AM_Admin {
 			<br class="clear">
 		</div>
 		<?php
+	}
+
+	/**
+	 * Strips a trailing " {separator} Site Name" suffix for display only --
+	 * the stored am_stats_urls.title stays document.title verbatim (see
+	 * AM_Stats_Tracker::get_or_create_url_id()), since that's the value
+	 * that keeps itself current as a post's title changes. The separator
+	 * isn't assumed to be any particular character (themes vary -- »,-,|,:),
+	 * so this matches "any run of non-word characters immediately before
+	 * the site name" rather than one hardcoded symbol. Falls back to the
+	 * untouched title if the site name isn't found at the end, e.g. a
+	 * cached hit from before the site's name changed.
+	 */
+	private static function display_title( string $title ): string {
+		$site = get_bloginfo( 'name' );
+		if ( '' === $title || '' === $site ) {
+			return $title;
+		}
+		$stripped = preg_replace( '/\s*[^\w\s]+\s*' . preg_quote( $site, '/' ) . '\s*$/iu', '', $title );
+		$stripped = trim( (string) $stripped );
+		return '' !== $stripped ? $stripped : $title;
 	}
 
 	/**
