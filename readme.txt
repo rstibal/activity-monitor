@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, event log
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.8.11
+Stable tag: 2.8.12
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -75,6 +75,9 @@ Yes. Settings → Privacy offers full addresses, anonymised addresses (the last 
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
 
 == Changelog ==
+
+= 2.8.12 =
+* Fixed: GeoLite2 "Update Now" reliably failed on a new install or right after entering a new MaxMind license key, with "Last import failed: Download failed: HTTP 401". MaxMind's redirect chain can bounce through more than one of their own hosts before finally handing off to storage, and each of those still expects the Basic Auth header -- the code was dropping it unconditionally after the very first redirect hop instead of only once the chain actually left maxmind.com, turning a hop that still required credentials into an unauthenticated one. The header is now forwarded for as long as the chain stays on a maxmind.com host. Failure messages also now include MaxMind's own error detail (e.g. "AUTHORIZATION_INVALID") instead of just the bare HTTP status, to make a genuinely wrong account ID/license key easier to tell apart from a request bug like this one.
 
 = 2.8.11 =
 * Fixed: a GeoLite2 "Update Now" import logged `PHP Warning: rmdir(...am-stats-geo-import): Directory not empty` even though the import itself completed successfully. The zip's wanted CSVs get extracted into a version-stamped subdirectory and then moved up to the working dir's root, leaving that now-empty subdirectory behind; cleanup only unlinked files at the top level and never removed it, so the final rmdir() of the working dir failed. Cleanup now recurses into subdirectories.

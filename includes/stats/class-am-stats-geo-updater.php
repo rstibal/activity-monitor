@@ -111,8 +111,16 @@ class AM_Stats_Geo_Updater {
 	 * query string; WP's default redirect-following resends every header,
 	 * including our Basic Auth, to that new host -- R2 then responds 400
 	 * Bad Request to a presigned URL that also carries an unexpected
-	 * Authorization header. Following the redirect manually and dropping
-	 * the header once the request leaves download.maxmind.com avoids it.
+	 * Authorization header. Following the redirect manually and only
+	 * forwarding the header while the redirect chain is still on a
+	 * maxmind.com host (see is_maxmind_host()) avoids it -- MaxMind's own
+	 * chain can bounce through more than one of their own hosts before
+	 * finally handing off to storage, and each of those still expects
+	 * Basic Auth; dropping it after the very first hop unconditionally
+	 * (rather than once it actually leaves maxmind.com) turned a hop that
+	 * still required credentials into an unauthenticated one, surfacing
+	 * as an HTTP 401 that had nothing to do with the account ID/license
+	 * key actually being wrong.
 	 *
 	 * @return array{url:string, last_modified:string}
 	 */
@@ -137,7 +145,7 @@ class AM_Stats_Geo_Updater {
 					throw new Exception( 'Redirect response had no Location header.' );
 				}
 				$url     = $location;
-				$headers = array(); // Not forwarded past the first hop -- see method doc.
+				$headers = self::is_maxmind_host( $url ) ? $headers : array();
 				continue;
 			}
 			if ( 200 === $code ) {
@@ -146,10 +154,38 @@ class AM_Stats_Geo_Updater {
 					'last_modified' => (string) wp_remote_retrieve_header( $response, 'last-modified' ),
 				);
 			}
-			throw new Exception( 'Unexpected response resolving the download URL: HTTP ' . esc_html( (string) $code ) );
+			throw new Exception( 'Unexpected response resolving the download URL: HTTP ' . esc_html( (string) $code ) . esc_html( self::response_detail( $response ) ) );
 		}
 
 		throw new Exception( 'Too many redirects resolving the download URL.' );
+	}
+
+	/** True for download.maxmind.com and any other *.maxmind.com host their redirect chain might hand off through. */
+	private static function is_maxmind_host( string $url ): bool {
+		$host = (string) wp_parse_url( $url, PHP_URL_HOST );
+		return 'maxmind.com' === $host || ( strlen( $host ) > 11 && '.maxmind.com' === substr( $host, -12 ) );
+	}
+
+	/**
+	 * Returns MaxMind's own JSON error body (e.g. " -- AUTHORIZATION_INVALID:
+	 * See https://...") to append to an HTTP-status-only exception message,
+	 * or '' when there isn't one -- a bare "HTTP 401" doesn't distinguish a
+	 * genuinely wrong account ID/license key from a request-construction
+	 * bug like the one this method's callers work around, and MaxMind's API
+	 * reliably explains which it is. Returned unescaped -- callers pass it
+	 * through esc_html() themselves at the point it's concatenated into the
+	 * exception message.
+	 */
+	private static function response_detail( $response ): string {
+		$body = wp_remote_retrieve_body( $response );
+		if ( '' === $body ) {
+			return '';
+		}
+		$decoded = json_decode( $body, true );
+		if ( is_array( $decoded ) && ! empty( $decoded['error'] ) ) {
+			return ' -- ' . (string) $decoded['error'];
+		}
+		return '';
 	}
 
 	/**
@@ -300,11 +336,11 @@ class AM_Stats_Geo_Updater {
 				throw new Exception( 'Redirect response had no Location header.' );
 			}
 			$url     = $location;
-			$headers = array(); // Not forwarded past the first hop -- see method doc.
+			$headers = self::is_maxmind_host( $url ) ? $headers : array(); // See resolve_download_url()'s doc.
 		}
 
 		if ( 200 !== (int) wp_remote_retrieve_response_code( $response ) ) {
-			throw new Exception( 'Download failed: HTTP ' . esc_html( (string) wp_remote_retrieve_response_code( $response ) ) );
+			throw new Exception( 'Download failed: HTTP ' . esc_html( (string) wp_remote_retrieve_response_code( $response ) ) . esc_html( self::response_detail( $response ) ) );
 		}
 		$last_modified = (string) wp_remote_retrieve_header( $response, 'last-modified' );
 
