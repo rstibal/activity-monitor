@@ -2149,7 +2149,7 @@ class AM_Admin {
 	public function field_stats_geo_account_id() {
 		$has_value = '' !== (string) get_option( 'am_stats_geo_account_id', '' );
 		?>
-		<input type="password" id="am_stats_geo_account_id" name="am_stats_geo_account_id" value="" autocomplete="off" class="regular-text"
+		<input type="password" id="am_stats_geo_account_id" name="am_stats_geo_account_id" value="" autocomplete="new-password" class="regular-text"
 			placeholder="<?php echo $has_value ? esc_attr__( 'Saved — leave blank to keep it', 'activity-monitor' ) : ''; ?>">
 		<?php if ( $has_value ) : ?>
 			<label><input type="checkbox" name="am_stats_geo_account_id_clear" value="1"> <?php esc_html_e( 'Clear', 'activity-monitor' ); ?></label>
@@ -2157,10 +2157,24 @@ class AM_Admin {
 		<?php
 	}
 
+	/**
+	 * autocomplete="new-password" here and on the account ID field above,
+	 * not "off" -- browsers and password-manager extensions widely ignore
+	 * "off" on a password-type input and offer to fill it from a saved
+	 * credential anyway. "new-password" is the value the autofill spec
+	 * actually defines for "this is a fresh secret, not a login to
+	 * autofill or offer to save." This matters more here than on an
+	 * ordinary login form: this field never echoes its saved value back
+	 * (see the description below), so a credential silently autofilled by
+	 * a password manager is visually indistinguishable from an empty
+	 * field with its placeholder -- the wrong value would get saved and
+	 * sent to MaxMind with nothing in the UI hinting why, surfacing only
+	 * as an opaque HTTP 401 from stage_download().
+	 */
 	public function field_stats_geo_license_key() {
 		$has_value = '' !== (string) get_option( 'am_stats_geo_license_key', '' );
 		?>
-		<input type="password" id="am_stats_geo_license_key" name="am_stats_geo_license_key" value="" autocomplete="off" class="regular-text"
+		<input type="password" id="am_stats_geo_license_key" name="am_stats_geo_license_key" value="" autocomplete="new-password" class="regular-text"
 			placeholder="<?php echo $has_value ? esc_attr__( 'Saved — leave blank to keep it', 'activity-monitor' ) : ''; ?>">
 		<?php if ( $has_value ) : ?>
 			<label><input type="checkbox" name="am_stats_geo_license_key_clear" value="1"> <?php esc_html_e( 'Clear', 'activity-monitor' ); ?></label>

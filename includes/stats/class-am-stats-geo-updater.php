@@ -40,10 +40,16 @@ class AM_Stats_Geo_Updater {
 	 * download quota the daily automatic check is designed around (see
 	 * class doc) without being so long that a failed attempt -- including
 	 * while diagnosing a real bug, not just an accidental double-click --
-	 * locks the button for the better part of an hour. 5 minutes still
-	 * caps manual triggers at 12/hour, comfortably under the 30/day quota.
+	 * locks the button for the better part of an hour. Was 5 minutes
+	 * through 2.8.13; cut to 1 minute after that turned out to still be
+	 * too long in practice while chasing the 2.8.12 auth-header bug on a
+	 * live site -- every failed attempt cost a genuine 5-minute wait
+	 * before the next retry could even be tried. 1 minute still caps
+	 * manual triggers at 60/hour, and a human clicking a button by hand
+	 * is nowhere near sustaining that for the hours it'd take to burn
+	 * through the 30/day quota.
 	 */
-	const MANUAL_TRIGGER_COOLDOWN = 5 * MINUTE_IN_SECONDS;
+	const MANUAL_TRIGGER_COOLDOWN = 1 * MINUTE_IN_SECONDS;
 
 	public static function init() {
 		add_action( self::CHECK_HOOK, array( __CLASS__, 'maybe_check_for_update' ) );
