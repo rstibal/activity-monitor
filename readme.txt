@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, event log
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.8.10
+Stable tag: 2.8.11
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -75,6 +75,9 @@ Yes. Settings → Privacy offers full addresses, anonymised addresses (the last 
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
 
 == Changelog ==
+
+= 2.8.11 =
+* Fixed: a GeoLite2 "Update Now" import logged `PHP Warning: rmdir(...am-stats-geo-import): Directory not empty` even though the import itself completed successfully. The zip's wanted CSVs get extracted into a version-stamped subdirectory and then moved up to the working dir's root, leaving that now-empty subdirectory behind; cleanup only unlinked files at the top level and never removed it, so the final rmdir() of the working dir failed. Cleanup now recurses into subdirectories.
 
 = 2.8.10 =
 * Fixed: on the Visitor Stats screen's Top Pages table, Title and URL rendered stacked on top of each other with Visits/Unique Visitors shoved to the right, instead of four aligned columns. 2.8.9's wrap+clamp fix had applied `display: -webkit-box` directly to those `<td>` elements, which overrides `display: table-cell` and knocks the cell out of the table's row/column layout. The clamp now applies to the inner link instead, matching how the Activity Log's own Message column avoids the same trap.

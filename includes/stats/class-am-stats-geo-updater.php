@@ -592,10 +592,30 @@ class AM_Stats_Geo_Updater {
 		if ( ! is_dir( $dir ) ) {
 			return;
 		}
-		foreach ( glob( $dir . '/*' ) ?: array() as $file ) {
-			if ( is_file( $file ) ) {
+		self::rmdir_recursive( $dir );
+	}
+
+	/**
+	 * The working dir isn't always flat by the time this runs: stage_extract()
+	 * extracts the wanted CSVs from the zip into the version-stamped
+	 * subdirectory the zip stores them under (e.g.
+	 * GeoLite2-Country-CSV_20260821/) and only renames the files themselves
+	 * up to $dir's root, leaving that now-empty subdirectory behind. A flat
+	 * unlink() loop over glob( $dir . '/*' ) skips directories entirely, so
+	 * that leftover subdirectory survived cleanup_working_dir() and made the
+	 * final rmdir( $dir ) fail with "Directory not empty" -- harmless (the
+	 * import itself had already finished by that point), but it leaked one
+	 * subdirectory into the OS temp dir per import. Recursing one level
+	 * (there's never more than one -- the zip only nests that single
+	 * version-stamped folder) clears it before the parent rmdir().
+	 */
+	private static function rmdir_recursive( string $dir ) {
+		foreach ( glob( $dir . '/*' ) ?: array() as $path ) {
+			if ( is_dir( $path ) ) {
+				self::rmdir_recursive( $path );
+			} else {
 				// phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink -- see stage_locations()'s comment on native filesystem calls in this class.
-				unlink( $file );
+				unlink( $path );
 			}
 		}
 		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_rmdir -- see stage_locations()'s comment on native filesystem calls in this class.
