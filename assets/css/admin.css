@@ -358,16 +358,17 @@
 	min-width: 260px;
 }
 
-/* Title/URL cells on the Top Pages table. am-log-table (shared with the
-   Activity Log) forces nowrap on every cell in these tables; without a cap
-   a long post title or path would push the row's width out rather than
-   truncating, which is what the log's own Type column caps against. Same
-   idea, applied as an inline-block span rather than a td max-width so it
-   doesn't fight the table's auto layout. */
+/* Title/Page cells on the Top Pages and Recent Hits tables -- same
+   technique as the Activity Log's .am-ip-cell above: the cap lives on the
+   <td> itself (see render_stats_table()'s $truncate_cols), not an inner
+   span, so it doesn't fight the table's own auto layout the way an
+   inline-block child with its own max-width can. Sized in ch rather than
+   .am-ip-cell's 16ch since a page title runs far longer than an IP
+   address; 60ch is generous enough that only unusually long titles/paths
+   ever actually hit the ellipsis. */
 .am-stats-truncate {
-	display: inline-block;
-	max-width: 320px;
+	max-width: 60ch;
 	overflow: hidden;
 	text-overflow: ellipsis;
-	vertical-align: middle;
+	white-space: nowrap;
 }
