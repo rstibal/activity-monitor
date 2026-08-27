@@ -48,8 +48,12 @@ workflow disappears.
   `user_login` in a `small.am-role`, on the reasoning that it was the row's
   own stored snapshot rather than a live lookup, but that made it the one
   place inconsistent with the Username column's login-only convention).
-  Single-line contexts (Slack/email) stay
-  `"display_name (user_login)"`. `display_name` is read live
+  Single-line contexts (email) stay `"display_name (user_login)"`. As of
+  2.8.6, Slack alerts are the one exception: they show `user_login` alone
+  (dropped per Rob's request, since a default display name that just
+  matches the login made the combined form read as the redundant
+  "rstibal (rstibal)" — see `AM_Notifications::send_slack()`).
+  `display_name` is read live
   via `get_userdata()`/`WP_User` where the user still exists, or from the
   `am_events.user_display_name` snapshot column otherwise (populated
   alongside `user_login` at write time in `AM_Event_Writer::log()`, and

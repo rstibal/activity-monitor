@@ -48,8 +48,9 @@ class AM_Notifications {
 
 			$type = $channel['type'] ?? 'email';
 			if ( 'slack' === $type ) {
-				$user_label = self::format_user_label( $args['user_display_name'] ?? '', $args['user_login'] ?? '' );
-				self::send_slack( $channel, $message, $user_label, (int) ( $args['event_id'] ?? 0 ) );
+				$user_login = (string) ( $args['user_login'] ?? '' );
+				$ip         = $args['ip_address'] ?? AM_DB_Legacy_IP::resolve();
+				self::send_slack( $channel, $message, $user_login, (string) $ip, (int) ( $args['event_id'] ?? 0 ) );
 			} else {
 				self::send_email( $channel, $level, $event_type, $action, $message, $args );
 			}
@@ -158,21 +159,32 @@ class AM_Notifications {
 	 * meant to close relative to email.
 	 *
 	 * The message is read as one sentence rather than "message + fields":
-	 * a " by {user} on {domain}." clause is appended after stripping the
-	 * message's own trailing period, e.g. 'File "x" uploaded.' becomes
-	 * 'File "x" uploaded by Rob Stibal (rstibal) on injurylawyers.com.'
-	 * System-initiated events with no logged-in user (WP-Cron, WP-CLI,
-	 * core, failed logins) drop the "by" clause and read '... on
-	 * injurylawyers.com.' instead.
+	 * " by {user_login} on {domain}" and " from {ip}" clauses are appended
+	 * after stripping the message's own trailing period, e.g.
+	 * 'File "x" uploaded.' becomes 'File "x" uploaded by rstibal on
+	 * injurylawyers.com from 203.0.113.4.' System-initiated events with no
+	 * logged-in user (WP-Cron, WP-CLI, core, failed logins) drop the "by"
+	 * clause and read '... on injurylawyers.com from 203.0.113.4.' instead.
+	 * The "from {ip}" clause itself drops out entirely when ip_address is
+	 * '' (am_ip_storage set to anonymised/none -- see AM_Admin::ip_cell_html()
+	 * for the same case handled on the Activity Log screen).
+	 *
+	 * user_login only, not "display_name (user_login)" -- unlike the email
+	 * body and every other single-line context, display_name is dropped
+	 * here on purpose: when a user's display name is left at its default
+	 * (equal to their login), the combined form reads as the redundant
+	 * "rstibal (rstibal)", and Rob wants this line uniform regardless of
+	 * whether a given user bothered to set a distinct display name.
 	 */
-	private static function send_slack( array $channel, string $message, string $user_label, int $event_id ) {
+	private static function send_slack( array $channel, string $message, string $user_login, string $ip, int $event_id ) {
 		$webhook_url = trim( $channel['webhook_url'] ?? '' );
 		if ( '' === $webhook_url ) {
 			return;
 		}
 
 		$domain = wp_strip_all_tags( (string) wp_parse_url( home_url(), PHP_URL_HOST ) );
-		$user   = wp_strip_all_tags( $user_label );
+		$user   = wp_strip_all_tags( $user_login );
+		$ip     = wp_strip_all_tags( $ip );
 		$base   = rtrim( wp_strip_all_tags( (string) $message ), '.' );
 
 		$log_url = add_query_arg(
@@ -180,9 +192,10 @@ class AM_Notifications {
 			admin_url( 'admin.php' )
 		);
 		$domain_link = "<{$log_url}|{$domain}>";
+		$ip_clause   = ( '' !== $ip ) ? " from {$ip}" : '';
 
-		$mrkdwn_msg = $base . ( ( '' !== $user ) ? " by {$user} on {$domain_link}." : " on {$domain_link}." );
-		$plain_msg  = $base . ( ( '' !== $user ) ? " by {$user} on {$domain}." : " on {$domain}." );
+		$mrkdwn_msg = $base . ( ( '' !== $user ) ? " by {$user} on {$domain_link}" : " on {$domain_link}" ) . "{$ip_clause}.";
+		$plain_msg  = $base . ( ( '' !== $user ) ? " by {$user} on {$domain}" : " on {$domain}" ) . "{$ip_clause}.";
 
 		$blocks = array(
 			array(

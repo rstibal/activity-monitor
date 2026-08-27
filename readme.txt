@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, event log
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.8.5
+Stable tag: 2.8.6
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -75,6 +75,9 @@ Yes. Settings → Privacy offers full addresses, anonymised addresses (the last 
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
 
 == Changelog ==
+
+= 2.8.6 =
+* Changed: the Slack alert now includes the event's IP address ("... on injurylawyers.com from 203.0.113.4.") and identifies the acting user by their username alone instead of "Display Name (username)" — display name was often left at its default of matching the username, which made that clause redundant.
 
 = 2.8.5 =
 * Changed: the "Update Now" cooldown under Settings → Visitor Stats → Geolocation is now 5 minutes instead of 1 hour, and the "please wait" message says how much longer. The 1-hour version reset on every click regardless of whether the import actually succeeded, which made a genuine failure lock the button out for far longer than intended.
