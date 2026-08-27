@@ -358,17 +358,30 @@
 	min-width: 260px;
 }
 
-/* Title/Page cells on the Top Pages and Recent Hits tables -- same
-   technique as the Activity Log's .am-ip-cell above: the cap lives on the
-   <td> itself (see render_stats_table()'s $truncate_cols), not an inner
-   span, so it doesn't fight the table's own auto layout the way an
-   inline-block child with its own max-width can. Sized in ch rather than
-   .am-ip-cell's 16ch since a page title runs far longer than an IP
-   address; 60ch is generous enough that only unusually long titles/paths
-   ever actually hit the ellipsis. */
+/* Title/Page cells on the Top Pages and Recent Hits tables. Titles and
+   URLs run far longer than an IP address, so the .am-ip-cell technique
+   (nowrap + overflow:hidden + max-width) doesn't actually compress them
+   under table-layout:auto: a nowrap cell's minimum column width is the
+   full unbroken string, so on a narrow screen the browser keeps the
+   column at that width and lets .am-table-scroll's horizontal scroll
+   take over, rather than shrinking it -- the max-width cap only ever
+   bites when it's wider than the content already. am-ip-cell gets away
+   with this because an IP address rarely exceeds its 16ch cap in the
+   first place.
+   This instead mirrors .am-message-cell below: white-space: normal
+   lets the cell wrap, and a wrapping cell's minimum width is only its
+   longest *word* -- so table-layout:auto is free to shrink the column
+   to fit whatever room is actually available, same as the Activity
+   Log's Message column. -webkit-line-clamp caps it at 2 lines instead
+   of growing the row indefinitely for a long title. Applied directly to
+   the <td> (see render_stats_table()'s $truncate_cols), not an inner
+   span. */
 .am-stats-truncate {
+	white-space: normal !important;
 	max-width: 60ch;
 	overflow: hidden;
 	text-overflow: ellipsis;
-	white-space: nowrap;
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
 }

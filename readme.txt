@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, event log
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.8.8
+Stable tag: 2.8.9
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -75,6 +75,9 @@ Yes. Settings → Privacy offers full addresses, anonymised addresses (the last 
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
 
 == Changelog ==
+
+= 2.8.9 =
+* Fixed: the Title/Page columns on the Visitor Stats screen's Top Pages and Recent Hits tables stayed wide at narrow browser widths instead of compressing the way the Activity Log's Message column does. A nowrap cell's minimum width under table-layout:auto is its full unbroken text, so the browser kept the column at that width and let it scroll horizontally rather than shrink it. These columns now wrap and clamp to 2 lines instead, matching the Message column's technique, so they compress with the available space.
 
 = 2.8.8 =
 * Changed: the Title/Page columns on the Visitor Stats screen's Top Pages and Recent Hits tables truncate at a more generous width (60ch instead of 320px) before showing an ellipsis, and the cap now lives on the table cell itself — the same technique the Activity Log's IP column uses — instead of an inner span.
