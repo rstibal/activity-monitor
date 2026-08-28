@@ -1,7 +1,11 @@
 # Activity Monitor — project notes
 
 Custom WordPress plugin: audit logging, with alerts and export.
-Being built toward a wordpress.org release.
+Not distributed via wordpress.org — released as a GitHub zip instead (see
+`.github/workflows/release.yml`). Still held to wordpress.org's plugin
+standards (readme.txt format, WordPress-Extra/PHPCompatibilityWP coding
+standards via `phpcs`) regardless, since those are just good discipline
+independent of where the plugin ships.
 
 **The repo root is the plugin root.** `.github/workflows/claude.yml` and
 `.gitignore` also live here and are *not* part of the distributable plugin —

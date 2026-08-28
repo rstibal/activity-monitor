@@ -2,7 +2,7 @@
 
 A complete WordPress activity log — tracks logins, content changes, plugin/theme/core updates, comments, taxonomy, menus, widgets, password changes, multisite events, and unauthorized access attempts.
 
-Distributed on wordpress.org as a public plugin.
+Not distributed via wordpress.org — released as a versioned zip attached to GitHub releases. Still held to wordpress.org's plugin standards (readme.txt format, coding standards) regardless.
 
 ## Features
 
@@ -17,7 +17,7 @@ Distributed on wordpress.org as a public plugin.
 
 ## Requirements
 
-- WordPress 5.3+
+- WordPress 6.0+
 - PHP 7.4+
 
 ## Installation
@@ -26,7 +26,7 @@ Install via **Plugins → Add New → Upload Plugin**, or by uploading the `acti
 
 ## Deployment workflow
 
-All edits are made locally and packaged as a versioned ZIP for manual upload — no server-side editing of plugin files. See `readme.txt` for the wordpress.org-formatted changelog, and commit history for full version-by-version detail.
+All edits are made locally and committed to GitHub — no server-side editing of plugin files. Cutting a GitHub release triggers `.github/workflows/release.yml`, which builds the versioned zip from a clean checkout and attaches it to the release; that zip is what gets uploaded to a site. See `readme.txt` for the wordpress.org-formatted changelog, and commit history for full version-by-version detail.
 
 ## Security
 
