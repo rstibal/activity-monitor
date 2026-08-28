@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, event log
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.8.16
+Stable tag: 2.8.17
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -75,6 +75,11 @@ Yes. Settings → Privacy offers full addresses, anonymised addresses (the last 
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
 
 == Changelog ==
+
+= 2.8.17 =
+* Changed: the Activity Log's top toolbar no longer shows a pagination control — the search box and Search Log button moved into that spot instead. Pagination is still available at the bottom of the table.
+* Changed: Visitor Stats' date-range dropdown moved up next to the visits/unique-visitors totals, as a third item in that row instead of its own control above it.
+* Changed: the visits/unique-visitors totals now read inline ("148 visits") instead of the count stacked on its own line above the label — the count keeps its original larger size, just flowing on the same line now.
 
 = 2.8.16 =
 * Changed: a table's last page (Activity Log or any of the seven Visitor Stats tables) now always renders 10 rows, padding a short final page with blank ones instead of letting the page render shorter than the ones before it.

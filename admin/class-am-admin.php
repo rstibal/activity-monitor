@@ -1359,12 +1359,6 @@ class AM_Admin {
 				<input type="hidden" name="am_user" value="<?php echo esc_attr( $user ); ?>">
 			<?php endif; ?>
 
-			<p class="search-box">
-				<label class="screen-reader-text" for="am-search-input"><?php esc_html_e( 'Search log:', 'activity-monitor' ); ?></label>
-				<input type="search" id="am-search-input" name="am_search" value="<?php echo esc_attr( $search ); ?>">
-				<?php submit_button( __( 'Search Log', 'activity-monitor' ), '', '', false, array( 'id' => 'search-submit' ) ); ?>
-			</p>
-
 			<div class="tablenav top">
 				<div class="alignleft actions">
 					<label class="screen-reader-text" for="am-filter-initiator"><?php esc_html_e( 'Filter by initiator', 'activity-monitor' ); ?></label>
@@ -1421,12 +1415,11 @@ class AM_Admin {
 					<?php endif; ?>
 				</div>
 
-				<div class="tablenav-pages<?php echo $num_pages > 1 ? '' : ' one-page'; ?>">
-					<span class="displaying-num"><?php echo $displaying_num_html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- built via esc_html() above. ?></span>
-					<?php if ( $num_pages > 1 ) : ?>
-						<span class="pagination-links"><?php echo $pagination_html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- already wp_kses_post()'d above. ?></span>
-					<?php endif; ?>
-				</div>
+				<p class="search-box">
+					<label class="screen-reader-text" for="am-search-input"><?php esc_html_e( 'Search log:', 'activity-monitor' ); ?></label>
+					<input type="search" id="am-search-input" name="am_search" value="<?php echo esc_attr( $search ); ?>">
+					<?php submit_button( __( 'Search Log', 'activity-monitor' ), '', '', false, array( 'id' => 'search-submit' ) ); ?>
+				</p>
 				<br class="clear">
 			</div>
 
@@ -1672,18 +1665,7 @@ class AM_Admin {
 		if ( ! (bool) get_option( 'am_stats_enable_tracking', 1 ) ) {
 			echo '<div class="notice notice-warning inline"><p>' . esc_html__( 'Tracking is currently turned off in Settings → Visitor Stats. Figures below reflect only what was already recorded.', 'activity-monitor' ) . '</p></div>';
 		}
-		?>
-		<form method="get" id="am-stats-filter-form">
-			<input type="hidden" name="page" value="<?php echo esc_attr( self::PAGE_STATS ); ?>">
-			<select name="am_range" onchange="this.form.submit()">
-				<?php foreach ( self::stats_range_choices() as $value => $label ) : ?>
-					<option value="<?php echo esc_attr( $value ); ?>" <?php selected( $value, $days ); ?>><?php echo esc_html( $label ); ?></option>
-				<?php endforeach; ?>
-			</select>
-			<noscript><button type="submit" class="button"><?php esc_html_e( 'Apply', 'activity-monitor' ); ?></button></noscript>
-		</form>
 
-		<?php
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only pagination, sanitized in stats_pages_from_request().
 		$pages = self::stats_pages_from_request( wp_unslash( $_GET ) );
 		echo '<div id="am-stats-content">';
@@ -1741,10 +1723,37 @@ class AM_Admin {
 
 		$totals = AM_Stats_Query::get_totals( $days );
 		?>
-		<ul class="am-stats-totals">
-			<li><strong><?php echo esc_html( number_format_i18n( $totals['visits'] ) ); ?></strong> <?php esc_html_e( 'visits', 'activity-monitor' ); ?></li>
-			<li><strong><?php echo esc_html( number_format_i18n( $totals['unique_visitors'] ) ); ?></strong> <?php esc_html_e( 'unique visitors', 'activity-monitor' ); ?></li>
-		</ul>
+		<form method="get" id="am-stats-filter-form">
+			<input type="hidden" name="page" value="<?php echo esc_attr( self::PAGE_STATS ); ?>">
+			<ul class="am-stats-totals">
+				<li>
+					<?php
+					printf(
+						/* translators: %s: formatted visit count */
+						esc_html__( '%s visits', 'activity-monitor' ),
+						'<strong>' . esc_html( number_format_i18n( $totals['visits'] ) ) . '</strong>'
+					);
+					?>
+				</li>
+				<li>
+					<?php
+					printf(
+						/* translators: %s: formatted unique-visitor count */
+						esc_html__( '%s unique visitors', 'activity-monitor' ),
+						'<strong>' . esc_html( number_format_i18n( $totals['unique_visitors'] ) ) . '</strong>'
+					);
+					?>
+				</li>
+				<li class="am-stats-range">
+					<select name="am_range" onchange="this.form.submit()">
+						<?php foreach ( self::stats_range_choices() as $value => $label ) : ?>
+							<option value="<?php echo esc_attr( $value ); ?>" <?php selected( $value, $days ); ?>><?php echo esc_html( $label ); ?></option>
+						<?php endforeach; ?>
+					</select>
+					<noscript><button type="submit" class="button"><?php esc_html_e( 'Apply', 'activity-monitor' ); ?></button></noscript>
+				</li>
+			</ul>
+		</form>
 
 		<?php $this->render_recent_hits_section( $days, $pages['hits'], $current_url ); ?>
 

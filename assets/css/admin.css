@@ -335,6 +335,7 @@
    nothing here. */
 .am-stats-totals {
 	display: flex;
+	align-items: center;
 	gap: 32px;
 	margin: 16px 0;
 	font-size: 14px;
@@ -343,8 +344,11 @@
 	list-style: none;
 	margin: 0;
 }
+/* The count keeps its original 24px size -- just inline-block instead of
+   block, so "148" flows on the same line as "visits" instead of
+   stacking above it on a line of its own. */
 .am-stats-totals strong {
-	display: block;
+	display: inline-block;
 	font-size: 24px;
 	line-height: 1.3;
 }
