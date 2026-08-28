@@ -26,14 +26,8 @@ class AM_Admin {
 	/** Option group posted to options.php by the Settings screen. */
 	const SETTINGS_GROUP = 'am_settings';
 
-	/**
-	 * Per-user rows-per-page for the Activity Log, stored as a user option
-	 * by core's Screen Options panel rather than as a site-wide setting --
-	 * this is exactly what core's own list tables use it for, and it keeps
-	 * one admin's preferred page size from changing everyone else's.
-	 */
-	const PER_PAGE_OPTION  = 'am_log_per_page';
-	const PER_PAGE_DEFAULT = 50;
+	/** Fixed page size for every paginated table this plugin renders. */
+	const PER_PAGE = 10;
 
 	/**
 	 * Hook suffixes returned by add_menu_page()/add_submenu_page(), used
@@ -61,9 +55,6 @@ class AM_Admin {
 		add_action( 'admin_post_am_clear_log',                array( $instance, 'handle_clear_log' ) );
 		add_action( 'admin_post_am_export_log',               array( $instance, 'handle_export' ) );
 		add_action( 'admin_post_am_stats_geo_update_now',     array( $instance, 'handle_stats_geo_update_now' ) );
-		// Note there is no 'set-screen-option' filter here. See
-		// add_screen_options() for why the log's per-page option needs no
-		// save-side hook at all.
 		add_action( 'admin_notices',                          array( $instance, 'show_notices' ) );
 		add_action( 'wp_ajax_am_get_v2_event_detail',         array( $instance, 'ajax_v2_event_detail' ) );
 		add_action( 'wp_ajax_am_ip_lookup',                   array( $instance, 'ajax_ip_lookup' ) );
@@ -71,6 +62,8 @@ class AM_Admin {
 		add_action( 'wp_ajax_am_channel_form',                array( $instance, 'ajax_channel_form' ) );
 		add_action( 'wp_ajax_am_save_channel',                array( $instance, 'ajax_save_channel' ) );
 		add_action( 'wp_ajax_am_delete_channel',              array( $instance, 'ajax_delete_channel' ) );
+		add_action( 'wp_ajax_am_log_table',                   array( $instance, 'ajax_log_table' ) );
+		add_action( 'wp_ajax_am_stats_content',               array( $instance, 'ajax_stats_content' ) );
 	}
 
 	// ── Menu ───────────────────────────────────────────────────────────
@@ -86,15 +79,6 @@ class AM_Admin {
 			2
 		);
 		self::$screen_hooks[] = $log_hook;
-
-		// Screen Options for the log's page size. Has to be registered on
-		// that screen's load- hook (the panel is built before the page
-		// renders), and $log_hook is the hook to use for the submenu below
-		// too: WordPress gives a submenu sharing its parent's slug the
-		// parent's hook, so they are the same string.
-		if ( $log_hook ) {
-			add_action( 'load-' . $log_hook, array( $this, 'add_screen_options' ) );
-		}
 
 		self::$screen_hooks[] = add_submenu_page(
 			self::PAGE_LOG,
@@ -115,40 +99,6 @@ class AM_Admin {
 		);
 
 		self::$screen_hooks = array_filter( self::$screen_hooks );
-	}
-
-	// ── Screen Options (Activity Log page size) ──────────────────────────
-
-	/**
-	 * Adds core's own "Number of items per page" control to the Activity
-	 * Log's Screen Options panel. The log used to hardcode 50 rows with no
-	 * way to change it; this is where core puts that control on every list
-	 * screen it ships, so it costs no new settings-page real estate and
-	 * behaves the way an admin already expects it to.
-	 *
-	 * Nothing is needed on the save side. Since WordPress 5.4.2,
-	 * set_screen_options() persists any option whose name ends in
-	 * "per_page" by itself, validating it to 1-999 -- which is why
-	 * PER_PAGE_OPTION is named the way it is. That is also the reason the
-	 * plugin's floor is 6.0: below 5.4.2 a custom screen option was dropped
-	 * unless the generic 'set-screen-option' filter claimed it, but that
-	 * filter is deprecated from 5.4.2 onward and attaching to it fires a
-	 * deprecation notice every time *any* screen option is saved anywhere
-	 * in wp-admin. Supporting both meant a version_compare() around a
-	 * hook; raising the floor deleted it. Don't add either filter back.
-	 */
-	public function add_screen_options() {
-		add_screen_option( 'per_page', array(
-			'label'   => __( 'Entries per page', 'activity-monitor' ),
-			'default' => self::PER_PAGE_DEFAULT,
-			'option'  => self::PER_PAGE_OPTION,
-		) );
-	}
-
-	/** The current user's log page size, falling back to the default. */
-	private static function per_page(): int {
-		$per_page = (int) get_user_option( self::PER_PAGE_OPTION );
-		return $per_page >= 1 ? $per_page : self::PER_PAGE_DEFAULT;
 	}
 
 	// ── Shared cell rendering ────────────────────────────────────────────
@@ -1197,22 +1147,24 @@ class AM_Admin {
 	// list-table layout -- which is why every <button> in a row needs an
 	// explicit type="button". See the Details button below.
 
-	private function render_log_screen() {
-		// The filter bar is a GET form that only narrows what this screen
-		// displays -- it changes no state, so there is nothing for a nonce to
-		// protect. The screen itself is already manage_options-gated, and
-		// every value below is sanitized before it reaches AM_Event_Query,
-		// which binds them as placeholders.
-		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- read-only display filters, see above.
-		$per_page   = self::per_page();
-		$page       = max( 1, absint( $_GET['paged'] ?? 1 ) );
+	/**
+	 * Renders everything inside the #am-log-app container: the level
+	 * status links plus the filter form, table and pagination. Called both
+	 * on a normal page load (from $_GET, via render_log_screen() below) and
+	 * from ajax_log_table() (from a parsed query string sent over AJAX) --
+	 * $raw is already wp_unslash()'d by the caller in both cases, so every
+	 * value here still goes through the same sanitizers as before.
+	 */
+	private function render_log_content( array $raw ) {
+		$per_page   = self::PER_PAGE;
+		$page       = max( 1, absint( $raw['paged'] ?? 1 ) );
 		// Normalized to '' when it isn't a real level, matching what
 		// AM_Event_Query does with it anyway. Without this, ?am_level=xyz
 		// leaves a value that filters nothing yet still counts as "not
 		// All", so the status links highlight neither All nor anything else.
-		$level      = sanitize_key( $_GET['am_level'] ?? '' );
+		$level      = sanitize_key( $raw['am_level'] ?? '' );
 		$level      = AM_Log_Levels::is_valid( $level ) ? $level : '';
-		$initiator  = sanitize_key( $_GET['am_initiator'] ?? '' );
+		$initiator  = sanitize_key( $raw['am_initiator'] ?? '' );
 
 		// The Type filter carries either a category ('media') or one
 		// specific event ('media|uploaded'). The two halves are joined
@@ -1221,19 +1173,29 @@ class AM_Admin {
 		// splitting those on '.' would misread a stored slug as a
 		// type/action pair and filter for something that never existed.
 		// A pipe can't occur in either column.
-		$type_filter = self::sanitize_type_filter( $_GET['am_type'] ?? '' );
+		$type_filter = self::sanitize_type_filter( $raw['am_type'] ?? '' );
 		$event_type  = $type_filter;
 		$type_action = '';
 		if ( false !== strpos( $type_filter, '|' ) ) {
 			list( $event_type, $type_action ) = explode( '|', $type_filter, 2 );
 		}
 
-		$action     = '' !== $type_action ? $type_action : sanitize_key( $_GET['am_action'] ?? '' );
-		$user       = sanitize_user( wp_unslash( $_GET['am_user'] ?? '' ) );
-		$date_from  = sanitize_text_field( $_GET['am_from'] ?? '' );
-		$date_to    = sanitize_text_field( $_GET['am_to'] ?? '' );
-		$search     = sanitize_text_field( $_GET['am_search'] ?? '' );
-		// phpcs:enable WordPress.Security.NonceVerification.Recommended
+		$action     = '' !== $type_action ? $type_action : sanitize_key( $raw['am_action'] ?? '' );
+		$user       = sanitize_user( $raw['am_user'] ?? '' );
+		$date_from  = sanitize_text_field( $raw['am_from'] ?? '' );
+		$date_to    = sanitize_text_field( $raw['am_to'] ?? '' );
+		$search     = sanitize_text_field( $raw['am_search'] ?? '' );
+
+		// Base for this render's own pagination links. Built explicitly
+		// from $raw rather than left to paginate_links()'s implicit
+		// current-URL default: that default is $_SERVER['REQUEST_URI'],
+		// which during an AJAX refresh is admin-ajax.php, not the log
+		// screen's URL, so pagination links generated there would point
+		// to the wrong place. $raw already carries 'page' (from the
+		// filter form's hidden input, or from the previous pagination
+		// link's own href), so this reproduces the log screen's URL
+		// exactly for both the initial page load and every AJAX refresh.
+		$current_url = add_query_arg( $raw, admin_url( 'admin.php' ) );
 
 		$data      = AM_Event_Query::get_events( compact( 'per_page', 'page', 'level', 'initiator', 'event_type', 'action', 'user', 'date_from', 'date_to', 'search' ) );
 		$items     = $data['items'];
@@ -1320,7 +1282,7 @@ class AM_Admin {
 		$pagination_html = '';
 		if ( $num_pages > 1 ) {
 			$pagination_html = wp_kses_post( paginate_links( array(
-				'base'      => add_query_arg( 'paged', '%#%' ),
+				'base'      => add_query_arg( 'paged', '%#%', $current_url ),
 				'format'    => '',
 				'prev_text' => '&laquo;',
 				'next_text' => '&raquo;',
@@ -1455,7 +1417,7 @@ class AM_Admin {
 					?>
 
 					<?php if ( $level || $initiator || $type_filter || $action || $user || $date_from || $date_to || $search ) : ?>
-						<a href="<?php echo esc_url( $base_url ); ?>" class="button"><?php esc_html_e( 'Reset', 'activity-monitor' ); ?></a>
+						<a href="<?php echo esc_url( $base_url ); ?>" id="am-log-reset" class="button"><?php esc_html_e( 'Reset', 'activity-monitor' ); ?></a>
 					<?php endif; ?>
 				</div>
 
@@ -1578,6 +1540,51 @@ class AM_Admin {
 	}
 
 	/**
+	 * The Activity Log's actual entry point. #am-log-app is the whole
+	 * boundary the AJAX refresh replaces: level links, filter form, table
+	 * and pagination, together, so ajax_log_table() below can return
+	 * exactly this container's inner HTML both for a page-turn/filter
+	 * change and for a browser back/forward that lands here.
+	 */
+	private function render_log_screen() {
+		// The filter bar is a GET form that only narrows what this screen
+		// displays -- it changes no state, so there is nothing for a nonce to
+		// protect. The screen itself is already manage_options-gated, and
+		// every value reaching render_log_content() is sanitized before it
+		// reaches AM_Event_Query, which binds it as a placeholder.
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only display filters, see above.
+		$raw = wp_unslash( $_GET );
+		echo '<div id="am-log-app">';
+		$this->render_log_content( $raw );
+		echo '</div>';
+	}
+
+	/**
+	 * AJAX counterpart of render_log_screen(): re-renders #am-log-app's
+	 * inner HTML from a query string posted by the JS pagination/filter
+	 * handlers in admin.js, instead of a full page reload. $_POST['qs'] is
+	 * the exact string the browser would otherwise have navigated to
+	 * (built from the filter form's own serialize(), or from a clicked
+	 * pagination link's href) -- parse_str() turns it back into the same
+	 * shape $_GET would have been, so render_log_content() needs no
+	 * AJAX-specific branch of its own.
+	 */
+	public function ajax_log_table() {
+		check_ajax_referer( 'am_ajax', 'nonce' );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( '-1' );
+		}
+
+		parse_str( wp_unslash( (string) ( $_POST['qs'] ?? '' ) ), $raw );
+
+		ob_start();
+		$this->render_log_content( $raw );
+		$html = ob_get_clean();
+
+		wp_send_json_success( array( 'html' => $html ) );
+	}
+
+	/**
 	 * Sanitizes the Activity Log's am_type value, which may be a bare
 	 * event_type or a "type|action" pair.
 	 *
@@ -1608,6 +1615,26 @@ class AM_Admin {
 		);
 	}
 
+	/** Per-table page numbers this screen tracks, keyed the same way $pages is passed around below. */
+	const STATS_PAGE_PARAMS = array(
+		'hits'    => 'am_hits_page',
+		'top'     => 'am_top_page',
+		'ref'     => 'am_ref_page',
+		'country' => 'am_country_page',
+		'browser' => 'am_browser_page',
+		'os'      => 'am_os_page',
+		'device'  => 'am_device_page',
+	);
+
+	/** Reads and validates every per-table page number from a $_GET-shaped array. */
+	private static function stats_pages_from_request( array $raw ): array {
+		$pages = array();
+		foreach ( self::STATS_PAGE_PARAMS as $key => $param ) {
+			$pages[ $key ] = max( 1, absint( $raw[ $param ] ?? 1 ) );
+		}
+		return $pages;
+	}
+
 	private function render_stats_screen() {
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only display filter, sanitized below.
 		$days = absint( $_GET['am_range'] ?? 30 );
@@ -1630,6 +1657,61 @@ class AM_Admin {
 		</form>
 
 		<?php
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only pagination, sanitized in stats_pages_from_request().
+		$pages = self::stats_pages_from_request( wp_unslash( $_GET ) );
+		echo '<div id="am-stats-content">';
+		$this->render_stats_content( $days, $pages );
+		echo '</div>';
+	}
+
+	/**
+	 * AJAX counterpart of render_stats_screen(): re-renders #am-stats-content's
+	 * inner HTML for a range change or a page-turn on any one of its seven
+	 * tables, from a query string posted by admin.js -- same qs-round-trip
+	 * pattern as ajax_log_table().
+	 */
+	public function ajax_stats_content() {
+		check_ajax_referer( 'am_ajax', 'nonce' );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( '-1' );
+		}
+
+		parse_str( wp_unslash( (string) ( $_POST['qs'] ?? '' ) ), $raw );
+
+		$days = absint( $raw['am_range'] ?? 30 );
+		if ( ! array_key_exists( $days, self::stats_range_choices() ) ) {
+			$days = 30;
+		}
+		$pages = self::stats_pages_from_request( $raw );
+
+		ob_start();
+		$this->render_stats_content( $days, $pages );
+		$html = ob_get_clean();
+
+		wp_send_json_success( array( 'html' => $html ) );
+	}
+
+	/**
+	 * The totals line plus all seven tables (Recent Hits, Top Pages,
+	 * Referrers, Countries, Browsers, OS, Devices). $pages holds each
+	 * table's own current page (see STATS_PAGE_PARAMS) -- a page-turn on
+	 * one table doesn't reset any of the others, only a range change does
+	 * (see admin.js's am-stats-filter-form submit handler).
+	 */
+	private function render_stats_content( int $days, array $pages ) {
+		// Explicit base for every table's pagination links below, for the
+		// same reason render_log_content() builds $current_url: the
+		// implicit current-URL default paginate_links() would otherwise
+		// use is admin-ajax.php during an AJAX refresh, not this screen's
+		// own URL.
+		$current_url = add_query_arg(
+			array_merge(
+				array( 'page' => self::PAGE_STATS, 'am_range' => $days ),
+				array_combine( array_values( self::STATS_PAGE_PARAMS ), $pages )
+			),
+			admin_url( 'admin.php' )
+		);
+
 		$totals = AM_Stats_Query::get_totals( $days );
 		?>
 		<ul class="am-stats-totals">
@@ -1637,11 +1719,17 @@ class AM_Admin {
 			<li><strong><?php echo esc_html( number_format_i18n( $totals['unique_visitors'] ) ); ?></strong> <?php esc_html_e( 'unique visitors', 'activity-monitor' ); ?></li>
 		</ul>
 
-		<?php $this->render_recent_hits_section( $days ); ?>
+		<?php $this->render_recent_hits_section( $days, $pages['hits'], $current_url ); ?>
 
 		<h2><?php esc_html_e( 'Top Pages', 'activity-monitor' ); ?></h2>
-		<?php $this->render_stats_table(
-			AM_Stats_Query::get_top_urls( $days ),
+		<?php
+		$top_data = AM_Stats_Query::get_top_urls( $days, $pages['top'], self::PER_PAGE );
+		$this->render_paginated_stats_table(
+			$top_data['items'],
+			$top_data['total'],
+			$pages['top'],
+			self::STATS_PAGE_PARAMS['top'],
+			$current_url,
 			array( __( 'Title', 'activity-monitor' ), __( 'URL', 'activity-monitor' ), __( 'Visits', 'activity-monitor' ), __( 'Unique Visitors', 'activity-monitor' ) ),
 			static function ( $row ) {
 				// Title/URL are the two columns here that can run long, so
@@ -1663,13 +1751,20 @@ class AM_Admin {
 					esc_html( number_format_i18n( (int) $row->unique_visitors ) ),
 				);
 			}
-		); ?>
+		);
+		?>
 
 		<div class="am-stats-breakdowns">
 			<div>
 				<h2><?php esc_html_e( 'Referrers', 'activity-monitor' ); ?></h2>
-				<?php $this->render_stats_table(
-					AM_Stats_Query::get_referrers( $days ),
+				<?php
+				$ref_data = AM_Stats_Query::get_referrers( $days, $pages['ref'], self::PER_PAGE );
+				$this->render_paginated_stats_table(
+					$ref_data['items'],
+					$ref_data['total'],
+					$pages['ref'],
+					self::STATS_PAGE_PARAMS['ref'],
+					$current_url,
 					array( __( 'Host', 'activity-monitor' ), __( 'Visits', 'activity-monitor' ) ),
 					static function ( $row ) {
 						return array(
@@ -1677,7 +1772,8 @@ class AM_Admin {
 							esc_html( number_format_i18n( (int) $row->visits ) ),
 						);
 					}
-				); ?>
+				);
+				?>
 			</div>
 			<div>
 				<h2><?php esc_html_e( 'Countries', 'activity-monitor' ); ?></h2>
@@ -1692,7 +1788,7 @@ class AM_Admin {
 						?>
 					</p>
 				<?php else : ?>
-					<?php $this->render_breakdown_table( AM_Stats_Query::get_breakdown( 'country_code', $days ), __( 'Country', 'activity-monitor' ) ); ?>
+					<?php $this->render_breakdown_table( 'country_code', $days, $pages['country'], $current_url, __( 'Country', 'activity-monitor' ) ); ?>
 				<?php endif; ?>
 			</div>
 		</div>
@@ -1700,15 +1796,15 @@ class AM_Admin {
 		<div class="am-stats-breakdowns">
 			<div>
 				<h2><?php esc_html_e( 'Browsers', 'activity-monitor' ); ?></h2>
-				<?php $this->render_breakdown_table( AM_Stats_Query::get_breakdown( 'browser', $days ) ); ?>
+				<?php $this->render_breakdown_table( 'browser', $days, $pages['browser'], $current_url ); ?>
 			</div>
 			<div>
 				<h2><?php esc_html_e( 'Operating Systems', 'activity-monitor' ); ?></h2>
-				<?php $this->render_breakdown_table( AM_Stats_Query::get_breakdown( 'os', $days ) ); ?>
+				<?php $this->render_breakdown_table( 'os', $days, $pages['os'], $current_url ); ?>
 			</div>
 			<div>
 				<h2><?php esc_html_e( 'Devices', 'activity-monitor' ); ?></h2>
-				<?php $this->render_breakdown_table( AM_Stats_Query::get_breakdown( 'device_type', $days ) ); ?>
+				<?php $this->render_breakdown_table( 'device_type', $days, $pages['device'], $current_url ); ?>
 			</div>
 		</div>
 		<?php
@@ -1718,38 +1814,14 @@ class AM_Admin {
 	 * Recent Hits: the history view, shown first (above the aggregated
 	 * sections below it) since it's the most concrete answer to "what's
 	 * actually happening." Every recorded pageview in the selected range,
-	 * newest first, paginated the same way the Activity Log paginates --
-	 * same tablenav/page-numbers markup and CSS, just a plain GET link per
-	 * page rather than a filter form, since Recent Hits has nothing to
-	 * filter yet. Kept to 10 rows per page rather than the log's 50 --
-	 * this is a glance at the most recent activity, not a browsing tool.
+	 * newest first, paginated the same way as every other table on this
+	 * screen -- see render_paginated_stats_table(). $page and $current_url
+	 * come from render_stats_content() rather than $_GET so this renders
+	 * identically on a page load and on an AJAX refresh.
 	 */
-	private function render_recent_hits_section( int $days ) {
-		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only pagination link, sanitized below.
-		$page     = max( 1, absint( $_GET['am_hits_page'] ?? 1 ) );
-		$per_page = 10;
-		$data     = AM_Stats_Query::get_hits( $days, $page, $per_page );
-		$items    = $data['items'];
-		$total    = $data['total'];
-		$num_pages = (int) ceil( $total / $per_page );
+	private function render_recent_hits_section( int $days, int $page, string $current_url ) {
+		$data        = AM_Stats_Query::get_hits( $days, $page, self::PER_PAGE );
 		$geo_enabled = (bool) get_option( 'am_stats_geo_enabled', 0 );
-
-		$pagination_html = '';
-		if ( $num_pages > 1 ) {
-			$pagination_html = wp_kses_post( paginate_links( array(
-				'base'      => add_query_arg( 'am_hits_page', '%#%' ),
-				'format'    => '',
-				'prev_text' => '&laquo;',
-				'next_text' => '&raquo;',
-				'total'     => $num_pages,
-				'current'   => $page,
-			) ) );
-		}
-		$displaying_num_html = sprintf(
-			/* translators: %s: formatted number of matching hits */
-			esc_html( _n( '%s hit', '%s hits', $total, 'activity-monitor' ) ),
-			number_format_i18n( $total )
-		);
 		?>
 		<h2><?php esc_html_e( 'Recent Hits', 'activity-monitor' ); ?></h2>
 		<?php
@@ -1759,8 +1831,12 @@ class AM_Admin {
 		}
 		$columns[] = __( 'Referrer', 'activity-monitor' );
 
-		$this->render_stats_table(
-			$items,
+		$this->render_paginated_stats_table(
+			$data['items'],
+			$data['total'],
+			$page,
+			self::STATS_PAGE_PARAMS['hits'],
+			$current_url,
 			$columns,
 			static function ( $row ) use ( $geo_enabled ) {
 				$full_url = home_url( $row->url );
@@ -1779,17 +1855,6 @@ class AM_Admin {
 				return $cells;
 			}
 		);
-		?>
-		<div class="tablenav bottom">
-			<div class="tablenav-pages<?php echo $num_pages > 1 ? '' : ' one-page'; ?>">
-				<span class="displaying-num"><?php echo $displaying_num_html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- built via esc_html() above. ?></span>
-				<?php if ( $num_pages > 1 ) : ?>
-					<span class="pagination-links"><?php echo $pagination_html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- already wp_kses_post()'d above. ?></span>
-				<?php endif; ?>
-			</div>
-			<br class="clear">
-		</div>
-		<?php
 	}
 
 	/**
@@ -1855,10 +1920,24 @@ class AM_Admin {
 		<?php
 	}
 
-	/** @param array<int, object{value:string,visits:int}> $rows */
-	private function render_breakdown_table( array $rows, string $value_label = '' ) {
-		$this->render_stats_table(
-			$rows,
+	/**
+	 * $column is one of AM_Stats_Query::get_breakdown()'s whitelisted
+	 * columns ('browser', 'os', 'device_type', 'country_code') -- passed
+	 * through rather than pre-queried by the caller so this can also look
+	 * up its own page-param key via STATS_PAGE_PARAMS, matching how
+	 * render_recent_hits_section() and the Top Pages/Referrers calls in
+	 * render_stats_content() are wired.
+	 */
+	private function render_breakdown_table( string $column, int $days, int $page, string $current_url, string $value_label = '' ) {
+		$param_key = array( 'country_code' => 'country', 'browser' => 'browser', 'os' => 'os', 'device_type' => 'device' )[ $column ];
+		$data      = AM_Stats_Query::get_breakdown( $column, $days, $page, self::PER_PAGE );
+
+		$this->render_paginated_stats_table(
+			$data['items'],
+			$data['total'],
+			$page,
+			self::STATS_PAGE_PARAMS[ $param_key ],
+			$current_url,
 			array( '' !== $value_label ? $value_label : __( 'Value', 'activity-monitor' ), __( 'Visits', 'activity-monitor' ) ),
 			static function ( $row ) {
 				return array(
@@ -1867,6 +1946,55 @@ class AM_Admin {
 				);
 			}
 		);
+	}
+
+	/**
+	 * Wraps render_stats_table() with the same tablenav/pagination markup
+	 * the Activity Log and Recent Hits use, capped at PER_PAGE (10) rows.
+	 * $page_param is the query-string key this particular table's page
+	 * number lives under (see STATS_PAGE_PARAMS) -- every table on the
+	 * Visitor Stats screen paginates independently, so each needs its own
+	 * key rather than sharing one 'paged'. No tablenav is rendered when
+	 * there's nothing to page through, matching render_stats_table()'s own
+	 * "no data" short-circuit.
+	 */
+	private function render_paginated_stats_table( array $items, int $total, int $page, string $page_param, string $current_url, array $columns, callable $row_cells ) {
+		$this->render_stats_table( $items, $columns, $row_cells );
+
+		if ( empty( $items ) ) {
+			return;
+		}
+
+		$per_page  = self::PER_PAGE;
+		$num_pages = (int) ceil( $total / $per_page );
+
+		$pagination_html = '';
+		if ( $num_pages > 1 ) {
+			$pagination_html = wp_kses_post( paginate_links( array(
+				'base'      => add_query_arg( $page_param, '%#%', $current_url ),
+				'format'    => '',
+				'prev_text' => '&laquo;',
+				'next_text' => '&raquo;',
+				'total'     => $num_pages,
+				'current'   => $page,
+			) ) );
+		}
+		$displaying_num_html = sprintf(
+			/* translators: %s: formatted number of matching rows */
+			esc_html( _n( '%s item', '%s items', $total, 'activity-monitor' ) ),
+			number_format_i18n( $total )
+		);
+		?>
+		<div class="tablenav bottom">
+			<div class="tablenav-pages<?php echo $num_pages > 1 ? '' : ' one-page'; ?>">
+				<span class="displaying-num"><?php echo $displaying_num_html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- built via esc_html() above. ?></span>
+				<?php if ( $num_pages > 1 ) : ?>
+					<span class="pagination-links"><?php echo $pagination_html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- already wp_kses_post()'d above. ?></span>
+				<?php endif; ?>
+			</div>
+			<br class="clear">
+		</div>
+		<?php
 	}
 
 	// ── Screen: Settings ──────────────────────────────────────────────────

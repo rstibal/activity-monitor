@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, event log
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.8.14
+Stable tag: 2.8.15
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -75,6 +75,9 @@ Yes. Settings → Privacy offers full addresses, anonymised addresses (the last 
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
 
 == Changelog ==
+
+= 2.8.15 =
+* Changed: every table on the Activity Log and Visitor Stats screens is now capped at 10 rows per page. Paging, filtering, and searching the Activity Log, changing the Visitor Stats date range, and paging any of its seven tables (Recent Hits, Top Pages, Referrers, Countries, Browsers, Operating Systems, Devices) now update in place over AJAX instead of reloading the page — the browser's back/forward buttons and bookmarked/shared URLs still work the same as before. Top Pages, Referrers, Countries, Browsers, Operating Systems, and Devices previously had a flat 20-row (or, for the last four, unlimited) result with no way to see anything past it; they're paginated now too. The Activity Log's per-user "Entries per page" Screen Option (added in 2.4.3, default 50) is removed in favor of the fixed 10-row page size shared by every other table on these two screens.
 
 = 2.8.14 =
 * Fixed: the MaxMind Account ID and License Key fields under Settings → Visitor Stats → Geolocation used `autocomplete="off"`, which browsers and password-manager extensions widely ignore for password-type inputs — they'll still offer to autofill a saved, unrelated credential. Since neither field ever echoes its saved value back (by design), an autofilled value looked identical to an empty field, so it could get saved and sent to MaxMind with nothing in the UI suggesting why, surfacing only as an opaque "Download failed: HTTP 401" that persisted across every retry on affected sites. Both fields now use `autocomplete="new-password"`, the value browsers actually honor for "this is a new secret, don't offer a saved one."

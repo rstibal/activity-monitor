@@ -1,4 +1,4 @@
-/* Activity Monitor — Admin JS v1.1.0 */
+/* Activity Monitor — Admin JS v1.2.0 */
 (function ($) {
 	'use strict';
 
@@ -180,6 +180,95 @@
 			}
 		})
 		.always(function () { $btn.prop('disabled', false); });
+	});
+
+	/* Activity Log and Visitor Stats: AJAX pagination/filtering, no page
+	   reload. Both screens follow the same qs-round-trip shape --
+	   render_log_content()/render_stats_content() build every link and
+	   form on the page from an explicit $current_url rather than the
+	   implicit "current URL" PHP would otherwise default to (which during
+	   an AJAX request is admin-ajax.php, not the screen the link is meant
+	   for), so any href or serialize()'d form inside the container is
+	   already the exact query string to send back and to push into the
+	   address bar. That symmetry is what lets one pair of handlers below
+	   cover both the initial GET-built links/inputs and every refresh
+	   after them without special-casing which one produced the markup. */
+
+	function amQsFromHref(href) {
+		var i = href.indexOf('?');
+		return i === -1 ? '' : href.slice(i + 1);
+	}
+
+	function amPushState(qs) {
+		window.history.pushState({ amQs: qs }, '', window.location.pathname + '?' + qs);
+	}
+
+	function amRefreshLog(qs, pushUrl) {
+		$.post(amData.ajaxUrl, { action: 'am_log_table', qs: qs, nonce: amData.nonce })
+		.done(function (r) {
+			if (r.success) {
+				$('#am-log-app').html(r.data.html);
+				if (pushUrl) amPushState(qs);
+			}
+		});
+	}
+
+	function amRefreshStats(qs, pushUrl) {
+		$.post(amData.ajaxUrl, { action: 'am_stats_content', qs: qs, nonce: amData.nonce })
+		.done(function (r) {
+			if (r.success) {
+				$('#am-stats-content').html(r.data.html);
+				if (pushUrl) amPushState(qs);
+			}
+		});
+	}
+
+	/* Level filter links, pagination links (top and bottom tablenav), the
+	   user-filter chip's remove link, and Reset -- every navigable link
+	   inside the log app except the per-row Details/username/IP links
+	   (those have their own handlers above and either use href="#" or are
+	   buttons) and the CSV/JSON/HTML/TXT export links, which are real
+	   downloads and must not be hijacked into an AJAX call. */
+	$(document).on('click', '#am-log-app .subsubsub a, #am-log-app .tablenav-pages a, #am-log-app .am-filter-chip-remove, #am-log-app #am-log-reset', function (e) {
+		e.preventDefault();
+		amRefreshLog(amQsFromHref(this.href), true);
+	});
+
+	$(document).on('submit', '#am-log-app #am-filter-form', function (e) {
+		e.preventDefault();
+		amRefreshLog($(this).serialize(), true);
+	});
+
+	/* Visitor Stats: the range dropdown resets every table's own page back
+	   to 1 -- an explicit list of the per-table page params rather than
+	   deleting whatever keys happen to be present, so a stale page number
+	   left over from the previous range can't strand a table (e.g.
+	   Referrers on page 4 of a range that now only has 1) showing nothing
+	   with no visible way back. Page-turn clicks on any one table leave
+	   every other table's page untouched. */
+	var amStatsPageParams = ['am_hits_page', 'am_top_page', 'am_ref_page', 'am_country_page', 'am_browser_page', 'am_os_page', 'am_device_page'];
+
+	$(document).on('submit', '#am-stats-filter-form', function (e) {
+		e.preventDefault();
+		var params = new URLSearchParams($(this).serialize());
+		amStatsPageParams.forEach(function (key) { params.delete(key); });
+		amRefreshStats(params.toString(), true);
+	});
+
+	$(document).on('click', '#am-stats-content .tablenav-pages a', function (e) {
+		e.preventDefault();
+		amRefreshStats(amQsFromHref(this.href), true);
+	});
+
+	/* Browser back/forward across either screen's AJAX-pushed states. A
+	   history entry that predates the AJAX conversion (or one reached by
+	   navigating away and back through wp-admin's own menu) reloads the
+	   document instead of firing popstate, so this only ever needs to
+	   handle the SPA-style entries pushState created above. */
+	window.addEventListener('popstate', function () {
+		var qs = window.location.search.replace(/^\?/, '');
+		if ($('#am-log-app').length) amRefreshLog(qs, false);
+		if ($('#am-stats-content').length) amRefreshStats(qs, false);
 	});
 
 }(jQuery));

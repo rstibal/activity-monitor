@@ -29,65 +29,105 @@ class AM_Stats_Query {
 		);
 	}
 
-	/** @return array<int, object{url:string,title:string,visits:int,unique_visitors:int}> */
-	public static function get_top_urls( int $days, int $limit = 20 ): array {
+	/**
+	 * @return array{items: array<int, object{url:string,title:string,visits:int,unique_visitors:int}>, total:int}
+	 */
+	public static function get_top_urls( int $days, int $page = 1, int $per_page = 10 ): array {
 		global $wpdb;
 		$hits_table = $wpdb->prefix . AM_Stats_Schema::HITS_TABLE;
 		$urls_table = $wpdb->prefix . AM_Stats_Schema::URLS_TABLE;
 		$since      = self::since( $days );
+		$page       = max( 1, $page );
+		$offset     = ( $page - 1 ) * $per_page;
 
-		return $wpdb->get_results( $wpdb->prepare(
+		$total = (int) $wpdb->get_var( $wpdb->prepare(
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant.
+			"SELECT COUNT(DISTINCT h.url_id) FROM `{$hits_table}` h
+			 WHERE h.date >= %s",
+			$since
+		) );
+
+		$items = $wpdb->get_results( $wpdb->prepare(
 			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table names are plugin constants.
 			"SELECT u.url, u.title, COUNT(*) AS visits, COUNT(DISTINCT h.visitor_hash) AS unique_visitors FROM `{$hits_table}` h INNER JOIN `{$urls_table}` u ON u.id = h.url_id
 			 WHERE h.date >= %s
 			 GROUP BY h.url_id
 			 ORDER BY visits DESC
-			 LIMIT %d",
+			 LIMIT %d OFFSET %d",
 			$since,
-			$limit
+			$per_page,
+			$offset
 		) );
+
+		return array( 'items' => $items, 'total' => $total );
 	}
 
-	/** @return array<int, object{referrer_host:string,visits:int}> */
-	public static function get_referrers( int $days, int $limit = 20 ): array {
+	/** @return array{items: array<int, object{referrer_host:string,visits:int}>, total:int} */
+	public static function get_referrers( int $days, int $page = 1, int $per_page = 10 ): array {
 		global $wpdb;
 		$hits_table = $wpdb->prefix . AM_Stats_Schema::HITS_TABLE;
 		$since      = self::since( $days );
+		$page       = max( 1, $page );
+		$offset     = ( $page - 1 ) * $per_page;
 
-		return $wpdb->get_results( $wpdb->prepare(
+		$total = (int) $wpdb->get_var( $wpdb->prepare(
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant.
+			"SELECT COUNT(DISTINCT referrer_host) FROM `{$hits_table}`
+			 WHERE date >= %s AND referrer_host != ''",
+			$since
+		) );
+
+		$items = $wpdb->get_results( $wpdb->prepare(
 			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant.
 			"SELECT referrer_host, COUNT(*) AS visits FROM `{$hits_table}`
 			 WHERE date >= %s AND referrer_host != ''
 			 GROUP BY referrer_host
 			 ORDER BY visits DESC
-			 LIMIT %d",
+			 LIMIT %d OFFSET %d",
 			$since,
-			$limit
+			$per_page,
+			$offset
 		) );
+
+		return array( 'items' => $items, 'total' => $total );
 	}
 
-	/** @return array<int, object{value:string,visits:int}> */
-	public static function get_breakdown( string $column, int $days ): array {
+	/** @return array{items: array<int, object{value:string,visits:int}>, total:int} */
+	public static function get_breakdown( string $column, int $days, int $page = 1, int $per_page = 10 ): array {
 		if ( ! in_array( $column, array( 'browser', 'os', 'device_type', 'country_code' ), true ) ) {
-			return array();
+			return array( 'items' => array(), 'total' => 0 );
 		}
 
 		global $wpdb;
 		$hits_table = $wpdb->prefix . AM_Stats_Schema::HITS_TABLE;
 		$since      = self::since( $days );
+		$page       = max( 1, $page );
+		$offset     = ( $page - 1 ) * $per_page;
 
 		// $column is whitelisted above, not user input -- safe to interpolate.
 		// GROUP BY refers to the "value" alias rather than repeating the
 		// column interpolation a second time (MySQL allows grouping by a
 		// SELECT-list alias).
-		return $wpdb->get_results( $wpdb->prepare(
+		$total = (int) $wpdb->get_var( $wpdb->prepare(
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table/column names are plugin constants, whitelisted above.
+			"SELECT COUNT(DISTINCT `{$column}`) FROM `{$hits_table}`
+			 WHERE date >= %s",
+			$since
+		) );
+
+		$items = $wpdb->get_results( $wpdb->prepare(
 			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table/column names are plugin constants, whitelisted above.
 			"SELECT `{$column}` AS value, COUNT(*) AS visits FROM `{$hits_table}`
 			 WHERE date >= %s
 			 GROUP BY value
-			 ORDER BY visits DESC",
-			$since
+			 ORDER BY visits DESC
+			 LIMIT %d OFFSET %d",
+			$since,
+			$per_page,
+			$offset
 		) );
+
+		return array( 'items' => $items, 'total' => $total );
 	}
 
 	/**

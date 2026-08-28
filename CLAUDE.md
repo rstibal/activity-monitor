@@ -193,14 +193,43 @@ If per-logger noise control is ever wanted back, it needs its own slug/label
 contract reintroduced on `AM_Logger_Base` — don't resurrect it as a
 half-measure grafted onto something else.
 
-**Rows per page is a Screen Option, not a setting** — `am_log_per_page`, via
-`add_screen_option()` on the log's `load-` hook. It's per-user, which is the
-point. **There is deliberately no save-side hook**: since WP 5.4.2 core
-persists any option whose name ends in `per_page` on its own (validated
-1–999), which is why the option is named that way. Don't add a
-`set-screen-option` filter — it's deprecated from 5.4.2 and firing it logs a
-deprecation notice whenever *any* screen option is saved anywhere in wp-admin.
-This is the one API that set the WP floor; see below.
+**Every table on the Activity Log and Visitor Stats screens is capped at
+`AM_Admin::PER_PAGE` (10) rows, fixed, not per-user.** The Activity Log used
+to expose this as a per-user Screen Option (`am_log_per_page`, added 2.4.3);
+it was removed in 2.8.15 in favor of the same fixed 10 every other table on
+both screens uses — don't reintroduce a Screen Options control here without
+deciding it should apply to all of them, or the Activity Log goes back to
+being the one table on these two screens with a different page size than the
+rest.
+
+**Paging, filtering, and searching the Activity Log, and paging or changing
+the date range on any of Visitor Stats' seven tables, all happen over AJAX,
+not a page reload.** `AM_Admin::render_log_content( array $raw )` and
+`render_stats_content( int $days, array $pages )` are the shared bodies:
+`render_log_screen()` / `render_stats_screen()` call them once from `$_GET`
+on a normal page load, echoing the result inside `#am-log-app` /
+`#am-stats-content`; `ajax_log_table()` / `ajax_stats_content()` call the
+same methods from a query string posted by `admin.js`, `parse_str()`'d back
+into the same shape `$_GET` would have been, and return just that container's
+inner HTML. Because both entry points feed the same rendering method, there
+is no AJAX-specific branch anywhere in either method to drift out of sync
+with the page-load path. `admin.js` intercepts clicks on pagination/filter
+links and the two forms inside those containers, POSTs the link's query
+string (or the form's `serialize()`) to `am_log_table` / `am_stats_content`,
+swaps the container's `innerHTML`, and pushes the same query string into the
+address bar with `pushState()` so back/forward still work. **Every
+`paginate_links()` call in both methods must pass an explicit base URL**
+(`$current_url`, built from `$raw` / `$pages` rather than left to
+`add_query_arg()`'s implicit current-URL default) — that default is
+`$_SERVER['REQUEST_URI']`, which during the AJAX request is
+`admin-ajax.php`, not the screen's own URL, so an implicit base would
+silently point every pagination link at the wrong place the first time a
+table is paginated from an AJAX-rendered page. Visitor Stats' seven tables
+each page independently — `AM_Admin::STATS_PAGE_PARAMS` maps a short key
+(`hits`, `top`, `ref`, `country`, `browser`, `os`, `device`) to its own query
+param, so paging one table never resets another's; changing the date range
+resets all seven, which is the one thing `admin.js`'s range-form handler
+does that a plain link click doesn't.
 
 All modals share that one overlay, the `openModal()` JS helper, and the
 `am_ajax` nonce.
