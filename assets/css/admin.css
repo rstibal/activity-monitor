@@ -89,6 +89,13 @@
 	height: auto;
 	min-height: 30px;
 }
+/* Core's .search-box carries its own margin (meant for sitting above the
+   tablenav, where it used to live); now that it's inside .tablenav top
+   in place of pagination (see render_log_content()), that margin just
+   adds uneven space around it here. */
+.am-wrap .tablenav p.search-box {
+	margin: 0;
+}
 
 /* Horizontal scroll for the wider tables (the log has eight columns).
    Purely a scroll container -- no border or background of its own, so
