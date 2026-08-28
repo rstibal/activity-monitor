@@ -1745,7 +1745,16 @@ class AM_Admin {
 					?>
 				</li>
 				<li class="am-stats-range">
-					<select name="am_range" onchange="this.form.submit()">
+					<?php
+					// No onchange="this.form.submit()" here -- see admin.js's
+					// 'change' handler on this select for why that native
+					// DOM method is the wrong tool once a JS refresh needs
+					// to intercept the change (it doesn't fire a 'submit'
+					// event, so nothing could catch it). The <noscript>
+					// button below is what makes this form still work with
+					// JS off.
+					?>
+					<select name="am_range">
 						<?php foreach ( self::stats_range_choices() as $value => $label ) : ?>
 							<option value="<?php echo esc_attr( $value ); ?>" <?php selected( $value, $days ); ?>><?php echo esc_html( $label ); ?></option>
 						<?php endforeach; ?>

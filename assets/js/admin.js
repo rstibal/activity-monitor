@@ -1,4 +1,4 @@
-/* Activity Monitor — Admin JS v1.2.0 */
+/* Activity Monitor — Admin JS v1.2.1 */
 (function ($) {
 	'use strict';
 
@@ -248,11 +248,27 @@
 	   every other table's page untouched. */
 	var amStatsPageParams = ['am_hits_page', 'am_top_page', 'am_ref_page', 'am_country_page', 'am_browser_page', 'am_os_page', 'am_device_page'];
 
-	$(document).on('submit', '#am-stats-filter-form', function (e) {
-		e.preventDefault();
-		var params = new URLSearchParams($(this).serialize());
+	function amStatsRangeChanged($form) {
+		var params = new URLSearchParams($form.serialize());
 		amStatsPageParams.forEach(function (key) { params.delete(key); });
 		amRefreshStats(params.toString(), true);
+	}
+
+	$(document).on('submit', '#am-stats-filter-form', function (e) {
+		e.preventDefault();
+		amStatsRangeChanged($(this));
+	});
+
+	/* The range <select> has no onchange attribute of its own -- see this
+	   handler instead. this.form.submit() (the native DOM method, as
+	   opposed to a real click on a submit control) deliberately does not
+	   fire a 'submit' event per spec, precisely so a script-triggered
+	   submit can't be intercepted the way a user-initiated one can -- so
+	   an onchange="this.form.submit()" attribute here would silently fall
+	   through to a full page reload instead of the AJAX refresh below.
+	   Binding 'change' directly sidesteps that entirely. */
+	$(document).on('change', '#am-stats-filter-form select[name="am_range"]', function () {
+		amStatsRangeChanged($(this.closest('form')));
 	});
 
 	$(document).on('click', '#am-stats-content .tablenav-pages a', function (e) {
