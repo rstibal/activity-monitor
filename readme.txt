@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, event log
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.8.15
+Stable tag: 2.8.16
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -75,6 +75,10 @@ Yes. Settings → Privacy offers full addresses, anonymised addresses (the last 
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
 
 == Changelog ==
+
+= 2.8.16 =
+* Changed: a table's last page (Activity Log or any of the seven Visitor Stats tables) now always renders 10 rows, padding a short final page with blank ones instead of letting the page render shorter than the ones before it.
+* Changed: within a row of side-by-side Visitor Stats cards (Referrers/Countries, and Browsers/Operating Systems/Devices), every card in that row now renders the same number of rows — whichever card in the row has the most, padded with blank rows on the others. Pagination on any one card is unaffected and still only appears once that card actually has more than 10 rows.
 
 = 2.8.15 =
 * Changed: every table on the Activity Log and Visitor Stats screens is now capped at 10 rows per page. Paging, filtering, and searching the Activity Log, changing the Visitor Stats date range, and paging any of its seven tables (Recent Hits, Top Pages, Referrers, Countries, Browsers, Operating Systems, Devices) now update in place over AJAX instead of reloading the page — the browser's back/forward buttons and bookmarked/shared URLs still work the same as before. Top Pages, Referrers, Countries, Browsers, Operating Systems, and Devices previously had a flat 20-row (or, for the last four, unlimited) result with no way to see anything past it; they're paginated now too. The Activity Log's per-user "Entries per page" Screen Option (added in 2.4.3, default 50) is removed in favor of the fixed 10-row page size shared by every other table on these two screens.

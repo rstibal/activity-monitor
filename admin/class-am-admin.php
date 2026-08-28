@@ -1492,6 +1492,16 @@ class AM_Admin {
 					<?php foreach ( $items as $row ) : ?>
 						<?php self::render_event_row( $row ); ?>
 					<?php endforeach; ?>
+					<?php
+					// A page short of a full PER_PAGE only happens on the
+					// last page of a multi-page result -- pad it out with
+					// blank rows so that page doesn't render shorter than
+					// every page before it. A lone under-full page (no
+					// other page to jump against) is left alone.
+					for ( $i = count( $items ); $num_pages > 1 && $i < $per_page; $i++ ) :
+					?>
+						<tr class="am-blank-row"><td colspan="8">&nbsp;</td></tr>
+					<?php endfor; ?>
 				</tbody>
 			</table>
 			</div><!-- .am-table-scroll -->
@@ -1635,6 +1645,23 @@ class AM_Admin {
 		return $pages;
 	}
 
+	/**
+	 * How many rows a table with $total matching rows should render on its
+	 * *current* page, before any row-leveling against sibling cards in the
+	 * same row (see render_stats_content()'s two am-stats-breakdowns
+	 * groups). PER_PAGE once there's more than one page to turn to --
+	 * otherwise a short last page would render at a different height than
+	 * the full ones before it -- and otherwise just $total, since a table
+	 * that only ever has one page has nothing to level against on its own.
+	 * A solo table (Top Pages, Recent Hits) uses this value as its final
+	 * $pad_to directly; a table sharing a card row takes the max of this
+	 * across every table in that row instead.
+	 */
+	private static function stats_own_target( int $total ): int {
+		$num_pages = (int) ceil( $total / self::PER_PAGE );
+		return $num_pages > 1 ? self::PER_PAGE : $total;
+	}
+
 	private function render_stats_screen() {
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only display filter, sanitized below.
 		$days = absint( $_GET['am_range'] ?? 30 );
@@ -1723,6 +1750,9 @@ class AM_Admin {
 
 		<h2><?php esc_html_e( 'Top Pages', 'activity-monitor' ); ?></h2>
 		<?php
+		// Top Pages is the one full-width table with no card-row siblings
+		// to level against, so its own target (see stats_own_target()) is
+		// also its final $pad_to.
 		$top_data = AM_Stats_Query::get_top_urls( $days, $pages['top'], self::PER_PAGE );
 		$this->render_paginated_stats_table(
 			$top_data['items'],
@@ -1750,7 +1780,23 @@ class AM_Admin {
 					esc_html( number_format_i18n( (int) $row->visits ) ),
 					esc_html( number_format_i18n( (int) $row->unique_visitors ) ),
 				);
-			}
+			},
+			self::stats_own_target( $top_data['total'] )
+		);
+
+		// Referrers + Countries share a card row, so both tables render at
+		// the same row count -- the greater of the two's own targets
+		// (stats_own_target()). Both queries have to run before either
+		// renders, since neither side knows what to pad to until it knows
+		// the other's total. Countries doesn't query at all (and doesn't
+		// enter the max) while geolocation is off -- there's nothing to
+		// level against but Referrers itself in that case.
+		$ref_data     = AM_Stats_Query::get_referrers( $days, $pages['ref'], self::PER_PAGE );
+		$geo_enabled  = (bool) get_option( 'am_stats_geo_enabled', 0 );
+		$country_data = $geo_enabled ? AM_Stats_Query::get_breakdown( 'country_code', $days, $pages['country'], self::PER_PAGE ) : null;
+		$row1_target  = max(
+			self::stats_own_target( $ref_data['total'] ),
+			$country_data ? self::stats_own_target( $country_data['total'] ) : 0
 		);
 		?>
 
@@ -1758,7 +1804,6 @@ class AM_Admin {
 			<div>
 				<h2><?php esc_html_e( 'Referrers', 'activity-monitor' ); ?></h2>
 				<?php
-				$ref_data = AM_Stats_Query::get_referrers( $days, $pages['ref'], self::PER_PAGE );
 				$this->render_paginated_stats_table(
 					$ref_data['items'],
 					$ref_data['total'],
@@ -1771,13 +1816,14 @@ class AM_Admin {
 							esc_html( $row->referrer_host ),
 							esc_html( number_format_i18n( (int) $row->visits ) ),
 						);
-					}
+					},
+					$row1_target
 				);
 				?>
 			</div>
 			<div>
 				<h2><?php esc_html_e( 'Countries', 'activity-monitor' ); ?></h2>
-				<?php if ( ! (bool) get_option( 'am_stats_geo_enabled', 0 ) ) : ?>
+				<?php if ( ! $geo_enabled ) : ?>
 					<p class="description">
 						<?php
 						printf(
@@ -1788,23 +1834,37 @@ class AM_Admin {
 						?>
 					</p>
 				<?php else : ?>
-					<?php $this->render_breakdown_table( 'country_code', $days, $pages['country'], $current_url, __( 'Country', 'activity-monitor' ) ); ?>
+					<?php $this->render_breakdown_table( 'country_code', $country_data, $pages['country'], $current_url, $row1_target, __( 'Country', 'activity-monitor' ) ); ?>
 				<?php endif; ?>
 			</div>
 		</div>
 
+		<?php
+		// Browsers + Operating Systems + Devices share a three-up card
+		// row -- same row-leveling as Referrers/Countries above, just
+		// across three tables instead of two.
+		$browser_data = AM_Stats_Query::get_breakdown( 'browser', $days, $pages['browser'], self::PER_PAGE );
+		$os_data      = AM_Stats_Query::get_breakdown( 'os', $days, $pages['os'], self::PER_PAGE );
+		$device_data  = AM_Stats_Query::get_breakdown( 'device_type', $days, $pages['device'], self::PER_PAGE );
+		$row2_target  = max(
+			self::stats_own_target( $browser_data['total'] ),
+			self::stats_own_target( $os_data['total'] ),
+			self::stats_own_target( $device_data['total'] )
+		);
+		?>
+
 		<div class="am-stats-breakdowns">
 			<div>
 				<h2><?php esc_html_e( 'Browsers', 'activity-monitor' ); ?></h2>
-				<?php $this->render_breakdown_table( 'browser', $days, $pages['browser'], $current_url ); ?>
+				<?php $this->render_breakdown_table( 'browser', $browser_data, $pages['browser'], $current_url, $row2_target ); ?>
 			</div>
 			<div>
 				<h2><?php esc_html_e( 'Operating Systems', 'activity-monitor' ); ?></h2>
-				<?php $this->render_breakdown_table( 'os', $days, $pages['os'], $current_url ); ?>
+				<?php $this->render_breakdown_table( 'os', $os_data, $pages['os'], $current_url, $row2_target ); ?>
 			</div>
 			<div>
 				<h2><?php esc_html_e( 'Devices', 'activity-monitor' ); ?></h2>
-				<?php $this->render_breakdown_table( 'device_type', $days, $pages['device'], $current_url ); ?>
+				<?php $this->render_breakdown_table( 'device_type', $device_data, $pages['device'], $current_url, $row2_target ); ?>
 			</div>
 		</div>
 		<?php
@@ -1853,7 +1913,8 @@ class AM_Admin {
 				}
 				$cells[] = esc_html( $row->referrer_host ?: '—' );
 				return $cells;
-			}
+			},
+			self::stats_own_target( $data['total'] )
 		);
 	}
 
@@ -1890,9 +1951,17 @@ class AM_Admin {
 	 * Recent Hits callers) -- never on the <td> itself, which the
 	 * -webkit-box display the clamp needs would knock out of table-cell
 	 * layout entirely (see .am-stats-truncate's comment).
+	 *
+	 * $pad_to, when greater than count( $rows ), appends blank rows until
+	 * the table reaches that many -- see render_paginated_stats_table()'s
+	 * doc for why (keeping a short last page, or a card sitting next to a
+	 * taller one, from rendering at a different height than its
+	 * neighbors). A single spanning <td> per blank row rather than one
+	 * per column: nothing needs the per-column widths a real row's cells
+	 * establish, since it's blank either way.
 	 */
-	private function render_stats_table( array $rows, array $columns, callable $row_cells ) {
-		if ( empty( $rows ) ) {
+	private function render_stats_table( array $rows, array $columns, callable $row_cells, int $pad_to = 0 ) {
+		if ( empty( $rows ) && $pad_to <= 0 ) {
 			echo '<p>' . esc_html__( 'No data yet for this range.', 'activity-monitor' ) . '</p>';
 			return;
 		}
@@ -1914,6 +1983,9 @@ class AM_Admin {
 							<?php endforeach; ?>
 						</tr>
 					<?php endforeach; ?>
+					<?php for ( $i = count( $rows ); $i < $pad_to; $i++ ) : ?>
+						<tr class="am-blank-row"><td colspan="<?php echo count( $columns ); ?>">&nbsp;</td></tr>
+					<?php endfor; ?>
 				</tbody>
 			</table>
 		</div>
@@ -1922,15 +1994,14 @@ class AM_Admin {
 
 	/**
 	 * $column is one of AM_Stats_Query::get_breakdown()'s whitelisted
-	 * columns ('browser', 'os', 'device_type', 'country_code') -- passed
-	 * through rather than pre-queried by the caller so this can also look
-	 * up its own page-param key via STATS_PAGE_PARAMS, matching how
-	 * render_recent_hits_section() and the Top Pages/Referrers calls in
-	 * render_stats_content() are wired.
+	 * columns ('browser', 'os', 'device_type', 'country_code'). $data is
+	 * pre-fetched by the caller (rather than queried in here, as it used
+	 * to be) because render_stats_content() needs every table in a
+	 * breakdown row's own total *before* it can decide $pad_to for any of
+	 * them -- see stats_own_target() and the row-leveling comment there.
 	 */
-	private function render_breakdown_table( string $column, int $days, int $page, string $current_url, string $value_label = '' ) {
+	private function render_breakdown_table( string $column, array $data, int $page, string $current_url, int $pad_to, string $value_label = '' ) {
 		$param_key = array( 'country_code' => 'country', 'browser' => 'browser', 'os' => 'os', 'device_type' => 'device' )[ $column ];
-		$data      = AM_Stats_Query::get_breakdown( $column, $days, $page, self::PER_PAGE );
 
 		$this->render_paginated_stats_table(
 			$data['items'],
@@ -1944,7 +2015,8 @@ class AM_Admin {
 					esc_html( $row->value ?: __( 'Other', 'activity-monitor' ) ),
 					esc_html( number_format_i18n( (int) $row->visits ) ),
 				);
-			}
+			},
+			$pad_to
 		);
 	}
 
@@ -1955,13 +2027,15 @@ class AM_Admin {
 	 * number lives under (see STATS_PAGE_PARAMS) -- every table on the
 	 * Visitor Stats screen paginates independently, so each needs its own
 	 * key rather than sharing one 'paged'. No tablenav is rendered when
-	 * there's nothing to page through, matching render_stats_table()'s own
-	 * "no data" short-circuit.
+	 * there's nothing to page through and nothing to pad to, matching
+	 * render_stats_table()'s own "no data" short-circuit. $pad_to is just
+	 * handed to render_stats_table() -- see stats_own_target() for how
+	 * callers arrive at it.
 	 */
-	private function render_paginated_stats_table( array $items, int $total, int $page, string $page_param, string $current_url, array $columns, callable $row_cells ) {
-		$this->render_stats_table( $items, $columns, $row_cells );
+	private function render_paginated_stats_table( array $items, int $total, int $page, string $page_param, string $current_url, array $columns, callable $row_cells, int $pad_to = 0 ) {
+		$this->render_stats_table( $items, $columns, $row_cells, $pad_to );
 
-		if ( empty( $items ) ) {
+		if ( empty( $items ) && $pad_to <= 0 ) {
 			return;
 		}
 
