@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, event log
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.9.2
+Stable tag: 2.9.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -75,6 +75,9 @@ Yes. Settings → Privacy offers full addresses, anonymised addresses (the last 
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
 
 == Changelog ==
+
+= 2.9.3 =
+* Fixed: a dropdown's newly selected value was unreadable in dark mode until you clicked elsewhere -- the browser repaints a select's own chrome right after a selection using an assumed-light palette regardless of our CSS; declared `color-scheme` so it repaints dark instead.
 
 = 2.9.2 =
 * Fixed: dark mode didn't reach the page background around the Activity Log/Visitor Stats/Settings content, or the screen headings — both are core wp-admin chrome that needed the same explicit-color treatment as the tables fixed in 2.9.1.

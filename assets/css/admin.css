@@ -67,6 +67,7 @@ body.wp-admin {
 	--am-danger:     #B23A3A;
 	--am-danger-tint: #F7E7E7;
 	--am-shadow: 0 1px 2px rgba(22,32,44,.06), 0 1px 1px rgba(22,32,44,.04);
+	--am-color-scheme: light;
 }
 body.wp-admin.am-theme-dark {
 	--am-paper:      #121822;
@@ -84,6 +85,7 @@ body.wp-admin.am-theme-dark {
 	--am-danger:     #E0726E;
 	--am-danger-tint: #3A1F20;
 	--am-shadow: 0 1px 2px rgba(0,0,0,.35);
+	--am-color-scheme: dark;
 }
 /* The page background directly around .am-wrap -- core's own chrome, not
    ours, so (like .wp-list-table/.form-table before it) it needs an explicit
@@ -103,6 +105,18 @@ body.wp-admin.am-theme-dark #wpbody-content {
 .am-wrap { color: var( --am-ink ); }
 .am-wrap a { color: var( --am-accent ); }
 .am-wrap a:hover, .am-wrap a:focus { color: var( --am-accent-ink ); }
+
+/* Tells the browser which palette to use for the parts of a native form
+   control it draws itself rather than reading our CSS for -- the momentary
+   repaint a <select> does immediately after picking a new option (and its
+   own focus ring) among them. Without this the browser assumes light
+   regardless of our authored colors, so under the dark theme that repaint
+   flashes light-on-light -- a newly chosen "Rows" or "Last 30 days" value
+   authored in our light-ink-on-dark-surface colors, momentarily drawn
+   against the browser's own light-scheme fill, unreadable until blur
+   forces a normal repaint. Inherits from here to every control inside
+   .am-wrap, so nothing needs to repeat it. */
+.am-wrap { color-scheme: var( --am-color-scheme ); }
 
 /* ── Theme toggle ──────────────────────────────────────────────────────── */
 /* Sits beside the version tag on every screen (render_screen_open()). A

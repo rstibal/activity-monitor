@@ -143,6 +143,24 @@ workflow disappears.
     color; }` rule — every dropdown on these three screens (Rows per page,
     the Visitor Stats range picker, every filter `<select>`) needs this, not
     just one.
+
+  2.9.3: a third bug in the same family, but with a different fix shape --
+  not a missing color rule this time. Right after picking a new option, a
+  `<select>` stayed unreadable until it lost focus (clicking elsewhere made
+  the value reappear). **The browser repaints a `<select>`'s own
+  chrome -- the moment right after a new option is picked, and its focus
+  ring -- using system colors it assumes are light, unless told
+  otherwise**, regardless of what `background`/`color` our CSS puts on the
+  element; that assumption is exactly what `color-scheme` overrides. No
+  amount of `background`/`color`/`border` on the select itself reaches
+  that repaint, which is why this one couldn't be fixed the same way as the
+  two above. Fixed with `--am-color-scheme` (`light` / `dark`, alongside the
+  rest of the token pairs) applied as `color-scheme: var(--am-color-scheme)`
+  on `.am-wrap`, which inherits to every control inside it. If a *third*
+  form-control quirk like this ever turns up (a checkbox/radio's native tick
+  mark, a native `<input type="date">` picker), check `color-scheme` before
+  reaching for more explicit color rules -- it's the general fix for "the
+  browser is drawing this part itself and doesn't know it should be dark."
 - **Dead code gets deleted, not commented out or marked unused.**
 
 ## Architecture
