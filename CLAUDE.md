@@ -99,6 +99,22 @@ workflow disappears.
   to support this: a "Share" column with a bar sized relative to the
   largest value on the current page (`AM_Admin::bar_cell()`/`max_visits()`),
   not just re-tinted numbers.
+  **The theme toggle needs an explicit rule on every core element it has to
+  reach, not just a token redefinition on `.am-wrap`.** 2.9.0 shipped with
+  the toggle doing nothing to `.wp-list-table` (the Activity Log/Visitor
+  Stats/Notification Channels tables) or `.form-table`/`.description`
+  (Settings) — fixed in 2.9.1. The cause: those elements are core furniture
+  that sets its own explicit background/color, and CSS inheritance only
+  fills in a value when nothing else in the cascade specifies one for that
+  element — an ancestor's `color: var(--am-ink)` on `.am-wrap` never reaches
+  a `<td>` core already colors explicitly, however the custom property
+  redefines under `[data-am-theme="dark"]`. Every one of our own elements
+  (buttons, inputs, `.am-card`, badges) was already explicit and flipped
+  correctly; only the untouched core elements were silently stuck in light
+  mode. If a future core element looks unchanged after toggling, this is
+  almost certainly why — check whether the rule targeting it says
+  `var(--am-*)` or is missing entirely, not whether the token itself is
+  defined for dark.
 - **Dead code gets deleted, not commented out or marked unused.**
 
 ## Architecture

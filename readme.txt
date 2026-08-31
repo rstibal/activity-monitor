@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, event log
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.9.0
+Stable tag: 2.9.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -75,6 +75,9 @@ Yes. Settings → Privacy offers full addresses, anonymised addresses (the last 
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
 
 == Changelog ==
+
+= 2.9.1 =
+* Fixed: the Ledger Console dark/light toggle didn't change the Activity Log, Visitor Stats, or Notification Channels tables, or the Settings screen's field text — those are core wp-admin table/form elements that set their own colors, which needed explicit dark-theme rules rather than relying on inheriting from the surrounding page.
 
 = 2.9.0 =
 * Added: "Ledger Console" — a new visual identity for the Activity Log, Visitor Stats, and Settings screens, with its own type system, a deliberate 8-step severity color ramp, and a per-user light/dark toggle.
