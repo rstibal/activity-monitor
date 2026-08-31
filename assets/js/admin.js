@@ -298,17 +298,26 @@
 		if ($('#am-stats-content').length) amRefreshStats(qs, false);
 	});
 
-	/* Ledger Console theme toggle. Flips .am-wrap's data-am-theme attribute
-	   immediately (every color in admin.css reads off that, see the token
-	   block) and saves the choice over AJAX -- see AM_Admin::ajax_save_theme().
-	   Delegated on document, not bound directly to the button: the toggle
-	   itself sits inside render_screen_open(), outside #am-log-app/
-	   #am-stats-content, so it's never replaced by an AJAX refresh, but
-	   delegation costs nothing and matches every other handler in this file. */
+	/* Ledger Console theme toggle. Two things need to flip together, both
+	   read by admin.css's token block: .am-wrap's data-am-theme attribute
+	   (drives the hardcoded per-severity dark colors that aren't tokenized)
+	   and a class on <body> (drives every var(--am-*) token, including the
+	   ones #wpcontent/#wpbody/#wpbody-content read -- those are ANCESTORS
+	   of .am-wrap, so they can only pick up a class placed on an element
+	   that contains them, i.e. <body>, never an attribute set further down
+	   the tree on .am-wrap alone). AM_Admin::filter_admin_body_class() sets
+	   the same class server-side on the next full page load; this only
+	   needs to keep the *current* page in sync until then. Saves over AJAX
+	   -- see AM_Admin::ajax_save_theme(). Delegated on document, not bound
+	   directly to the button: the toggle itself sits inside
+	   render_screen_open(), outside #am-log-app/#am-stats-content, so it's
+	   never replaced by an AJAX refresh, but delegation costs nothing and
+	   matches every other handler in this file. */
 	$(document).on('click', '.am-theme-toggle', function () {
 		var $wrap = $(this).closest('.am-wrap');
 		var next = $wrap.attr('data-am-theme') === 'dark' ? 'light' : 'dark';
 		$wrap.attr('data-am-theme', next);
+		$('body').toggleClass('am-theme-dark', next === 'dark');
 		$(this).attr('aria-pressed', next === 'dark' ? 'true' : 'false');
 		$(this).find('.am-tt-label').text(next === 'dark' ? 'Dark' : 'Light');
 		$.post(amData.ajaxUrl, { action: 'am_save_theme', theme: next, nonce: amData.nonce });

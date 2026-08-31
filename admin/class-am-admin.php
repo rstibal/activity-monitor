@@ -60,6 +60,7 @@ class AM_Admin {
 		add_action( 'admin_post_am_export_log',               array( $instance, 'handle_export' ) );
 		add_action( 'admin_post_am_stats_geo_update_now',     array( $instance, 'handle_stats_geo_update_now' ) );
 		add_action( 'admin_notices',                          array( $instance, 'show_notices' ) );
+		add_filter( 'admin_body_class',                       array( $instance, 'filter_admin_body_class' ) );
 		add_action( 'wp_ajax_am_get_v2_event_detail',         array( $instance, 'ajax_v2_event_detail' ) );
 		add_action( 'wp_ajax_am_ip_lookup',                   array( $instance, 'ajax_ip_lookup' ) );
 		add_action( 'wp_ajax_am_user_profile',                array( $instance, 'ajax_user_profile' ) );
@@ -201,6 +202,26 @@ class AM_Admin {
 			'ajaxUrl' => admin_url( 'admin-ajax.php' ),
 			'nonce'   => wp_create_nonce( 'am_ajax' ),
 		) );
+	}
+
+	/**
+	 * Adds am-theme-dark to <body> on this plugin's own screens when the
+	 * user has the toggle on. Needed alongside the data-am-theme attribute
+	 * render_screen_open() puts on .am-wrap: the dark token values
+	 * (--am-paper etc.) are declared on body.wp-admin.am-theme-dark, not on
+	 * .am-wrap itself, because #wpcontent/#wpbody/#wpbody-content -- core's
+	 * own page-background chrome around .am-wrap -- are ANCESTORS of
+	 * .am-wrap and can't read a custom property declared further down the
+	 * tree. See admin.css's token block for the rest of that reasoning.
+	 * Gated the same way enqueue_assets() is, so no other admin screen's
+	 * <body> class list changes.
+	 */
+	public function filter_admin_body_class( $classes ) {
+		$screen = get_current_screen();
+		if ( ! $screen || ! in_array( $screen->id, self::$screen_hooks, true ) ) {
+			return $classes;
+		}
+		return $classes . ' am-theme-' . self::user_theme() . ' ';
 	}
 
 	// ── Settings registration ────────────────────────────────────────────

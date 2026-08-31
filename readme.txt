@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, event log
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.9.1
+Stable tag: 2.9.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -75,6 +75,10 @@ Yes. Settings → Privacy offers full addresses, anonymised addresses (the last 
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
 
 == Changelog ==
+
+= 2.9.2 =
+* Fixed: dark mode didn't reach the page background around the Activity Log/Visitor Stats/Settings content, or the screen headings — both are core wp-admin chrome that needed the same explicit-color treatment as the tables fixed in 2.9.1.
+* Fixed: dropdown option lists (e.g. Rows, the date-range picker) were unreadable in dark mode — light text on the browser's native white popup background.
 
 = 2.9.1 =
 * Fixed: the Ledger Console dark/light toggle didn't change the Activity Log, Visitor Stats, or Notification Channels tables, or the Settings screen's field text — those are core wp-admin table/form elements that set their own colors, which needed explicit dark-theme rules rather than relying on inheriting from the surrounding page.

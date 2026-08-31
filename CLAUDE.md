@@ -115,6 +115,34 @@ workflow disappears.
   almost certainly why — check whether the rule targeting it says
   `var(--am-*)` or is missing entirely, not whether the token itself is
   defined for dark.
+
+  2.9.2 found two more instances of the same class of bug, each with its
+  own wrinkle:
+  - **An ancestor can't read a token a descendant defines.** The tokens were
+    declared on `.am-wrap[data-am-theme="dark"]`, so `#wpcontent` /
+    `#wpbody` / `#wpbody-content` — core's page-background chrome, which
+    *wraps* `.am-wrap` rather than sitting inside it — had no way to read
+    them, leaving a light halo around an otherwise-dark screen. Custom
+    properties only cascade down the tree, never up. Fixed by hoisting the
+    whole token set to `body.wp-admin` (light defaults) /
+    `body.wp-admin.am-theme-dark` (dark overrides) instead of `.am-wrap`, so
+    both that ancestor chrome and `.am-wrap` itself read the same values.
+    `AM_Admin::filter_admin_body_class()` puts the class on `<body>` from
+    `user_theme()` on every full page load; the toggle's JS handler now sets
+    it too (`$('body').toggleClass('am-theme-dark', …)`), alongside the
+    `data-am-theme` attribute it already set on `.am-wrap` (still needed —
+    the hardcoded per-severity dark colors key off that attribute, not a
+    token). The two have to be kept in sync in exactly one place: the
+    click handler.
+  - **A `<select>`'s open dropdown list is a native OS popup, not a styled
+    child of the `<select>` box.** Coloring the `<select>` itself
+    (`background`/`color`) only reliably styles the closed box; several
+    browser/OS combinations keep the open option list's background white
+    regardless, so text colored for a dark box went light-on-white in the
+    popup. Fixed with an explicit `.am-wrap select option { background;
+    color; }` rule — every dropdown on these three screens (Rows per page,
+    the Visitor Stats range picker, every filter `<select>`) needs this, not
+    just one.
 - **Dead code gets deleted, not commented out or marked unused.**
 
 ## Architecture

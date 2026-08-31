@@ -28,16 +28,30 @@
 }
 .am-wrap h1, .am-wrap h2, .am-wrap h3 {
 	font-family: "IBM Plex Sans", -apple-system, sans-serif;
+	color: var( --am-ink );
 }
 
 /* ── Tokens ────────────────────────────────────────────────────────────── */
-/* Light is the default (no attribute needed); dark applies only once a user
-   has actually turned the per-screen toggle on -- see render_screen_open()
-   and AM_Admin::user_theme(). There's no prefers-color-scheme fallback here
-   the way an Artifact would use one: this is a real per-user preference
-   stored in usermeta, not a document guessing at OS theme, so it stays off
-   until asked for. */
-.am-wrap {
+/* Defined on body, not .am-wrap: #wpcontent/#wpbody/#wpbody-content (core's
+   own page-background chrome around .am-wrap, see below) are ANCESTORS of
+   .am-wrap, and a custom property is only visible to the element that
+   defines it and that element's descendants -- an ancestor can't read a
+   token declared further down the tree. Declaring the whole set here once
+   is what lets both that ancestor chrome and .am-wrap itself (and
+   everything inside it) read the same values.
+
+   Light is the default (the plain `body.wp-admin` block); dark applies only
+   once a user has actually turned the per-screen toggle on, via the
+   am-theme-dark class filter_admin_body_class() adds -- see
+   render_screen_open() and AM_Admin::user_theme(). There's no
+   prefers-color-scheme fallback here the way an Artifact would use one:
+   this is a real per-user preference stored in usermeta, not a document
+   guessing at OS theme, so it stays off until asked for. Safe to declare
+   unconditionally on every wp-admin screen (not just this plugin's) since a
+   custom property with no var() referencing it does nothing -- and
+   admin.css itself only ever loads on this plugin's own screens anyway,
+   see enqueue_assets(). */
+body.wp-admin {
 	--am-paper:      #EDF0F3;
 	--am-surface:    #FFFFFF;
 	--am-surface-2:  #F5F7F9;
@@ -54,7 +68,7 @@
 	--am-danger-tint: #F7E7E7;
 	--am-shadow: 0 1px 2px rgba(22,32,44,.06), 0 1px 1px rgba(22,32,44,.04);
 }
-.am-wrap[data-am-theme="dark"] {
+body.wp-admin.am-theme-dark {
 	--am-paper:      #121822;
 	--am-surface:    #1A222D;
 	--am-surface-2:  #202A36;
@@ -71,6 +85,17 @@
 	--am-danger-tint: #3A1F20;
 	--am-shadow: 0 1px 2px rgba(0,0,0,.35);
 }
+/* The page background directly around .am-wrap -- core's own chrome, not
+   ours, so (like .wp-list-table/.form-table before it) it needs an explicit
+   rule rather than relying on inheritance reaching it. Only repainted on
+   this plugin's own screens: the am-theme-dark class is scoped to those in
+   filter_admin_body_class(), so no other admin screen's background moves. */
+body.wp-admin.am-theme-dark #wpcontent,
+body.wp-admin.am-theme-dark #wpbody,
+body.wp-admin.am-theme-dark #wpbody-content {
+	background: var( --am-paper );
+}
+
 /* color inherits from here to every descendant on its own -- no need to
    force it with a universal selector, which would only fight the
    more-specific rules below over cascade order instead of losing cleanly
@@ -138,6 +163,17 @@
 	padding: 6px 10px;
 	min-height: 32px;
 	box-shadow: none;
+}
+/* The <select> box itself picks up --am-surface/--am-ink above, but its
+   dropdown popup is a native OS control that doesn't inherit them --
+   several browser/OS combinations keep the popup's background white
+   regardless of the select's own styling unless each <option> is given an
+   explicit color too, which otherwise leaves light-on-white (or worse,
+   light-on-light) text in the open list even though the closed box looks
+   right. */
+.am-wrap select option {
+	background: var( --am-surface );
+	color: var( --am-ink );
 }
 .am-wrap input[type="text"]:focus,
 .am-wrap input[type="search"]:focus,
