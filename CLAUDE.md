@@ -197,14 +197,19 @@ If per-logger noise control is ever wanted back, it needs its own slug/label
 contract reintroduced on `AM_Logger_Base` — don't resurrect it as a
 half-measure grafted onto something else.
 
-**Every table on the Activity Log and Visitor Stats screens is capped at
-`AM_Admin::PER_PAGE` (10) rows, fixed, not per-user.** The Activity Log used
-to expose this as a per-user Screen Option (`am_log_per_page`, added 2.4.3);
-it was removed in 2.8.15 in favor of the same fixed 10 every other table on
-both screens uses — don't reintroduce a Screen Options control here without
-deciding it should apply to all of them, or the Activity Log goes back to
-being the one table on these two screens with a different page size than the
-rest.
+**Every Visitor Stats table is capped at `AM_Admin::PER_PAGE` (10) rows,
+fixed, not per-user.** The Activity Log used to share that same fixed 10 (as
+of 2.8.15, replacing a per-user Screen Option that had existed since 2.4.3)
+but got its own per-user control back in 2.8.20: a plain `<select
+name="am_per_page">` next to its pagination (`AM_Admin::LOG_PER_PAGE_CHOICES`
+— 10/20/50/100), not a Settings-screen field or the Screen Options API. It's
+read and persisted by `AM_Admin::log_per_page()` in usermeta
+(`am_log_per_page`, cleaned up in `uninstall.php` via `delete_metadata()`
+across all users) — a request carrying a valid `am_per_page` both applies and
+re-saves it, everything else falls back to the stored preference. This is a
+deliberate exception, not a precedent: Visitor Stats' seven tables stay fixed,
+so don't generalize this into a shared per-table Screen Options control
+without deciding it should apply to all of them.
 
 **Paging, filtering, and searching the Activity Log, and paging or changing
 the date range on any of Visitor Stats' seven tables, all happen over AJAX,

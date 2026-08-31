@@ -26,8 +26,12 @@ class AM_Admin {
 	/** Option group posted to options.php by the Settings screen. */
 	const SETTINGS_GROUP = 'am_settings';
 
-	/** Fixed page size for every paginated table this plugin renders. */
+	/** Fixed page size for every paginated table this plugin renders,
+	 *  except the Activity Log -- see LOG_PER_PAGE_CHOICES below. */
 	const PER_PAGE = 10;
+
+	/** Rows-per-page choices for the Activity Log's own dropdown. */
+	const LOG_PER_PAGE_CHOICES = array( 10, 20, 50, 100 );
 
 	/**
 	 * Hook suffixes returned by add_menu_page()/add_submenu_page(), used
@@ -1155,8 +1159,36 @@ class AM_Admin {
 	 * $raw is already wp_unslash()'d by the caller in both cases, so every
 	 * value here still goes through the same sanitizers as before.
 	 */
+	/**
+	 * Rows-per-page for the Activity Log table specifically -- everything
+	 * else this plugin paginates stays fixed at PER_PAGE. Persisted per
+	 * user in usermeta rather than a plugin option, since it's a display
+	 * preference tied to who's looking, not something to configure once
+	 * for the whole site.
+	 *
+	 * $raw carrying a valid am_per_page (from the dropdown's own change,
+	 * or from a pagination/filter link built with it still in the query
+	 * string, see $current_url below) both applies and re-saves it, so it
+	 * stays in effect for every link generated off this render without a
+	 * meta lookup. A request with no such value -- the very first load,
+	 * or Reset, which deliberately drops filters but not this -- falls
+	 * back to the stored preference, defaulting to PER_PAGE.
+	 */
+	private static function log_per_page( array $raw ): int {
+		$user_id = get_current_user_id();
+		if ( isset( $raw['am_per_page'] ) && in_array( (int) $raw['am_per_page'], self::LOG_PER_PAGE_CHOICES, true ) ) {
+			$per_page = (int) $raw['am_per_page'];
+			if ( $user_id ) {
+				update_user_meta( $user_id, 'am_log_per_page', $per_page );
+			}
+			return $per_page;
+		}
+		$stored = $user_id ? (int) get_user_meta( $user_id, 'am_log_per_page', true ) : 0;
+		return in_array( $stored, self::LOG_PER_PAGE_CHOICES, true ) ? $stored : self::PER_PAGE;
+	}
+
 	private function render_log_content( array $raw ) {
-		$per_page   = self::PER_PAGE;
+		$per_page   = self::log_per_page( $raw );
 		$page       = max( 1, absint( $raw['paged'] ?? 1 ) );
 		// Normalized to '' when it isn't a real level, matching what
 		// AM_Event_Query does with it anyway. Without this, ?am_level=xyz
@@ -1532,6 +1564,14 @@ class AM_Admin {
 
 				<div class="tablenav-pages<?php echo $num_pages > 1 ? '' : ' one-page'; ?>">
 					<span class="displaying-num"><?php echo $displaying_num_html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- built via esc_html() above. ?></span>
+					<span class="am-per-page">
+						<label class="screen-reader-text" for="am-per-page-select"><?php esc_html_e( 'Rows per page', 'activity-monitor' ); ?></label>
+						<select name="am_per_page" id="am-per-page-select">
+							<?php foreach ( self::LOG_PER_PAGE_CHOICES as $choice ) : ?>
+								<option value="<?php echo esc_attr( $choice ); ?>" <?php selected( $choice, $per_page ); ?>><?php echo esc_html( $choice ); ?></option>
+							<?php endforeach; ?>
+						</select>
+					</span>
 					<?php if ( $num_pages > 1 ) : ?>
 						<span class="pagination-links"><?php echo $pagination_html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- already wp_kses_post()'d above. ?></span>
 					<?php endif; ?>

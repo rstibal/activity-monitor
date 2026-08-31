@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, event log
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.8.19
+Stable tag: 2.8.20
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -75,6 +75,9 @@ Yes. Settings → Privacy offers full addresses, anonymised addresses (the last 
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
 
 == Changelog ==
+
+= 2.8.20 =
+* Added: a rows-per-page dropdown (10/20/50/100) next to the Activity Log's pagination, saved per user.
 
 = 2.8.19 =
 * Changed: removed the leftover margin around the search box in the Activity Log's top toolbar (carried over from when it sat as its own element above the tablenav) now that it sits inside the tablenav's top row in place of pagination.

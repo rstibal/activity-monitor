@@ -239,6 +239,17 @@
 		amRefreshLog($(this).serialize(), true);
 	});
 
+	/* Rows-per-page dropdown: lives inside #am-filter-form (see CLAUDE.md on
+	   why the whole table is one form), so serialize() already carries its
+	   value -- this just resets paged back to 1, the same way the Visitor
+	   Stats range dropdown resets its own tables' page params below. */
+	$(document).on('change', '#am-log-app select[name="am_per_page"]', function () {
+		var $form = $(this).closest('form');
+		var params = new URLSearchParams($form.serialize());
+		params.delete('paged');
+		amRefreshLog(params.toString(), true);
+	});
+
 	/* Visitor Stats: the range dropdown resets every table's own page back
 	   to 1 -- an explicit list of the per-table page params rather than
 	   deleting whatever keys happen to be present, so a stale page number

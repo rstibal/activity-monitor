@@ -77,6 +77,12 @@ delete_option( 'am_ip_storage' );
 delete_option( 'am_ip_lookup_enabled' );
 delete_option( 'am_delete_data_on_uninstall' );
 delete_option( 'am_maintenance_mode_last_state' );
+// Activity Log rows-per-page choice (2.8.20), stored per user rather than
+// as a plugin option -- see AM_Admin::log_per_page(). Unlike session_tokens
+// below, this meta key belongs to the plugin, so it's removed for every
+// user, not left in place.
+delete_metadata( 'user', 0, 'am_log_per_page', '', true );
+
 // Session management was removed in 2.4.0; these are its two leftover
 // settings. Note what is deliberately NOT here: the session_tokens user
 // meta. That is WordPress's own storage, which this plugin only ever read

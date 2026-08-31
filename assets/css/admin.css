@@ -335,6 +335,9 @@
 	background: transparent;
 	color: #646970;
 }
+.tablenav-pages .am-per-page {
+	margin: 0 8px;
+}
 
 /* Visitor Stats screen. A summary stat row and a side-by-side breakdown
    layout are both things core has no list-table equivalent for -- the
