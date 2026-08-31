@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, event log
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.9.4
+Stable tag: 2.9.5
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -75,6 +75,9 @@ Yes. Settings → Privacy offers full addresses, anonymised addresses (the last 
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
 
 == Changelog ==
+
+= 2.9.5 =
+* Fixed: the Activity Log's per-row severity color stripe had gone flat gray. A 2.9.1 dark-mode fix set `.am-log-table td`'s `border-color` (the shorthand, all four sides) with `!important`, which silently beat the stripe's own `border-left` on every row regardless of level. Narrowed to the three sides that rule actually needs.
 
 = 2.9.4 =
 * Changed: every Settings section (Logging, Display, Privacy, Visitor Stats, Geolocation, Data) now renders in a real card container, matching Notification Channels and Clear Log, instead of a CSS-only card look layered over core's own section markup.

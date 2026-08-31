@@ -277,7 +277,21 @@ body.wp-admin.am-theme-dark #wpbody-content {
 .am-wrap .wp-list-table tbody tr:hover { background: var( --am-surface-3 ); }
 
 .am-log-table { table-layout: auto; border-collapse: collapse; }
-.am-log-table td { vertical-align: middle; white-space: nowrap; border-color: var( --am-border ) !important; }
+/* border-top/right/bottom-color, deliberately not the border-color shorthand:
+   that sets all four sides, including border-left-color -- which is exactly
+   the property the per-row severity spine below sets on td:first-child.
+   Because both rules target the same property, !important here would win
+   over the spine's plain (non-!important) declaration regardless of which
+   selector is more specific, silently flattening every row to this neutral
+   gray. Narrowing to the three sides the spine never touches is what lets
+   both rules stand. */
+.am-log-table td {
+	vertical-align: middle;
+	white-space: nowrap;
+	border-top-color: var( --am-border ) !important;
+	border-right-color: var( --am-border ) !important;
+	border-bottom-color: var( --am-border ) !important;
+}
 .am-log-table th { border-color: var( --am-border ) !important; }
 .am-log-table .am-type-cell { max-width: 150px; }
 .am-datetime-cell, .am-ip-cell { font-family: "IBM Plex Mono", monospace; font-size: 12.5px; color: var( --am-muted ); white-space: nowrap; }

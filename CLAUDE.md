@@ -172,6 +172,26 @@ workflow disappears.
   mark, a native `<input type="date">` picker), check `color-scheme` before
   reaching for more explicit color rules -- it's the general fix for "the
   browser is drawing this part itself and doesn't know it should be dark."
+
+  2.9.5: a self-inflicted regression from the 2.9.1 fix, not a new browser
+  quirk. `.am-log-table td { border-color: var(--am-border) !important; }`
+  was added to force the Activity Log's grid lines onto the theme token
+  (see 2.9.1 above); `border-color` is a *shorthand* that sets all four
+  sides, including `border-left-color` -- which is exactly what the
+  per-row severity spine (`.am-row-am-<level> td:first-child { border-left:
+  3px solid <color>; }`) sets on the same cell. `!important` beats a
+  non-`!important` declaration for the same property regardless of which
+  selector is more specific, so every row's spine silently flattened to
+  the neutral gray border color, no matter its level. **A `!important`
+  shorthand added for one purpose can clobber an unrelated longhand another
+  rule owns, even when that rule is more specific and would otherwise win
+  outright.** Fixed by narrowing the grid-line rule to `border-top-color`
+  /`border-right-color`/`border-bottom-color`, leaving `border-left-color`
+  to whichever rule already owned it. Generalize this: before reaching for
+  `!important` on a shorthand (`border-color`, `background`, `font`, `margin`),
+  check whether any longhand side of it is already independently owned by
+  a more specific rule elsewhere -- the shorthand will win that side too,
+  `!important` or not, and silently.
 - **Dead code gets deleted, not commented out or marked unused.**
 
 ## Architecture
