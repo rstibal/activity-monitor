@@ -1,4 +1,4 @@
-/* Activity Monitor — Admin JS v1.2.1 */
+/* Activity Monitor — Admin JS v1.3.0 */
 (function ($) {
 	'use strict';
 
@@ -296,6 +296,22 @@
 		var qs = window.location.search.replace(/^\?/, '');
 		if ($('#am-log-app').length) amRefreshLog(qs, false);
 		if ($('#am-stats-content').length) amRefreshStats(qs, false);
+	});
+
+	/* Ledger Console theme toggle. Flips .am-wrap's data-am-theme attribute
+	   immediately (every color in admin.css reads off that, see the token
+	   block) and saves the choice over AJAX -- see AM_Admin::ajax_save_theme().
+	   Delegated on document, not bound directly to the button: the toggle
+	   itself sits inside render_screen_open(), outside #am-log-app/
+	   #am-stats-content, so it's never replaced by an AJAX refresh, but
+	   delegation costs nothing and matches every other handler in this file. */
+	$(document).on('click', '.am-theme-toggle', function () {
+		var $wrap = $(this).closest('.am-wrap');
+		var next = $wrap.attr('data-am-theme') === 'dark' ? 'light' : 'dark';
+		$wrap.attr('data-am-theme', next);
+		$(this).attr('aria-pressed', next === 'dark' ? 'true' : 'false');
+		$(this).find('.am-tt-label').text(next === 'dark' ? 'Dark' : 'Light');
+		$.post(amData.ajaxUrl, { action: 'am_save_theme', theme: next, nonce: amData.nonce });
 	});
 
 }(jQuery));

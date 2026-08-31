@@ -66,20 +66,39 @@ workflow disappears.
   to `user_login` when it's empty.
 - **Timestamps** go through `AM_Date_Format::combined()`. CSV/JSON export
   deliberately bypasses it, keeping raw UTC to stay machine-readable.
-- **Build on wp-admin's own furniture, don't restyle it.** Screens use core's
-  `.wrap` + `.wp-heading-inline` + `.wp-header-end`, `.subsubsub` for status
-  filters, `.search-box`, `.tablenav` (`.alignleft.actions` left,
-  `.tablenav-pages` right, `<br class="clear">`), `.wp-list-table widefat
-  striped`, and — on Settings — the Settings API's own `<h2>` + `.form-table`
-  output. `admin.css` should only define what core has no equivalent for —
-  severity/initiator badges, the modal, column widths, and `.page-numbers`
-  (which core's list tables don't emit, so core ships no styling for it).
-  Before 2.3.0 this file restyled buttons, inputs, form-tables, table headers
-  and wrapped every screen in a white panel; the result read as a separate
-  product embedded in wp-admin. Don't reintroduce that. Settings kept a
-  version of it until 2.4.3 in `.am-settings-section` (a hand-rolled
-  `.postbox`) plus an invented group heading, section divider and red "danger
-  zone" — all deleted. If a settings control needs framing, it already has it.
+- **"Ledger Console" is this plugin's visual identity (2.9.0).** From 2.3.0
+  through 2.8.x the rule here was the opposite of this — "build on wp-admin's
+  own furniture, don't restyle it" — after an earlier version restyled
+  buttons, inputs, form-tables and table headers and wrapped every screen in
+  a white panel, and the result read as a separate product embedded in
+  wp-admin rather than part of it. 2.9.0 reverses that on purpose, as a
+  deliberate, approved design system rather than one-off decoration: a
+  case-file-ledger identity (the plugin's job is a security audit log, so the
+  look leans into that) with its own type system (IBM Plex Sans for
+  headings/chrome, Public Sans for body/table text, IBM Plex Mono for data —
+  timestamps, IPs, versions — loaded from Google Fonts in `enqueue_assets()`),
+  a deliberate 8-step severity color ramp (gray → blue → teal → amber →
+  orange → red → magenta → wine, debug through emergency, so severity reads
+  as a position on a scale rather than eight arbitrary badge colors), and a
+  per-user light/dark toggle (`am_theme` usermeta, `AM_Admin::user_theme()`,
+  `ajax_save_theme()` — same storage pattern as `am_log_per_page`, see
+  below). The prior rule's actual lesson still holds and is what keeps this
+  from repeating 2.3.0's mistake: **stay scoped**. Every rule in `admin.css`
+  lives under `.am-wrap` — the wp-admin bar and the left-hand menu are
+  untouched, and no other plugin's screens are affected. Within that scope,
+  restyling core's own furniture (buttons, inputs, `.tablenav-pages`,
+  `.form-table`) is now the deliberate choice, not a mistake to avoid — but
+  it's still done additively where possible: the Settings screen's card
+  look is pure CSS layered onto `do_settings_sections()`'s unchanged
+  `<h2>` + `<table class="form-table">` output (`h2 + p`, `h2 + table.form-table`
+  sibling selectors, so it doesn't care whether a given section has an intro
+  paragraph), not a rewrite of how Settings renders. `.am-card` wraps the
+  three sections `do_settings_sections()` doesn't own (Notification
+  Channels, Clear Log) the same way. Visitor Stats' breakdown tables
+  (Referrers, Countries, Browsers, OS, Devices) got one real markup change
+  to support this: a "Share" column with a bar sized relative to the
+  largest value on the current page (`AM_Admin::bar_cell()`/`max_visits()`),
+  not just re-tinted numbers.
 - **Dead code gets deleted, not commented out or marked unused.**
 
 ## Architecture

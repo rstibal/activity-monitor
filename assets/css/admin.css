@@ -1,424 +1,438 @@
-/* ── Activity Monitor — Admin Styles v1.1.0 ───────────────────────────── */
+/* ── Activity Monitor — Admin Styles: "Ledger Console" v2.9.0 ──────────── */
 
-/* ── Layout ────────────────────────────────────────────────────────────── */
-/*
- * Deliberately thin. These screens are built on wp-admin's own furniture
- * -- .wrap, .wp-heading-inline, .subsubsub, .search-box, .tablenav,
- * .wp-list-table.striped -- and core already styles every one of them.
- * What's left in this file is only what core has no equivalent for:
- * severity/initiator badges, the modal, and a handful of column-width
- * rules.
- *
- * Before adding a rule that restyles a core component (buttons, inputs,
- * form-table, pagination, table headers), consider that an earlier
- * version of this file did exactly that -- custom blue buttons, rounded
- * inputs, uppercase table headers, a white panel wrapping the whole
- * screen -- and the result read as a different product bolted into
- * wp-admin rather than part of it. That was removed on purpose in 2.3.0.
- *
- * .am-wrap itself carries no rules, and shouldn't gain a max-width: core
- * admin screens fill the available width, and a cap here left an odd
- * gutter next to every other admin page.
- */
+/* This file used to be deliberately thin, building entirely on wp-admin's
+   own furniture and adding only what core had no equivalent for -- see the
+   git history before 2.9.0, and CLAUDE.md's design-system note, for why
+   that was the rule from 2.3.0 through 2.8.x. 2.9.0 replaces that rule on
+   purpose: a proposed, then approved, visual identity for this plugin's
+   three screens ("Ledger Console" -- a case-file ledger crossed with a
+   security console, since that's what an audit log actually is). It is
+   still deliberately SCOPED, though -- every rule below lives under
+   .am-wrap, which is this plugin's own content area. The wp-admin bar and
+   the left-hand menu are untouched; a site's other plugins render exactly
+   as before. */
 
-/* No <code> styling override here on purpose. This plugin used to wrap
-   IPs, URLs, session IDs and event slugs in <code> purely to get a
-   monospace look, and needed a rule cancelling WP core's gray <code>
-   background so those values didn't read as highlighted code blocks.
-   All of that was removed in 2.0.62 -- <code> is now reserved for
-   actual code (HTML, JS, and so on), and code genuinely does want
-   core's default treatment, so overriding it here would be backwards. */
+/* ── Fonts ─────────────────────────────────────────────────────────────── */
+/* IBM Plex Sans for headings/chrome, Public Sans for body/table text, IBM
+   Plex Mono for anything that's data rather than prose -- timestamps, IP
+   addresses, version numbers. The mono face is what makes this read as a
+   ledger rather than a themed version of the default admin font. Loaded in
+   enqueue_assets() as a separate stylesheet (fonts.googleapis.com); if that
+   request fails or is blocked, every rule below already lists a system
+   sans-serif fallback. */
 
-/* Version, beside the .wp-heading-inline <h1>. Muted and small so it
-   annotates the heading rather than competing with it -- the same role
-   core's own inline heading extras play. */
-.am-version {
-	color: #646970;
-	font-size: 12px;
-	vertical-align: super;
+.am-wrap {
+	font-family: "Public Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+	background: var( --am-paper );
+	padding: 4px 0 40px;
+}
+.am-wrap h1, .am-wrap h2, .am-wrap h3 {
+	font-family: "IBM Plex Sans", -apple-system, sans-serif;
 }
 
-/* Label ahead of the export buttons in the bottom tablenav, aligned to
-   core's own .tablenav .actions line-height so it sits on the same
-   baseline as the buttons beside it. */
+/* ── Tokens ────────────────────────────────────────────────────────────── */
+/* Light is the default (no attribute needed); dark applies only once a user
+   has actually turned the per-screen toggle on -- see render_screen_open()
+   and AM_Admin::user_theme(). There's no prefers-color-scheme fallback here
+   the way an Artifact would use one: this is a real per-user preference
+   stored in usermeta, not a document guessing at OS theme, so it stays off
+   until asked for. */
+.am-wrap {
+	--am-paper:      #EDF0F3;
+	--am-surface:    #FFFFFF;
+	--am-surface-2:  #F5F7F9;
+	--am-surface-3:  #EAEEF1;
+	--am-ink:        #16202C;
+	--am-muted:      #5B6B7C;
+	--am-faint:      #8898A6;
+	--am-border:     #D7DCE2;
+	--am-border-strong: #C1C9D1;
+	--am-accent:     #0F6E5E;
+	--am-accent-ink: #0A4D42;
+	--am-accent-tint: #E3F1EE;
+	--am-danger:     #B23A3A;
+	--am-danger-tint: #F7E7E7;
+	--am-shadow: 0 1px 2px rgba(22,32,44,.06), 0 1px 1px rgba(22,32,44,.04);
+}
+.am-wrap[data-am-theme="dark"] {
+	--am-paper:      #121822;
+	--am-surface:    #1A222D;
+	--am-surface-2:  #202A36;
+	--am-surface-3:  #26313F;
+	--am-ink:        #E7ECF1;
+	--am-muted:      #9AACBC;
+	--am-faint:      #71879B;
+	--am-border:     #2C3A48;
+	--am-border-strong: #3A4A5B;
+	--am-accent:     #33BFA1;
+	--am-accent-ink: #8FE9D4;
+	--am-accent-tint: #15332E;
+	--am-danger:     #E0726E;
+	--am-danger-tint: #3A1F20;
+	--am-shadow: 0 1px 2px rgba(0,0,0,.35);
+}
+/* color inherits from here to every descendant on its own -- no need to
+   force it with a universal selector, which would only fight the
+   more-specific rules below over cascade order instead of losing cleanly
+   to them. */
+.am-wrap { color: var( --am-ink ); }
+.am-wrap a { color: var( --am-accent ); }
+.am-wrap a:hover, .am-wrap a:focus { color: var( --am-accent-ink ); }
+
+/* ── Theme toggle ──────────────────────────────────────────────────────── */
+/* Sits beside the version tag on every screen (render_screen_open()). A
+   binary switch, not a 3-state artifact-style theme -- this is a stored
+   usermeta preference, so "system" has no meaning here. */
+.am-theme-toggle {
+	margin-left: auto;
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	background: none;
+	border: none;
+	cursor: pointer;
+	font-family: "IBM Plex Sans", sans-serif;
+	font-size: 12.5px;
+	color: var( --am-muted );
+	padding: 2px;
+}
+.am-theme-toggle:hover { color: var( --am-ink ); }
+.am-theme-toggle .am-tt-track {
+	width: 32px; height: 18px; border-radius: 10px;
+	background: var( --am-surface-3 ); border: 1px solid var( --am-border-strong );
+	position: relative; flex: none;
+}
+.am-theme-toggle .am-tt-thumb {
+	position: absolute; top: 1px; left: 1px; width: 14px; height: 14px;
+	border-radius: 50%; background: var( --am-accent );
+	transition: transform .15s ease;
+}
+.am-theme-toggle[aria-pressed="true"] .am-tt-thumb { transform: translateX( 14px ); }
+
+/* ── Heading row ───────────────────────────────────────────────────────── */
+.am-version {
+	color: var( --am-faint );
+	font-size: 12px;
+	font-family: "IBM Plex Mono", monospace;
+	vertical-align: super;
+}
+.am-heading-row { display: flex; align-items: baseline; gap: 10px; }
+
+/* ── Controls: inputs, selects, buttons ───────────────────────────────── */
+/* Scoped to .am-wrap, so nothing outside this plugin's own screens is
+   touched -- every other admin screen, and every other plugin's, keeps
+   core's stock control styling. */
+.am-wrap input[type="text"],
+.am-wrap input[type="search"],
+.am-wrap input[type="date"],
+.am-wrap input[type="number"],
+.am-wrap input[type="password"],
+.am-wrap select,
+.am-wrap textarea {
+	font-family: "Public Sans", sans-serif;
+	font-size: 13px;
+	color: var( --am-ink );
+	background: var( --am-surface );
+	border: 1px solid var( --am-border-strong );
+	border-radius: 4px;
+	padding: 6px 10px;
+	min-height: 32px;
+	box-shadow: none;
+}
+.am-wrap input[type="text"]:focus,
+.am-wrap input[type="search"]:focus,
+.am-wrap input[type="date"]:focus,
+.am-wrap input[type="number"]:focus,
+.am-wrap input[type="password"]:focus,
+.am-wrap select:focus,
+.am-wrap textarea:focus {
+	border-color: var( --am-accent );
+	box-shadow: 0 0 0 1px var( --am-accent );
+	outline: none;
+}
+.am-wrap input[type="checkbox"],
+.am-wrap input[type="radio"] { accent-color: var( --am-accent ); }
+
+.am-wrap .button {
+	font-family: "IBM Plex Sans", sans-serif;
+	font-size: 13px;
+	border-radius: 4px;
+	border-color: var( --am-border-strong );
+	background: var( --am-surface );
+	color: var( --am-ink );
+	box-shadow: none;
+	text-shadow: none;
+}
+.am-wrap .button:hover { border-color: var( --am-faint ); background: var( --am-surface-2 ); }
+.am-wrap .button-primary {
+	background: var( --am-accent );
+	border-color: var( --am-accent );
+	color: #fff;
+}
+.am-wrap .button-primary:hover { filter: brightness( 1.08 ); background: var( --am-accent ); border-color: var( --am-accent ); }
+
+/* Destructive actions -- recolored to the danger token, same two-class
+   specificity trick as before (core's .wp-core-ui .button is 0,2,0). */
+.am-wrap .button.am-btn-danger { color: var( --am-danger ); border-color: var( --am-danger ); background: var( --am-surface ); }
+.am-wrap .button.am-btn-danger:hover, .am-wrap .button.am-btn-danger:focus { background: var( --am-danger ); color: #fff; border-color: var( --am-danger ); }
+
+/* Label ahead of the export buttons in the bottom tablenav. */
 .am-export-label {
 	display: inline-block;
 	margin-right: 6px;
-	color: #646970;
+	color: var( --am-muted );
 	line-height: 30px;
 	vertical-align: top;
 }
 
-/* Active user-filter chip. Borrows core's notice look (white, left
-   accent bar) rather than inventing a shape: it is a piece of state the
-   reader needs to notice, which is exactly what a notice is for. Sits
-   between the tablenav and the table. */
-.am-active-filter {
-	margin: 0 0 8px;
-}
+/* Active user-filter chip. */
+.am-active-filter { margin: 0 0 8px; }
 .am-filter-chip {
 	display: inline-flex;
 	align-items: center;
 	gap: 10px;
 	padding: 6px 10px;
-	background: #fff;
-	border: 1px solid #c3c4c7;
-	border-left: 4px solid #72aee6;
-	box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+	background: var( --am-surface );
+	border: 1px solid var( --am-border );
+	border-left: 4px solid var( --am-accent );
+	box-shadow: var( --am-shadow );
 }
-.am-filter-chip-remove {
-	color: #646970;
-	text-decoration: none;
-	font-size: 16px;
-	line-height: 1;
-}
-.am-filter-chip-remove:hover, .am-filter-chip-remove:focus {
-	color: #d63638;
-	text-decoration: none;
-}
+/* .am-wrap .am-filter-chip-remove, not the bare class -- .am-wrap a above
+   is two selectors (type + class, specificity 0,1,1), which otherwise
+   outranks a single class here regardless of source order. */
+.am-wrap .am-filter-chip-remove { color: var( --am-muted ); text-decoration: none; font-size: 16px; line-height: 1; }
+.am-wrap .am-filter-chip-remove:hover, .am-wrap .am-filter-chip-remove:focus { color: var( --am-danger ); text-decoration: none; }
 
-/* Core sets .tablenav { height: 30px }, sized for the single short row
-   its own screens put there. This toolbar carries two selects, two date
-   inputs, a Filter button and a Reset link, which is taller than that
-   and wraps on a narrow window -- so the floated .alignleft.actions
-   inside it overflowed the fixed-height box and hung below the tablenav,
-   where the table then had to flow around it. Height auto lets the box
-   grow to fit its own contents, which is what the <br class="clear">
-   already in the markup expects. */
-.am-wrap .tablenav {
-	height: auto;
-	min-height: 30px;
-}
-/* Core's .search-box carries its own margin (meant for sitting above the
-   tablenav, where it used to live); now that it's inside .tablenav top
-   in place of pagination (see render_log_content()), that margin just
-   adds uneven space around it here. */
-.am-wrap .tablenav p.search-box {
-	margin: 0;
-}
+/* Core sets .tablenav { height: 30px }, too short for this toolbar's two
+   selects, two date inputs, a Filter button and a Reset link. */
+.am-wrap .tablenav { height: auto; min-height: 30px; }
+.am-wrap .tablenav p.search-box { margin: 0; }
 
-/* Horizontal scroll for the wider tables (the log has eight columns).
-   Purely a scroll container -- no border or background of its own, so
-   the .wp-list-table inside keeps core's own framing.
+/* Horizontal scroll for the wider tables. */
+.am-table-scroll { clear: both; overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
-   clear: both is load-bearing, not decoration. overflow-x makes this a
-   block formatting context, and a BFC root shrinks to avoid any float
-   still open above it rather than flowing under it -- so a stray float
-   from .subsubsub, .search-box or the toolbar above left the table
-   narrower than the page instead of full width. */
-.am-table-scroll {
-	clear: both;
-	overflow-x: auto;
-	-webkit-overflow-scrolling: touch;
-}
-
-/* Applied to the Activity Log table and to the Notification Channels
-   table on Settings, both of which are plain core .wp-list-table.striped.
-   Only two behaviours differ from core's default:
-   auto layout, because these columns vary far more in natural width than
-   a fixed layout handles well, and nowrap cells, because a wrapped
-   timestamp or IP is harder to scan than a truncated one. Everything
-   else -- header weight, padding, borders, row striping -- is core's. */
-.am-log-table { table-layout: auto; }
-.am-log-table td { vertical-align: middle; white-space: nowrap; }
-
-/* Type column in the Activity Log — the full readable event name from
-   AM_Event_Labels::label(), i.e. "Media Uploaded" rather than just
-   "Media". Deliberately more specific than the Type filter above the
-   table, which can only offer the event_type half and so lists a
-   single "Media" option: the filter picks a category, the column says
-   what actually happened within it. Capped because these run long
-   ("Password Reset Requested", "WordPress Core Updated") and without a
-   limit the column would take that width from Message, which carries
-   more information per row. Wraps instead. */
+.am-log-table { table-layout: auto; border-collapse: collapse; }
+.am-log-table td { vertical-align: middle; white-space: nowrap; border-color: var( --am-border ) !important; }
+.am-log-table th { border-color: var( --am-border ) !important; }
 .am-log-table .am-type-cell { max-width: 150px; }
+.am-datetime-cell, .am-ip-cell { font-family: "IBM Plex Mono", monospace; font-size: 12.5px; color: var( --am-muted ); white-space: nowrap; }
+.am-ip-cell { max-width: 16ch; overflow: hidden; text-overflow: ellipsis; }
+.am-ip-lookup { color: var( --am-accent ); }
 
-/* Date column in the Activity Log. Was two stacked lines (date over a
-   smaller, gray time) until 2.0.70; now a single line, which is what
-   nowrap enforces here — without it a narrow column would wrap the
-   timestamp back onto two lines and undo the change. How long that
-   line runs is the admin's own choice via the Date & Time Display
-   setting, so a wide format is a deliberate trade rather than
-   something to defend against here. */
-.am-datetime-cell { white-space: nowrap; }
-
-/* Message column (Activity Log only -- Notification Channels still uses
-   the shared .am-message-cell below, unchanged). No
-   max-width: table-layout:auto already gives this column whatever
-   space the other (mostly nowrap) columns don't need, so capping it
-   here only wasted space. The clamp itself lives on the inner
-   .am-log-message-clamp span rather than the <td>: applying
-   -webkit-line-clamp directly to a table cell fights the cell's own
-   table-cell box, and the clipped 3rd line can visibly bleed into the
-   cell's padding instead of being cut off cleanly. Clamping a plain
-   block-level child inside the cell avoids that. */
 .am-log-message-clamp {
-	display: -webkit-box;
-	-webkit-line-clamp: 2;
-	-webkit-box-orient: vertical;
-	overflow: hidden;
-	white-space: normal;
+	display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+	overflow: hidden; white-space: normal;
 }
-
 .am-message-cell {
-	white-space: normal !important;
-	max-width: 320px;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	display: -webkit-box;
-	-webkit-line-clamp: 2;
-	-webkit-box-orient: vertical;
+	white-space: normal !important; max-width: 320px; overflow: hidden; text-overflow: ellipsis;
+	display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
 }
 
-/* IP Address column (Activity Log) — sized in ch
-   (character width) rather than a fixed px guess, so it scales with
-   font size. 16ch comfortably fits any IPv4 address (max 15 chars,
-   e.g. 255.255.255.255) with a little breathing room; IPv6 (up to 45
-   chars per the am_events column width) will overflow and truncate
-   with an ellipsis rather than widening the column or wrapping.
-   Single-line (not the multi-line clamp am-message-cell uses), since
-   an address wrapping across lines is harder to read, not easier --
-   the full value is still available via the title attribute (native
-   browser tooltip) and by clicking through to the IP lookup modal. */
-.am-ip-cell {
-	max-width: 16ch;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-}
+/* ── Ledger rows ───────────────────────────────────────────────────────── */
+/* One spine color per PSR-3 level, ordered debug (calmest) through
+   emergency (most severe) -- gray, blue, teal, amber, orange, red,
+   magenta, wine. The ramp itself is the signature: severity reads as a
+   position on a scale, not eight arbitrary colors, so it's legible even to
+   someone who's never memorized what each level name means. */
+.am-row-am-debug     td:first-child { border-left: 3px solid #8B99A8; }
+.am-row-am-info       td:first-child { border-left: 3px solid #2F6FA8; }
+.am-row-am-notice    td:first-child { border-left: 3px solid #0F6E5E; }
+.am-row-am-warning   td:first-child { border-left: 3px solid #B8842B; }
+.am-row-am-error     td:first-child { border-left: 3px solid #C1622B; }
+.am-row-am-critical  td:first-child { border-left: 3px solid #B23A3A; }
+.am-row-am-alert     td:first-child { border-left: 3px solid #8E2A6B; }
+.am-row-am-emergency td:first-child { border-left: 3px solid #4A1030; }
+.am-wrap[data-am-theme="dark"] .am-row-am-debug     td:first-child { border-left-color: #8FA0B0; }
+.am-wrap[data-am-theme="dark"] .am-row-am-info       td:first-child { border-left-color: #6AA9E0; }
+.am-wrap[data-am-theme="dark"] .am-row-am-notice    td:first-child { border-left-color: #33BFA1; }
+.am-wrap[data-am-theme="dark"] .am-row-am-warning   td:first-child { border-left-color: #E0AA4E; }
+.am-wrap[data-am-theme="dark"] .am-row-am-error     td:first-child { border-left-color: #E28A55; }
+.am-wrap[data-am-theme="dark"] .am-row-am-critical  td:first-child { border-left-color: #E0726E; }
+.am-wrap[data-am-theme="dark"] .am-row-am-alert     td:first-child { border-left-color: #D06BB0; }
+.am-wrap[data-am-theme="dark"] .am-row-am-emergency td:first-child { border-left-color: #F2597A; }
 
-/* Row accent borders — one per AM_Log_Levels::ORDER value (debug lowest
-   -> emergency highest). Ramp runs gray -> green -> blue -> yellow ->
-   orange -> red -> deep red -> darkest red, so severity reads at a
-   glance without needing to read the badge text. */
-.am-row-am-emergency td:first-child { border-left: 3px solid #7b1113; }
-.am-row-am-alert     td:first-child { border-left: 3px solid #a5281b; }
-.am-row-am-critical  td:first-child { border-left: 3px solid #e74c3c; }
-.am-row-am-error     td:first-child { border-left: 3px solid #e8710a; }
-.am-row-am-warning   td:first-child { border-left: 3px solid #f39c12; }
-.am-row-am-notice    td:first-child { border-left: 3px solid #2196f3; }
-.am-row-am-info      td:first-child { border-left: 3px solid #2ecc71; }
-.am-row-am-debug     td:first-child { border-left: 3px solid #8c8f94; }
-
-/* Marks the row a Slack alert's am_event_id deep-link points at (see
-   admin.js), so it's still easy to spot after the Details modal that
-   opened automatically on page load is closed. A background tint
-   rather than the severity border-left above so the two don't compete
-   for the same visual slot. */
 .am-row-highlighted td { background: #fff8c5 !important; }
+.am-wrap[data-am-theme="dark"] .am-row-highlighted td { background: #4A3F0F !important; }
 
-.am-badge { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap; }
-.am-debug     { background: #f0f0f1; color: #50575e; }
-.am-info      { background: #d5f5e3; color: #1e8449; }
-.am-notice    { background: #d6eaf8; color: #154360; }
-.am-warning   { background: #fdebd0; color: #7d4e00; }
-.am-error     { background: #fce3cf; color: #8a3a00; }
-.am-critical  { background: #fadbd8; color: #7b241c; }
-.am-alert     { background: #f5d0cc; color: #641e14; }
-.am-emergency { background: #f0c4c1; color: #4a0e0f; }
+/* Level/initiator badges. A small dot (::before, so no markup change) plus
+   a tinted rectangle rather than a filled pill -- reads as a stamp on a
+   case file, and keeps the same color doing double duty as the row spine
+   and the badge, instead of two unrelated palettes for the same meaning. */
+.am-badge {
+	display: inline-flex; align-items: center; gap: 6px;
+	padding: 3px 9px; border-radius: 3px; font-size: 11px; font-weight: 600;
+	font-family: "IBM Plex Sans", sans-serif;
+	text-transform: uppercase; letter-spacing: .4px; white-space: nowrap;
+}
+.am-badge::before { content: ""; width: 6px; height: 6px; border-radius: 2px; background: currentColor; flex: none; }
 
-/* Initiator badges — deliberately a cooler, more muted palette than the
-   severity levels above, so "who/what did this" never gets visually
-   confused with "how bad was this" at a glance. */
-.am-init-wp_user        { background: #e8eaf6; color: #2c3e91; } /* logged-in human */
-.am-init-web_user       { background: #ede7f6; color: #512e8a; } /* anonymous visitor */
-.am-init-wp_cron        { background: #e0f2f1; color: #1a6b64; } /* scheduled/automated */
-.am-init-wp_cli         { background: #eceff1; color: #37474f; } /* command line */
-.am-init-wp_auto_update { background: #fff3e0; color: #8a5300; } /* unattended background update */
-.am-init-rest_api       { background: #e0f7fa; color: #00595e; } /* REST call with no logged-in browser session */
-.am-init-system         { background: #f5f5f5; color: #616161; } /* internal/unattributed */
+.am-debug     { background: var( --am-surface-3 ); color: #5B6B7C; }
+.am-info      { background: #E3EDF6; color: #1F4C73; }
+.am-notice    { background: #E3F1EE; color: #0A4D42; }
+.am-warning   { background: #F7ECDA; color: #7A5719; }
+.am-error     { background: #F7E3D5; color: #7A3C16; }
+.am-critical  { background: #F5DEDE; color: #7A2626; }
+.am-alert     { background: #F0DCEA; color: #5C1B49; }
+.am-emergency { background: #E7D2DC; color: #3A0C22; }
+.am-wrap[data-am-theme="dark"] .am-debug     { background: #26313F; color: #AEBBC9; }
+.am-wrap[data-am-theme="dark"] .am-info      { background: #1E3550; color: #9CC6EE; }
+.am-wrap[data-am-theme="dark"] .am-notice    { background: #15332E; color: #7FE0C8; }
+.am-wrap[data-am-theme="dark"] .am-warning   { background: #3B2F14; color: #F2C878; }
+.am-wrap[data-am-theme="dark"] .am-error     { background: #3B2415; color: #F2A87C; }
+.am-wrap[data-am-theme="dark"] .am-critical  { background: #3B1D1D; color: #F2A19D; }
+.am-wrap[data-am-theme="dark"] .am-alert     { background: #331A2C; color: #E4A8D0; }
+.am-wrap[data-am-theme="dark"] .am-emergency { background: #2E0F1B; color: #F98FAE; }
 
-.am-role { display: block; color: #646970; font-size: 11px; }
+/* Initiator badges -- deliberately a cooler, muted palette, never overlapping
+   the severity hues above, so "who/what did this" never reads as "how bad
+   was this" at a glance. No dot: that visual language is reserved for
+   severity. */
+.am-badge.am-init-wp_user        { background: #E6E9F5; color: #2C3E91; }
+.am-badge.am-init-web_user       { background: #EDE7F5; color: #512E8A; }
+.am-badge.am-init-wp_cron        { background: #E0F0EE; color: #1A6B64; }
+.am-badge.am-init-wp_cli         { background: #EAEDEF; color: #37474F; }
+.am-badge.am-init-wp_auto_update { background: #F5EBDD; color: #8A5300; }
+.am-badge.am-init-rest_api       { background: #DFF1F3; color: #00595E; }
+.am-badge.am-init-system         { background: var( --am-surface-3 ); color: var( --am-muted ); }
+.am-badge.am-init-wp_user::before, .am-badge.am-init-web_user::before, .am-badge.am-init-wp_cron::before,
+.am-badge.am-init-wp_cli::before, .am-badge.am-init-wp_auto_update::before, .am-badge.am-init-rest_api::before,
+.am-badge.am-init-system::before { display: none; }
+.am-wrap[data-am-theme="dark"] .am-badge.am-init-wp_user        { background: #232B4A; color: #AAB6EE; }
+.am-wrap[data-am-theme="dark"] .am-badge.am-init-web_user       { background: #2B2340; color: #C7ACEE; }
+.am-wrap[data-am-theme="dark"] .am-badge.am-init-wp_cron        { background: #17332F; color: #7FDCCF; }
+.am-wrap[data-am-theme="dark"] .am-badge.am-init-wp_cli         { background: #262E33; color: #B9C4CA; }
+.am-wrap[data-am-theme="dark"] .am-badge.am-init-wp_auto_update { background: #362A11; color: #EFC57C; }
+.am-wrap[data-am-theme="dark"] .am-badge.am-init-rest_api       { background: #103235; color: #7FDCE2; }
+.am-wrap[data-am-theme="dark"] .am-badge.am-init-system         { background: var( --am-surface-3 ); color: var( --am-muted ); }
 
-/* Destructive actions. Core has no "danger button", so this is one of
-   the few genuinely additive rules here -- kept to a red label and
-   border on core's own .button shape rather than a differently-shaped
-   control. Selector is `.button.am-btn-danger`, not the bare class:
-   core's own `.wp-core-ui .button` rule is two classes deep (specificity
-   0,2,0), which outranks a single-class `.am-btn-danger` (0,1,0)
-   regardless of stylesheet order -- the red never actually painted. */
-.button.am-btn-danger { color: #b32d2e; border-color: #b32d2e; }
-.button.am-btn-danger:hover, .button.am-btn-danger:focus { background: #b32d2e; color: #fff; border-color: #b32d2e; }
+.am-role { display: block; color: var( --am-muted ); font-size: 11px; }
 
-.am-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 100000; display: flex; align-items: center; justify-content: center; }
-.am-modal { background: #fff; border-radius: 6px; box-shadow: 0 8px 40px rgba(0,0,0,0.25); width: 660px; max-width: 95vw; max-height: 85vh; display: flex; flex-direction: column; }
-.am-modal-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid #dcdcde; }
+/* ── Modal ─────────────────────────────────────────────────────────────── */
+.am-modal-overlay { position: fixed; inset: 0; background: rgba(10,15,20,.6); z-index: 100000; display: flex; align-items: center; justify-content: center; }
+.am-modal { background: var( --am-surface ); border-radius: 6px; box-shadow: 0 8px 40px rgba(0,0,0,.35); width: 660px; max-width: 95vw; max-height: 85vh; display: flex; flex-direction: column; }
+.am-modal-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var( --am-border ); }
 .am-modal-header h2 { margin: 0; font-size: 16px; }
-.am-modal-close { background: none; border: none; font-size: 24px; line-height: 1; cursor: pointer; color: #646970; padding: 0 4px; }
-.am-modal-close:hover { color: #d63638; }
+.am-modal-close { background: none; border: none; font-size: 24px; line-height: 1; cursor: pointer; color: var( --am-muted ); padding: 0 4px; }
+.am-modal-close:hover { color: var( --am-danger ); }
 .am-modal-body { padding: 20px; overflow-y: auto; }
-.am-modal-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 18px; padding-top: 16px; border-top: 1px solid #f0f0f1; }
+.am-modal-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 18px; padding-top: 16px; border-top: 1px solid var( --am-border ); }
 .am-modal-actions:has(> :only-child) { justify-content: flex-end; }
 
 .am-detail-table { width: 100%; border-collapse: collapse; }
-.am-detail-table th, .am-detail-table td { padding: 8px 10px; border: 1px solid #dcdcde; font-size: 13px; vertical-align: top; }
-.am-detail-table th { background: #f6f7f7; font-weight: 600; width: 130px; white-space: nowrap; }
+.am-detail-table th, .am-detail-table td { padding: 8px 10px; border: 1px solid var( --am-border ); font-size: 13px; vertical-align: top; }
+.am-detail-table th { background: var( --am-surface-2 ); font-weight: 600; width: 130px; white-space: nowrap; font-family: "IBM Plex Sans", sans-serif; }
 
-/* Before/after diff table shown in the event detail modal. */
 .am-diff-table { width: 100%; border-collapse: collapse; }
-.am-diff-table td { padding: 4px 6px; font-size: 12px; vertical-align: top; border-bottom: 1px solid #f0f0f1; }
-.am-diff-before { color: #b32d2e; text-decoration: line-through; }
-.am-diff-after { color: #2271b1; }
+.am-diff-table td { padding: 4px 6px; font-size: 12px; vertical-align: top; border-bottom: 1px solid var( --am-border ); }
+.am-diff-before { color: var( --am-danger ); text-decoration: line-through; }
+.am-diff-after { color: var( --am-accent ); }
 
-/* Settings screen. There is deliberately almost nothing here.
-   Everything on that screen is now core furniture -- <h2> headings,
-   .form-table rows built by the Settings API, .description paragraphs,
-   .wp-list-table for the channel list, submit_button() -- and
-   core styles all of it. Until 2.4.3 this block reimplemented .postbox
-   as .am-settings-section, added a small-caps group heading, a section
-   divider rule and a red-bordered "danger zone", none of which core
-   needed help with; the screen read as a separate product embedded in
-   wp-admin, exactly what 2.3.0 removed from the log screen. Don't
-   reintroduce it.
-
-   In particular: no styling below for inputs, checkboxes, buttons or
-   .form-table. Those were all restyled here once (rounded blue-ringed
-   fields, custom blue save buttons) and it was the single biggest reason
-   Settings didn't look like wp-admin. */
-
-/* The per-option explanation under each radio in Privacy > IP addresses.
-   Core's .description sits under a whole field, not under one choice
-   within it, so it has no indent of its own -- without this the text
-   lines up with the radio instead of the label it belongs to. */
-.am-radio-description {
-	margin: 0 0 10px 24px;
+/* ── Settings ──────────────────────────────────────────────────────────── */
+/* Every field is still core furniture (do_settings_sections() emits a plain
+   <h2> then <table class="form-table"> per section, with an optional <p>
+   intro in between) -- nothing here changes that markup. What's new is
+   reshaping those siblings into a card per section purely with borders and
+   radius, using the adjacent-sibling combinator so it works whether or not
+   a given section has an intro paragraph, with no PHP change required. */
+.am-wrap form[action$="options.php"] h2 {
+	margin: 26px 0 0;
+	padding: 13px 18px;
+	font-size: 14.5px;
+	font-weight: 600;
+	background: var( --am-surface-2 );
+	border: 1px solid var( --am-border );
+	border-radius: 8px 8px 0 0;
 }
-
-/* Validation message inside the channel modal. Core has no inline
-   form-error style to borrow, and this is the same red it uses for
-   destructive/error text elsewhere in wp-admin. */
-.am-modal-error {
-	color: #d63638;
-	margin: 12px 0 0;
+.am-wrap form[action$="options.php"] h2:first-of-type { margin-top: 4px; }
+.am-wrap form[action$="options.php"] h2 + p {
+	margin: 0; padding: 12px 18px 0;
+	background: var( --am-surface );
+	border-left: 1px solid var( --am-border );
+	border-right: 1px solid var( --am-border );
+	color: var( --am-muted ); font-size: 12.5px;
 }
+.am-wrap form[action$="options.php"] table.form-table {
+	margin: 0;
+	background: var( --am-surface );
+	border: 1px solid var( --am-border );
+	border-top: none;
+	border-radius: 0 0 8px 8px;
+}
+.am-wrap form[action$="options.php"] table.form-table th { font-family: "IBM Plex Sans", sans-serif; }
+.am-wrap form[action$="options.php"] table.form-table:last-child { margin-bottom: 4px; }
+
+.am-radio-description { margin: 0 0 10px 24px; color: var( --am-muted ); }
+.am-modal-error { color: var( --am-danger ); margin: 12px 0 0; }
 
 .am-channel-fields { padding: 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .am-field-row { display: flex; flex-direction: column; }
 .am-field-full { grid-column: 1 / -1; }
-.am-field-row label { font-size: 12px; font-weight: 600; color: #1d2327; display: flex; flex-direction: column; gap: 4px; }
-.am-field-row .description { font-size: 11px !important; color: #646970; margin: 2px 0 0 !important; }
+.am-field-row label { font-size: 12px; font-weight: 600; color: var( --am-ink ); display: flex; flex-direction: column; gap: 4px; }
+.am-field-row .description { font-size: 11px !important; color: var( --am-muted ); margin: 2px 0 0 !important; }
 
-/* Pagination. paginate_links() emits .page-numbers, which core's list
-   tables don't use (they build their own prev/next markup), so core
-   ships no styling for it and something has to be defined here.
-   Matched to core's .tablenav-pages buttons -- small, square, gray,
-   blue link text, the current page a plain dark box. Was previously a
-   row of 32px filled-blue rounded buttons, which was the loudest thing
-   on the screen and looked nothing like wp-admin. */
+/* Notification Channels / Clear Log / Update Now -- their own render
+   methods below the Settings API form, wrapped in .am-card for the same
+   boxed look as the sections above, since these aren't emitted by core and
+   have no h2/table.form-table pair to hang the sibling trick off of. */
+.am-card {
+	background: var( --am-surface );
+	border: 1px solid var( --am-border );
+	border-radius: 8px;
+	padding: 18px;
+	margin: 26px 0 0;
+}
+.am-card > h2:first-child { margin: 0 0 4px; font-size: 14.5px; }
+.am-card > p:first-of-type { color: var( --am-muted ); font-size: 12.5px; margin-top: 4px; }
+
+.am-status-ok { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var( --am-accent ); }
+.am-status-ok .am-dot { width: 6px; height: 6px; border-radius: 50%; background: var( --am-accent ); }
+
+/* ── Pagination ────────────────────────────────────────────────────────── */
 .tablenav-pages .page-numbers {
 	display: inline-block;
 	min-width: 17px;
 	padding: 3px 6px;
 	margin: 0 2px;
-	border: 1px solid #dcdcde;
-	background: #f6f7f7;
-	color: #2271b1;
-	font-size: 13px;
+	border: 1px solid var( --am-border-strong );
+	background: var( --am-surface );
+	color: var( --am-accent );
+	font-family: "IBM Plex Mono", monospace;
+	font-size: 12.5px;
 	line-height: 1.6;
 	text-align: center;
 	text-decoration: none;
+	border-radius: 3px;
 }
-.tablenav-pages a.page-numbers:hover,
-.tablenav-pages a.page-numbers:focus {
-	border-color: #8c8f94;
-	background: #f0f0f1;
-	color: #135e96;
-	text-decoration: none;
+.tablenav-pages a.page-numbers:hover, .tablenav-pages a.page-numbers:focus {
+	border-color: var( --am-faint ); background: var( --am-surface-2 ); color: var( --am-accent-ink ); text-decoration: none;
 }
-.tablenav-pages .page-numbers.current {
-	border-color: #8c8f94;
-	background: #dcdcde;
-	color: #1d2327;
-}
-.tablenav-pages .page-numbers.dots {
-	border-color: transparent;
-	background: transparent;
-	color: #646970;
-}
-/* Activity Log only -- the rows-per-page dropdown is a third item in this
-   row alongside core's own .displaying-num and .pagination-links, which
-   core's float-based tablenav-pages has no notion of evenly gapping. Flex
-   plus a single gap value lines up and spaces all three the same way
-   without touching the Visitor Stats tablenav-pages, which never gets the
-   am-log-tablenav-pages class and keeps core's default layout untouched. */
-.am-log-tablenav-pages {
-	display: flex;
-	align-items: center;
-	justify-content: flex-end;
-	gap: 12px;
-}
-.am-per-page {
-	display: flex;
-	align-items: center;
-	gap: 6px;
-}
+.tablenav-pages .page-numbers.current { border-color: var( --am-ink ); background: var( --am-ink ); color: var( --am-surface ); }
+.tablenav-pages .page-numbers.dots { border-color: transparent; background: transparent; color: var( --am-faint ); }
+.am-log-tablenav-pages { display: flex; align-items: center; justify-content: flex-end; gap: 12px; }
+.am-per-page { display: flex; align-items: center; gap: 6px; color: var( --am-muted ); font-size: 12.5px; }
+.displaying-num { color: var( --am-muted ); font-size: 12.5px; }
 
-/* Visitor Stats screen. A summary stat row and a side-by-side breakdown
-   layout are both things core has no list-table equivalent for -- the
-   tables themselves are plain .wp-list-table.widefat.striped and need
-   nothing here. */
-.am-stats-totals {
-	display: flex;
-	align-items: center;
-	gap: 32px;
-	margin: 16px 0;
-	font-size: 14px;
-}
-.am-stats-totals li {
-	list-style: none;
-	margin: 0;
-}
-/* The count keeps its original 24px size -- just inline-block instead of
-   block, so "148" flows on the same line as "visits" instead of
-   stacking above it on a line of its own. */
+/* ── Visitor Stats ─────────────────────────────────────────────────────── */
+.am-stats-totals { display: flex; align-items: center; gap: 32px; margin: 16px 0; font-size: 14px; color: var( --am-muted ); }
+.am-stats-totals li { list-style: none; margin: 0; }
 .am-stats-totals strong {
-	display: inline-block;
-	font-size: 24px;
-	line-height: 1.3;
+	display: inline-block; font-family: "IBM Plex Mono", monospace; font-size: 22px; font-weight: 600;
+	font-variant-numeric: tabular-nums; color: var( --am-ink );
 }
-.am-stats-breakdowns {
-	display: flex;
-	gap: 24px;
-	flex-wrap: wrap;
-}
-.am-stats-breakdowns > div {
-	flex: 1 1 260px;
-	min-width: 260px;
+.am-stats-breakdowns { display: flex; gap: 24px; flex-wrap: wrap; }
+.am-stats-breakdowns > div { flex: 1 1 260px; min-width: 260px; }
+.am-stats-breakdowns h2, .am-wrap h2.am-card-title { font-size: 14.5px; margin: 0 0 8px; }
+
+.am-stats-truncate {
+	white-space: normal !important; overflow: hidden; text-overflow: ellipsis;
+	display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
 }
 
-/* Title/Page cells on the Top Pages and Recent Hits tables. Titles and
-   URLs run far longer than an IP address, so the .am-ip-cell technique
-   (nowrap + overflow:hidden + max-width) doesn't actually compress them
-   under table-layout:auto: a nowrap cell's minimum column width is the
-   full unbroken string, so on a narrow screen the browser keeps the
-   column at that width and lets .am-table-scroll's horizontal scroll
-   take over, rather than shrinking it -- the max-width cap only ever
-   bites when it's wider than the content already. am-ip-cell gets away
-   with this because an IP address rarely exceeds its 16ch cap in the
-   first place.
-   This instead mirrors .am-message-cell below: white-space: normal
-   lets the cell wrap, and a wrapping cell's minimum width is only its
-   longest *word* -- so table-layout:auto is free to shrink the column
-   to fit whatever room is actually available, same as the Activity
-   Log's Message column. No max-width, for the same reason
-   .am-message-cell's neighbor .am-log-message-clamp has none: the
-   column already gets whatever width the other (mostly nowrap) columns
-   in the row don't need, so capping it here would only waste space,
-   not further constrain wrapping -- that's -webkit-line-clamp's job,
-   capping it at 2 lines instead of growing the row indefinitely for a
-   long title.
-   Applied to the inner <a>, never the <td> -- the -webkit-box display
-   the clamp needs overrides display: table-cell if put on the <td>
-   itself, which knocks that cell out of the table's row/column layout
-   entirely (it renders as a block instead, stacking under/over its
-   neighbors rather than sitting beside them). .am-log-message-clamp
-   above documents the same trap for the Activity Log's Message column,
-   which is why that one clamps a child span too instead of its <td>. */
-.am-stats-truncate {
-	white-space: normal !important;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	display: -webkit-box;
-	-webkit-line-clamp: 2;
-	-webkit-box-orient: vertical;
-}
+/* Breakdown tables (Referrers, Countries, Browsers, OS, Devices) get a
+   third "Share" column: a horizontal bar sized relative to the largest
+   value on the current page, so relative weight reads at a glance instead
+   of requiring a mental scan down the Visits column. Still a real <td> in
+   a real <table> -- render_breakdown_table()/the Referrers callback in
+   render_stats_content() build the inner markup, this only styles it. */
+.am-bar { display: block; min-width: 90px; height: 6px; border-radius: 3px; background: var( --am-surface-3 ); overflow: hidden; }
+.am-bar-fill { display: block; height: 100%; background: var( --am-accent ); border-radius: 3px; }

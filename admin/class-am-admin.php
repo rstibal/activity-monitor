@@ -68,6 +68,7 @@ class AM_Admin {
 		add_action( 'wp_ajax_am_delete_channel',              array( $instance, 'ajax_delete_channel' ) );
 		add_action( 'wp_ajax_am_log_table',                   array( $instance, 'ajax_log_table' ) );
 		add_action( 'wp_ajax_am_stats_content',               array( $instance, 'ajax_stats_content' ) );
+		add_action( 'wp_ajax_am_save_theme',                  array( $instance, 'ajax_save_theme' ) );
 	}
 
 	// ── Menu ───────────────────────────────────────────────────────────
@@ -187,7 +188,14 @@ class AM_Admin {
 		if ( ! in_array( $hook, self::$screen_hooks, true ) ) {
 			return;
 		}
-		wp_enqueue_style( 'am-admin', AM_URL . 'assets/css/admin.css', array(), AM_VERSION );
+		// "Ledger Console" design system (2.9.0) -- IBM Plex Sans/Mono +
+		// Public Sans, loaded from Google Fonts as a dependency of admin.css
+		// so it's guaranteed to be in the document before admin.css's
+		// font-family rules apply. Admin-only (this hook only fires on this
+		// plugin's own screens, gated above), so the one request goes only
+		// to whoever is already logged into wp-admin -- not a site visitor.
+		wp_enqueue_style( 'am-admin-fonts', 'https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Public+Sans:wght@400;500;600&display=swap', array(), AM_VERSION );
+		wp_enqueue_style( 'am-admin', AM_URL . 'assets/css/admin.css', array( 'am-admin-fonts' ), AM_VERSION );
 		wp_enqueue_script( 'am-admin', AM_URL . 'assets/js/admin.js', array( 'jquery' ), AM_VERSION, true );
 		wp_localize_script( 'am-admin', 'amData', array(
 			'ajaxUrl' => admin_url( 'admin-ajax.php' ),
@@ -1114,13 +1122,50 @@ class AM_Admin {
 	 * inner container lose its own contrast against the page.
 	 */
 	private function render_screen_open( string $title ) {
+		$theme = self::user_theme();
 		?>
-		<div class="wrap am-wrap">
+		<div class="wrap am-wrap" data-am-theme="<?php echo esc_attr( $theme ); ?>">
 
-			<h1 class="wp-heading-inline"><?php echo esc_html( $title ); ?></h1>
-			<span class="am-version">v<?php echo esc_html( AM_VERSION ); ?></span>
+			<div class="am-heading-row">
+				<h1 class="wp-heading-inline"><?php echo esc_html( $title ); ?></h1>
+				<span class="am-version">v<?php echo esc_html( AM_VERSION ); ?></span>
+				<button type="button" class="am-theme-toggle" aria-pressed="<?php echo 'dark' === $theme ? 'true' : 'false'; ?>">
+					<span class="am-tt-track"><span class="am-tt-thumb"></span></span>
+					<span class="am-tt-label"><?php echo 'dark' === $theme ? esc_html__( 'Dark', 'activity-monitor' ) : esc_html__( 'Light', 'activity-monitor' ); ?></span>
+				</button>
+			</div>
 			<hr class="wp-header-end">
 		<?php
+	}
+
+	/**
+	 * Per-user light/dark preference for this plugin's own screens only --
+	 * stored in usermeta (am_theme), not a plugin option, same reasoning as
+	 * log_per_page(): a display preference tied to who's looking, not
+	 * something to configure once for the whole site. Defaults to 'light'
+	 * for a user who has never touched the toggle; there's no OS-level
+	 * "system" state to fall back to since this isn't rendered in a
+	 * standalone document the way an Artifact is -- it's part of wp-admin,
+	 * which has no notion of the visitor's OS color-scheme preference.
+	 */
+	private static function user_theme(): string {
+		$user_id = get_current_user_id();
+		$stored  = $user_id ? (string) get_user_meta( $user_id, 'am_theme', true ) : '';
+		return 'dark' === $stored ? 'dark' : 'light';
+	}
+
+	/** Persists the theme toggle's click -- see admin.js's am-theme-toggle handler. */
+	public function ajax_save_theme() {
+		check_ajax_referer( 'am_ajax', 'nonce' );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( '-1' );
+		}
+		$theme   = 'dark' === wp_unslash( (string) ( $_POST['theme'] ?? '' ) ) ? 'dark' : 'light';
+		$user_id = get_current_user_id();
+		if ( $user_id ) {
+			update_user_meta( $user_id, 'am_theme', $theme );
+		}
+		wp_send_json_success();
 	}
 
 	/** Closes the chrome opened above and emits the shared modal overlay. */
@@ -1863,16 +1908,18 @@ class AM_Admin {
 			<div>
 				<h2><?php esc_html_e( 'Referrers', 'activity-monitor' ); ?></h2>
 				<?php
+				$ref_max = self::max_visits( $ref_data['items'] );
 				$this->render_paginated_stats_table(
 					$ref_data['items'],
 					$ref_data['total'],
 					$pages['ref'],
 					self::STATS_PAGE_PARAMS['ref'],
 					$current_url,
-					array( __( 'Host', 'activity-monitor' ), __( 'Visits', 'activity-monitor' ) ),
-					static function ( $row ) {
+					array( __( 'Host', 'activity-monitor' ), __( 'Share', 'activity-monitor' ), __( 'Visits', 'activity-monitor' ) ),
+					static function ( $row ) use ( $ref_max ) {
 						return array(
 							esc_html( $row->referrer_host ),
+							self::bar_cell( (int) $row->visits, $ref_max ),
 							esc_html( number_format_i18n( (int) $row->visits ) ),
 						);
 					},
@@ -2061,6 +2108,7 @@ class AM_Admin {
 	 */
 	private function render_breakdown_table( string $column, array $data, int $page, string $current_url, int $pad_to, string $value_label = '' ) {
 		$param_key = array( 'country_code' => 'country', 'browser' => 'browser', 'os' => 'os', 'device_type' => 'device' )[ $column ];
+		$max       = self::max_visits( $data['items'] );
 
 		$this->render_paginated_stats_table(
 			$data['items'],
@@ -2068,15 +2116,38 @@ class AM_Admin {
 			$page,
 			self::STATS_PAGE_PARAMS[ $param_key ],
 			$current_url,
-			array( '' !== $value_label ? $value_label : __( 'Value', 'activity-monitor' ), __( 'Visits', 'activity-monitor' ) ),
-			static function ( $row ) {
+			array( '' !== $value_label ? $value_label : __( 'Value', 'activity-monitor' ), __( 'Share', 'activity-monitor' ), __( 'Visits', 'activity-monitor' ) ),
+			static function ( $row ) use ( $max ) {
 				return array(
 					esc_html( $row->value ?: __( 'Other', 'activity-monitor' ) ),
+					self::bar_cell( (int) $row->visits, $max ),
 					esc_html( number_format_i18n( (int) $row->visits ) ),
 				);
 			},
 			$pad_to
 		);
+	}
+
+	/** Largest `visits` value across a set of breakdown/referrer rows, for sizing bar_cell(). */
+	private static function max_visits( array $items ): int {
+		$max = 0;
+		foreach ( $items as $item ) {
+			$max = max( $max, (int) $item->visits );
+		}
+		return $max;
+	}
+
+	/**
+	 * One "Share" cell for a breakdown/referrer table row: a horizontal bar
+	 * sized relative to $max (the largest value on the current page), so
+	 * relative weight reads at a glance instead of a mental scan down the
+	 * Visits column. Relative to the page, not the grand total, since a
+	 * far-down page of a long tail would otherwise render every bar as a
+	 * sliver against a leader it can no longer see.
+	 */
+	private static function bar_cell( int $value, int $max ): string {
+		$pct = $max > 0 ? min( 100, round( $value / $max * 100 ) ) : 0;
+		return '<span class="am-bar"><span class="am-bar-fill" style="width:' . esc_attr( $pct ) . '%"></span></span>';
 	}
 
 	/**
@@ -2468,20 +2539,20 @@ class AM_Admin {
 				);
 				?>
 			<?php elseif ( '' !== $status['error'] ) : ?>
-				<span style="color:#d63638;"><?php echo esc_html( sprintf(
+				<span style="color:var(--am-danger,#d63638);"><?php echo esc_html( sprintf(
 					/* translators: %s: error message */
 					__( 'Last import failed: %s', 'activity-monitor' ),
 					$status['error']
 				) ); ?></span>
 			<?php elseif ( $status['last_updated'] > 0 ) : ?>
-				<?php
+				<span class="am-status-ok"><span class="am-dot"></span><?php
 				printf(
 					/* translators: 1: number of ranges, 2: last updated date/time */
 					esc_html__( '%1$s IP ranges loaded, last updated %2$s.', 'activity-monitor' ),
 					esc_html( number_format_i18n( $status['row_count'] ) ),
 					esc_html( wp_date( AM_Date_Format::combined(), $status['last_updated'] ) )
 				);
-				?>
+				?></span>
 			<?php else : ?>
 				<?php esc_html_e( 'No database imported yet.', 'activity-monitor' ); ?>
 			<?php endif; ?>
@@ -2523,6 +2594,7 @@ class AM_Admin {
 	private function render_channels_section() {
 		$channels = get_option( 'am_notification_channels', array() );
 		?>
+		<div class="am-card">
 		<h2><?php esc_html_e( 'Notification Channels', 'activity-monitor' ); ?></h2>
 		<p>
 			<?php esc_html_e( 'Instant alerts. Each channel fires when an event meets or exceeds its minimum level. Channels save as you add or edit them — the Save Changes button above does not apply to them.', 'activity-monitor' ); ?>
@@ -2559,6 +2631,7 @@ class AM_Admin {
 				<?php esc_html_e( 'Add Slack Channel', 'activity-monitor' ); ?>
 			</button>
 		</p>
+		</div><!-- .am-card -->
 		<?php
 	}
 
@@ -2566,6 +2639,7 @@ class AM_Admin {
 
 	private function render_clear_log_section() {
 		?>
+		<div class="am-card">
 		<h2><?php esc_html_e( 'Clear Log', 'activity-monitor' ); ?></h2>
 		<p>
 			<?php esc_html_e( 'Permanently delete every entry in the activity log. This cannot be undone, and it is separate from the retention setting above, which only removes entries once they age out.', 'activity-monitor' ); ?>
@@ -2576,6 +2650,7 @@ class AM_Admin {
 			<input type="hidden" name="action" value="am_clear_log">
 			<?php submit_button( __( 'Clear Entire Log', 'activity-monitor' ), 'am-btn-danger', 'submit', true ); ?>
 		</form>
+		</div><!-- .am-card -->
 		<?php
 	}
 
