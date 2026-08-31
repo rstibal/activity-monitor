@@ -335,8 +335,22 @@
 	background: transparent;
 	color: #646970;
 }
-.tablenav-pages .am-per-page {
-	margin: 0 8px;
+/* Activity Log only -- the rows-per-page dropdown is a third item in this
+   row alongside core's own .displaying-num and .pagination-links, which
+   core's float-based tablenav-pages has no notion of evenly gapping. Flex
+   plus a single gap value lines up and spaces all three the same way
+   without touching the Visitor Stats tablenav-pages, which never gets the
+   am-log-tablenav-pages class and keeps core's default layout untouched. */
+.am-log-tablenav-pages {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 12px;
+}
+.am-per-page {
+	display: flex;
+	align-items: center;
+	gap: 6px;
 }
 
 /* Visitor Stats screen. A summary stat row and a side-by-side breakdown

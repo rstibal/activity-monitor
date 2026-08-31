@@ -31,7 +31,7 @@ class AM_Admin {
 	const PER_PAGE = 10;
 
 	/** Rows-per-page choices for the Activity Log's own dropdown. */
-	const LOG_PER_PAGE_CHOICES = array( 10, 20, 50, 100 );
+	const LOG_PER_PAGE_CHOICES = array( 10, 15, 20, 50, 100 );
 
 	/**
 	 * Hook suffixes returned by add_menu_page()/add_submenu_page(), used
@@ -1562,7 +1562,7 @@ class AM_Admin {
 					<?php endforeach; ?>
 				</div>
 
-				<div class="tablenav-pages<?php echo $num_pages > 1 ? '' : ' one-page'; ?>">
+				<div class="tablenav-pages am-log-tablenav-pages<?php echo $num_pages > 1 ? '' : ' one-page'; ?>">
 					<span class="displaying-num"><?php echo $displaying_num_html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- built via esc_html() above. ?></span>
 					<span class="am-per-page">
 						<label class="screen-reader-text" for="am-per-page-select"><?php esc_html_e( 'Rows per page', 'activity-monitor' ); ?></label>
@@ -1571,6 +1571,7 @@ class AM_Admin {
 								<option value="<?php echo esc_attr( $choice ); ?>" <?php selected( $choice, $per_page ); ?>><?php echo esc_html( $choice ); ?></option>
 							<?php endforeach; ?>
 						</select>
+						<?php esc_html_e( 'rows', 'activity-monitor' ); ?>
 					</span>
 					<?php if ( $num_pages > 1 ) : ?>
 						<span class="pagination-links"><?php echo $pagination_html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- already wp_kses_post()'d above. ?></span>

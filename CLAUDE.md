@@ -202,7 +202,7 @@ fixed, not per-user.** The Activity Log used to share that same fixed 10 (as
 of 2.8.15, replacing a per-user Screen Option that had existed since 2.4.3)
 but got its own per-user control back in 2.8.20: a plain `<select
 name="am_per_page">` next to its pagination (`AM_Admin::LOG_PER_PAGE_CHOICES`
-— 10/20/50/100), not a Settings-screen field or the Screen Options API. It's
+— 10/15/20/50/100), not a Settings-screen field or the Screen Options API. It's
 read and persisted by `AM_Admin::log_per_page()` in usermeta
 (`am_log_per_page`, cleaned up in `uninstall.php` via `delete_metadata()`
 across all users) — a request carrying a valid `am_per_page` both applies and
