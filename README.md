@@ -15,6 +15,19 @@ Not distributed via wordpress.org — released as a versioned zip attached to Gi
 - Configurable log retention with daily pruning via WP-Cron
 - Cloudflare-aware IP resolution (validates `CF-Connecting-IP` against verified Cloudflare CIDR ranges rather than trusting it blindly)
 
+## Screenshots
+
+| | |
+|---|---|
+| Activity Log (light) | Activity Log (dark) |
+| ![Activity Log, light mode](.github/screenshots/activity-log-light.png) | ![Activity Log, dark mode](.github/screenshots/activity-log-dark.png) |
+| Event Details | Settings |
+| ![Event Details modal](.github/screenshots/event-details.png) | ![Settings screen](.github/screenshots/settings.png) |
+
+Visitor Stats:
+
+![Visitor Stats screen](.github/screenshots/visitor-stats.png)
+
 ## Requirements
 
 - WordPress 6.0+
