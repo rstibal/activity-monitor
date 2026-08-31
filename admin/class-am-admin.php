@@ -2251,7 +2251,7 @@ class AM_Admin {
 		<form method="post" action="<?php echo esc_url( admin_url( 'options.php' ) ); ?>">
 			<?php
 			settings_fields( self::SETTINGS_GROUP );
-			do_settings_sections( self::PAGE_SETTINGS );
+			$this->render_settings_sections();
 			submit_button();
 			?>
 		</form>
@@ -2260,6 +2260,44 @@ class AM_Admin {
 		$this->render_geo_update_now_section();
 		$this->render_channels_section();
 		$this->render_clear_log_section();
+	}
+
+	/**
+	 * A drop-in replacement for core's do_settings_sections( self::PAGE_SETTINGS ),
+	 * wrapping each section in .am-card -- the same container
+	 * render_channels_section()/render_clear_log_section() use below -- so
+	 * every section on this screen is a real card, not the h2+table.form-table
+	 * sibling pair core emits on its own dressed up with CSS. Mirrors core's
+	 * own loop (see wp-admin/includes/template.php) exactly, just with a
+	 * <div class="am-card"> opened before each section and closed after;
+	 * still reads from the same $wp_settings_sections/$wp_settings_fields
+	 * globals add_settings_section()/add_settings_field() populate, and
+	 * still calls the section's own callback and core's own
+	 * do_settings_fields() to render the fields table, so nothing about how
+	 * a section or field is registered changes.
+	 */
+	private function render_settings_sections() {
+		global $wp_settings_sections, $wp_settings_fields;
+
+		if ( ! isset( $wp_settings_sections[ self::PAGE_SETTINGS ] ) ) {
+			return;
+		}
+
+		foreach ( (array) $wp_settings_sections[ self::PAGE_SETTINGS ] as $section ) {
+			echo '<div class="am-card">';
+			if ( $section['title'] ) {
+				echo '<h2>' . esc_html( $section['title'] ) . '</h2>';
+			}
+			if ( $section['callback'] ) {
+				call_user_func( $section['callback'], $section );
+			}
+			if ( isset( $wp_settings_fields[ self::PAGE_SETTINGS ][ $section['id'] ] ) ) {
+				echo '<table class="form-table" role="presentation">';
+				do_settings_fields( self::PAGE_SETTINGS, $section['id'] );
+				echo '</table>';
+			}
+			echo '</div><!-- .am-card -->';
+		}
 	}
 
 	// ── Settings fields ──────────────────────────────────────────────────

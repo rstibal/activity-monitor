@@ -393,38 +393,16 @@ body.wp-admin.am-theme-dark #wpbody-content {
 .am-diff-after { color: var( --am-accent ); }
 
 /* ── Settings ──────────────────────────────────────────────────────────── */
-/* Every field is still core furniture (do_settings_sections() emits a plain
-   <h2> then <table class="form-table"> per section, with an optional <p>
-   intro in between) -- nothing here changes that markup. What's new is
-   reshaping those siblings into a card per section purely with borders and
-   radius, using the adjacent-sibling combinator so it works whether or not
-   a given section has an intro paragraph, with no PHP change required. */
-.am-wrap form[action$="options.php"] h2 {
-	margin: 26px 0 0;
-	padding: 13px 18px;
-	font-size: 14.5px;
-	font-weight: 600;
-	background: var( --am-surface-2 );
-	border: 1px solid var( --am-border );
-	border-radius: 8px 8px 0 0;
-}
-.am-wrap form[action$="options.php"] h2:first-of-type { margin-top: 4px; }
-.am-wrap form[action$="options.php"] h2 + p {
-	margin: 0; padding: 12px 18px 0;
-	background: var( --am-surface );
-	border-left: 1px solid var( --am-border );
-	border-right: 1px solid var( --am-border );
-	color: var( --am-muted ); font-size: 12.5px;
-}
-.am-wrap form[action$="options.php"] table.form-table {
-	margin: 0;
-	background: var( --am-surface );
-	border: 1px solid var( --am-border );
-	border-top: none;
-	border-radius: 0 0 8px 8px;
-}
-.am-wrap form[action$="options.php"] table.form-table th { font-family: "IBM Plex Sans", sans-serif; }
-.am-wrap form[action$="options.php"] table.form-table:last-child { margin-bottom: 4px; }
+/* Every field is still core furniture -- render_settings_sections() (a
+   drop-in replacement for do_settings_sections()) still calls the same
+   section callbacks and core's own do_settings_fields(), just wrapped in a
+   real .am-card per section instead of leaving core's h2/table.form-table
+   siblings to be dressed up with CSS. table.form-table itself needs no
+   background/border of its own any more -- .am-card already gives the
+   whole section one -- just enough spacing to sit under the h2/intro
+   above it. */
+.am-card table.form-table { margin: 4px 0 0; }
+.am-card table.form-table th { font-family: "IBM Plex Sans", sans-serif; }
 
 /* Same root cause as .wp-list-table above: core sets its own explicit text
    colors on form-table labels and .description text, so the theme toggle
@@ -441,10 +419,11 @@ body.wp-admin.am-theme-dark #wpbody-content {
 .am-field-row label { font-size: 12px; font-weight: 600; color: var( --am-ink ); display: flex; flex-direction: column; gap: 4px; }
 .am-field-row .description { font-size: 11px !important; color: var( --am-muted ); margin: 2px 0 0 !important; }
 
-/* Notification Channels / Clear Log / Update Now -- their own render
-   methods below the Settings API form, wrapped in .am-card for the same
-   boxed look as the sections above, since these aren't emitted by core and
-   have no h2/table.form-table pair to hang the sibling trick off of. */
+/* Shared by every card on Settings: the Settings API sections above
+   (wrapped by render_settings_sections()) and Notification Channels/Clear
+   Log/Update Now below the form (their own render methods, wrapped
+   directly in the PHP that builds them, since they aren't emitted by core
+   at all). */
 .am-card {
 	background: var( --am-surface );
 	border: 1px solid var( --am-border );
@@ -454,6 +433,9 @@ body.wp-admin.am-theme-dark #wpbody-content {
 }
 .am-card > h2:first-child { margin: 0 0 4px; font-size: 14.5px; }
 .am-card > p:first-of-type { color: var( --am-muted ); font-size: 12.5px; margin-top: 4px; }
+/* First section sits right under the screen's own heading -- no need for
+   the same 26px gap every card after it gets from the one above. */
+.am-wrap form[action$="options.php"] .am-card:first-child { margin-top: 4px; }
 
 .am-status-ok { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var( --am-accent ); }
 .am-status-ok .am-dot { width: 6px; height: 6px; border-radius: 50%; background: var( --am-accent ); }

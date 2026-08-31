@@ -87,14 +87,25 @@ workflow disappears.
   lives under `.am-wrap` — the wp-admin bar and the left-hand menu are
   untouched, and no other plugin's screens are affected. Within that scope,
   restyling core's own furniture (buttons, inputs, `.tablenav-pages`,
-  `.form-table`) is now the deliberate choice, not a mistake to avoid — but
-  it's still done additively where possible: the Settings screen's card
-  look is pure CSS layered onto `do_settings_sections()`'s unchanged
-  `<h2>` + `<table class="form-table">` output (`h2 + p`, `h2 + table.form-table`
-  sibling selectors, so it doesn't care whether a given section has an intro
-  paragraph), not a rewrite of how Settings renders. `.am-card` wraps the
-  three sections `do_settings_sections()` doesn't own (Notification
-  Channels, Clear Log) the same way. Visitor Stats' breakdown tables
+  `.form-table`) is now the deliberate choice, not a mistake to avoid.
+  Every Settings section renders inside a real `.am-card` div —
+  `AM_Admin::render_settings_sections()` is a drop-in replacement for core's
+  `do_settings_sections( self::PAGE_SETTINGS )`, opening one before each
+  section and closing it after. It still reads the same
+  `$wp_settings_sections`/`$wp_settings_fields` globals
+  `add_settings_section()`/`add_settings_field()` populate and still calls
+  the section's own callback plus core's own `do_settings_fields()` — the
+  registration side (`register_sections_and_fields()`) is completely
+  unchanged, only the per-section wrapper differs from what core would emit
+  on its own. (2.9.0 initially did this the other way — pure CSS via `h2 +
+  p`, `h2 + table.form-table` sibling selectors over core's own unwrapped
+  output, so no PHP change was needed — but that made every section a
+  *fake* card assembled from separately-bordered siblings, not a real
+  container; 2.9.4 replaced it with the real thing once real containers
+  were wanted throughout Settings, matching Notification Channels/Clear Log
+  below the form, which were always real `.am-card` divs since their own
+  render methods don't go through `do_settings_sections()` at all.) Visitor
+  Stats' breakdown tables
   (Referrers, Countries, Browsers, OS, Devices) got one real markup change
   to support this: a "Share" column with a bar sized relative to the
   largest value on the current page (`AM_Admin::bar_cell()`/`max_visits()`),

@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, event log
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.9.3
+Stable tag: 2.9.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -75,6 +75,9 @@ Yes. Settings → Privacy offers full addresses, anonymised addresses (the last 
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
 
 == Changelog ==
+
+= 2.9.4 =
+* Changed: every Settings section (Logging, Display, Privacy, Visitor Stats, Geolocation, Data) now renders in a real card container, matching Notification Channels and Clear Log, instead of a CSS-only card look layered over core's own section markup.
 
 = 2.9.3 =
 * Fixed: a dropdown's newly selected value was unreadable in dark mode until you clicked elsewhere -- the browser repaints a select's own chrome right after a selection using an assumed-light palette regardless of our CSS; declared `color-scheme` so it repaints dark instead.
