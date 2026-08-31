@@ -189,6 +189,16 @@ body.wp-admin.am-theme-dark #wpbody-content {
 	background: var( --am-surface );
 	color: var( --am-ink );
 }
+/* Core's .wp-core-ui select:hover matches .am-wrap select on specificity, so
+   source order alone decides -- and it sets its own border/text color,
+   which under the dark palette lands close enough to --am-surface to read
+   as no border and no text at all. Text inputs have no hover effect, so
+   selects don't need one either: this just re-asserts the resting state. */
+.am-wrap select:hover {
+	border-color: var( --am-border-strong );
+	color: var( --am-ink );
+	background: var( --am-surface );
+}
 .am-wrap input[type="text"]:focus,
 .am-wrap input[type="search"]:focus,
 .am-wrap input[type="date"]:focus,
@@ -199,6 +209,13 @@ body.wp-admin.am-theme-dark #wpbody-content {
 	border-color: var( --am-accent );
 	box-shadow: 0 0 0 1px var( --am-accent );
 	outline: none;
+}
+/* Same specificity tie as select:hover above -- .wp-core-ui select:focus
+   also sets its own text/background color, so the shared focus rule above
+   (border-color/box-shadow only) isn't enough to keep a select readable. */
+.am-wrap select:focus {
+	color: var( --am-ink );
+	background: var( --am-surface );
 }
 .am-wrap input[type="checkbox"],
 .am-wrap input[type="radio"] { accent-color: var( --am-accent ); }
@@ -269,7 +286,7 @@ body.wp-admin.am-theme-dark #wpbody-content {
    explicit, in both themes, rather than a dark-only patch: that's what
    makes the toggle actually reach the table instead of just the chrome
    around it. */
-.am-wrap .wp-list-table { background: var( --am-surface ); color: var( --am-ink ); }
+.am-wrap .wp-list-table { background: var( --am-surface ); color: var( --am-ink ); border-color: var( --am-border ); }
 .am-wrap .wp-list-table th, .am-wrap .wp-list-table td { color: var( --am-ink ); border-color: var( --am-border ); }
 .am-wrap .wp-list-table thead th, .am-wrap .wp-list-table tfoot th { background: var( --am-surface-2 ); color: var( --am-muted ); }
 .am-wrap .wp-list-table.striped > tbody > tr:nth-child(odd) { background: var( --am-surface-2 ); }
@@ -388,7 +405,14 @@ body.wp-admin.am-theme-dark #wpbody-content {
 
 /* ── Modal ─────────────────────────────────────────────────────────────── */
 .am-modal-overlay { position: fixed; inset: 0; background: rgba(10,15,20,.6); z-index: 100000; display: flex; align-items: center; justify-content: center; }
-.am-modal { background: var( --am-surface ); border-radius: 6px; box-shadow: 0 8px 40px rgba(0,0,0,.35); width: 660px; max-width: 95vw; max-height: 85vh; display: flex; flex-direction: column; }
+/* The modal overlay sits outside .am-wrap (render_screen_close() closes
+   .am-wrap right before emitting it), so .am-wrap's `color: var(--am-ink)`
+   never reaches it -- background picks up the dark palette fine (custom
+   properties are defined on body.wp-admin, not .am-wrap), but text falls
+   back to wp-admin's default light-mode text color, unreadably dim against
+   the dark surface. Set explicitly here instead of relying on inheritance
+   from a scope this markup isn't inside. */
+.am-modal { background: var( --am-surface ); color: var( --am-ink ); border-radius: 6px; box-shadow: 0 8px 40px rgba(0,0,0,.35); width: 660px; max-width: 95vw; max-height: 85vh; display: flex; flex-direction: column; }
 .am-modal-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var( --am-border ); }
 .am-modal-header h2 { margin: 0; font-size: 16px; }
 .am-modal-close { background: none; border: none; font-size: 24px; line-height: 1; cursor: pointer; color: var( --am-muted ); padding: 0 4px; }
