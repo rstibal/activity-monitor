@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, event log
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.9.6
+Stable tag: 2.9.7
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -75,6 +75,9 @@ Yes. Settings → Privacy offers full addresses, anonymised addresses (the last 
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
 
 == Changelog ==
+
+= 2.9.7 =
+* Fixed: the Details modal's title was still dark-on-dark after 2.9.6 — core's own `h2` rule sets an explicit text color that beats an inherited one, so the modal body's fix didn't reach the heading. Colored the title explicitly too.
 
 = 2.9.6 =
 * Fixed: in dark mode, the Activity Log/Visitor Stats/Notification Channels tables had a stark, core-default light-gray outer border that clashed with the surrounding dark chrome — the earlier dark-mode pass had only recolored the cell gridlines, not the table's own `widefat` border. Now matches the softer border used by `.am-card`.

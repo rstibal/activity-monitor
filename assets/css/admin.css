@@ -414,7 +414,10 @@ body.wp-admin.am-theme-dark #wpbody-content {
    from a scope this markup isn't inside. */
 .am-modal { background: var( --am-surface ); color: var( --am-ink ); border-radius: 6px; box-shadow: 0 8px 40px rgba(0,0,0,.35); width: 660px; max-width: 95vw; max-height: 85vh; display: flex; flex-direction: column; }
 .am-modal-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var( --am-border ); }
-.am-modal-header h2 { margin: 0; font-size: 16px; }
+/* Core's own h2 rule sets an explicit color, which beats the inherited
+   var(--am-ink) from .am-modal above -- inheritance has no specificity, so
+   any rule naming the element outright wins regardless of source order. */
+.am-modal-header h2 { margin: 0; font-size: 16px; color: var( --am-ink ); }
 .am-modal-close { background: none; border: none; font-size: 24px; line-height: 1; cursor: pointer; color: var( --am-muted ); padding: 0 4px; }
 .am-modal-close:hover { color: var( --am-danger ); }
 .am-modal-body { padding: 20px; overflow-y: auto; }
