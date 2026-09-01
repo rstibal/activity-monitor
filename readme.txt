@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, event log
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.9.7
+Stable tag: 2.9.8
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -75,6 +75,10 @@ Yes. Settings → Privacy offers full addresses, anonymised addresses (the last 
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
 
 == Changelog ==
+
+= 2.9.8 =
+* Changed: form inputs, buttons, and the Details modal's field table now render at 12px instead of 13px.
+* Changed: the datetime/IP cells, pagination numbers, and per-page/card-subtitle/status text (all 12.5px) now use IBM Plex Sans instead of a mix of IBM Plex Mono and the inherited body font.
 
 = 2.9.7 =
 * Fixed: the Details modal's title was still dark-on-dark after 2.9.6 — core's own `h2` rule sets an explicit text color that beats an inherited one, so the modal body's fix didn't reach the heading. Colored the title explicitly too.
