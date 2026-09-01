@@ -287,7 +287,7 @@ body.wp-admin.am-theme-dark #wpbody-content {
    makes the toggle actually reach the table instead of just the chrome
    around it. */
 .am-wrap .wp-list-table { background: var( --am-surface ); color: var( --am-ink ); border-color: var( --am-border ); }
-.am-wrap .wp-list-table th, .am-wrap .wp-list-table td { color: var( --am-ink ); border-color: var( --am-border ); }
+.am-wrap .wp-list-table th, .am-wrap .wp-list-table td { color: var( --am-ink ); border-color: var( --am-border ); font-family: "Public Sans", sans-serif; font-size: 12px; }
 .am-wrap .wp-list-table thead th, .am-wrap .wp-list-table tfoot th { background: var( --am-surface-2 ); color: var( --am-muted ); }
 .am-wrap .wp-list-table.striped > tbody > tr:nth-child(odd) { background: var( --am-surface-2 ); }
 .am-wrap .wp-list-table.striped > tbody > tr:nth-child(even) { background: var( --am-surface ); }
@@ -311,7 +311,7 @@ body.wp-admin.am-theme-dark #wpbody-content {
 }
 .am-log-table th { border-color: var( --am-border ) !important; }
 .am-log-table .am-type-cell { max-width: 150px; }
-.am-datetime-cell, .am-ip-cell { font-family: "IBM Plex Sans", sans-serif; font-size: 12px; color: var( --am-muted ); white-space: nowrap; }
+.am-datetime-cell, .am-log-table td.am-ip-cell { font-family: "IBM Plex Sans", sans-serif; font-size: 12px; color: var( --am-muted ); white-space: nowrap; }
 .am-ip-cell { max-width: 16ch; overflow: hidden; text-overflow: ellipsis; }
 .am-ip-lookup { color: var( --am-accent ); }
 
