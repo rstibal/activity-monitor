@@ -248,6 +248,7 @@ body.wp-admin.am-theme-dark #wpbody-content {
 	display: inline-block;
 	margin-right: 6px;
 	color: var( --am-muted );
+	font-size: 12px;
 	line-height: 30px;
 	vertical-align: top;
 }
@@ -274,6 +275,16 @@ body.wp-admin.am-theme-dark #wpbody-content {
    selects, two date inputs, a Filter button and a Reset link. */
 .am-wrap .tablenav { height: auto; min-height: 30px; }
 .am-wrap .tablenav p.search-box { margin: 0; }
+
+/* The status/level filter links above the table (All, Info, Notice, ...)
+   and the "Rows per page" select in the bottom tablenav both come from
+   core at its own default size, not this plugin's 12px baseline. */
+.am-wrap .subsubsub { font-size: 12px; }
+/* .wp-core-ui is a body class (an ancestor of .am-wrap, not a descendant),
+   so ".am-wrap .wp-core-ui ..." would never match -- scoping through
+   .am-wrap alone is enough since wp-core-ui is already present on every
+   wp-admin screen. */
+body.wp-core-ui .am-wrap .tablenav select { font-size: 12px; }
 
 /* Horizontal scroll for the wider tables. */
 .am-table-scroll { clear: both; overflow-x: auto; -webkit-overflow-scrolling: touch; }
@@ -450,6 +461,7 @@ body.wp-admin.am-theme-dark #wpbody-content {
    needs an explicit override here too, not just on the table backgrounds. */
 .am-wrap .form-table th, .am-wrap .form-table td { color: var( --am-ink ); }
 .am-wrap .description, .am-wrap p.description { color: var( --am-muted ); }
+.am-wrap .form-table, .am-wrap .form-table td, .am-wrap .form-table td p, .am-wrap .form-table th { font-size: 12px; }
 
 .am-radio-description { margin: 0 0 10px 24px; color: var( --am-muted ); }
 .am-modal-error { color: var( --am-danger ); margin: 12px 0 0; }
@@ -507,7 +519,7 @@ body.wp-admin.am-theme-dark #wpbody-content {
 .displaying-num { font-family: "IBM Plex Sans", sans-serif; color: var( --am-muted ); font-size: 12px; }
 
 /* ── Visitor Stats ─────────────────────────────────────────────────────── */
-.am-stats-totals { display: flex; align-items: center; gap: 32px; margin: 16px 0; font-size: 14px; color: var( --am-muted ); }
+.am-stats-totals { display: flex; align-items: center; gap: 32px; margin: 16px 0; font-size: 12px; color: var( --am-muted ); }
 .am-stats-totals li { list-style: none; margin: 0; }
 .am-stats-totals strong {
 	display: inline-block; font-family: "IBM Plex Mono", monospace; font-size: 22px; font-weight: 600;

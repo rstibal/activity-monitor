@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, event log
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.9.10
+Stable tag: 2.9.11
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -75,6 +75,9 @@ Yes. Settings → Privacy offers full addresses, anonymised addresses (the last 
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
 
 == Changelog ==
+
+= 2.9.11 =
+* Changed: the remaining pieces of the plugin still rendering at core's default size -- the Activity Log's status/level filter links (.subsubsub), the Export label, the "Rows per page" select, Visitor Stats' totals subtitle, and the Settings screen's form-table cells -- now render at 12px, the plugin's uniform default. Headings keep their own sizes.
 
 = 2.9.10 =
 * Fixed: the Activity Log/Visitor Stats/Notification Channels tables' own cell text (Type, Action, User, Message, and every other ordinary column) never had an explicit font-size or font-family — the previous two releases' changes only reached specific elements (form controls, buttons, datetime/IP cells, pagination). Core's `.wp-list-table` sets its own explicit values there, so inheritance from the surrounding `.am-wrap` never landed. Now explicit: Public Sans at 12px, matching the rest of the screen.
