@@ -59,6 +59,7 @@ class AM_Event_Labels {
 		'system.maintenance_enabled'             => 'Maintenance Mode Enabled',
 		'system.maintenance_disabled'            => 'Maintenance Mode Disabled',
 		'system.mail_failed'                     => 'Email Delivery Failed',
+		'system.mail_sent'                       => 'Email Sent',
 		'system.php_warning'                     => 'PHP Warning',
 		'system.php_notice'                      => 'PHP Notice',
 		'system.php_deprecated'                  => 'PHP Deprecated Notice',

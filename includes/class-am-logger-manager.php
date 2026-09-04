@@ -30,6 +30,7 @@ class AM_Logger_Manager {
 		'AM_Logger_File_Editor',
 		'AM_Logger_Maintenance_Mode',
 		'AM_Logger_Mail_Failures',
+		'AM_Logger_Mail_Sent',
 		'AM_Logger_Rest_Api',
 		'AM_Logger_Options',
 	);
