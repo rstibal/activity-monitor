@@ -74,7 +74,7 @@ class AM_Logger_Comments extends AM_Logger_Base {
 				/* translators: %d: comment ID */
 				__( 'Comment (ID %d) permanently deleted.', 'activity-monitor' ),
 				$id
-			),
+			) . AM_Bulk_Context::suffix_for( $id ),
 			array(
 				'level'       => AM_Log_Levels::NOTICE,
 				'object_type' => 'comment',
@@ -98,7 +98,7 @@ class AM_Logger_Comments extends AM_Logger_Base {
 				$comment->comment_ID,
 				$old_status,
 				$new_status
-			),
+			) . AM_Bulk_Context::suffix_for( (int) $comment->comment_ID ),
 			array(
 				'level'       => AM_Log_Levels::INFO,
 				'object_type' => 'comment',

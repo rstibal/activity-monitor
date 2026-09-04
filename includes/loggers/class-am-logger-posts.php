@@ -118,7 +118,7 @@ class AM_Logger_Posts extends AM_Logger_Base {
 				$post->post_title,
 				$post->post_type,
 				$post_id
-			),
+			) . AM_Bulk_Context::suffix_for( $post_id ),
 			array(
 				'level'       => AM_Log_Levels::WARNING,
 				'object_type' => $post->post_type,
@@ -142,7 +142,7 @@ class AM_Logger_Posts extends AM_Logger_Base {
 				__( '"%1$s" (%2$s) moved to Trash.', 'activity-monitor' ),
 				$post->post_title,
 				$post->post_type
-			),
+			) . AM_Bulk_Context::suffix_for( $post_id ),
 			array(
 				'level'       => AM_Log_Levels::NOTICE,
 				'object_type' => $post->post_type,
@@ -166,7 +166,7 @@ class AM_Logger_Posts extends AM_Logger_Base {
 				__( '"%1$s" (%2$s) restored from Trash.', 'activity-monitor' ),
 				$post->post_title,
 				$post->post_type
-			),
+			) . AM_Bulk_Context::suffix_for( $post_id ),
 			array(
 				'level'       => AM_Log_Levels::INFO,
 				'object_type' => $post->post_type,

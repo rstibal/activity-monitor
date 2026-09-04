@@ -3,7 +3,7 @@
  * Plugin Name: Activity Monitor
  * Plugin URI:  https://robstibal.com
  * Description: Comprehensive WordPress audit log – tracks logins, content changes, settings updates, security events, and more. Includes real-time visitor/traffic stats with optional country-level geolocation.
- * Version:     2.9.12
+ * Version:     2.9.13
  * Author:      Rob Stibal
  * Author URI:  http://robstibal.com
  * License:     GPL v2 or later
@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'AM_VERSION', '2.9.12' );
+define( 'AM_VERSION', '2.9.13' );
 define( 'AM_FILE',    __FILE__ );
 define( 'AM_DIR',     plugin_dir_path( __FILE__ ) );
 define( 'AM_URL',     plugin_dir_url( __FILE__ ) );
@@ -36,6 +36,7 @@ require_once AM_DIR . 'includes/class-am-log-levels.php';
 require_once AM_DIR . 'includes/class-am-date-format.php';
 require_once AM_DIR . 'includes/class-am-event-labels.php';
 require_once AM_DIR . 'includes/class-am-initiator-detector.php';
+require_once AM_DIR . 'includes/class-am-bulk-context.php';
 require_once AM_DIR . 'includes/class-am-event-writer.php';
 require_once AM_DIR . 'includes/class-am-event-query.php';
 require_once AM_DIR . 'includes/class-am-notifications.php';
@@ -85,6 +86,7 @@ function am_init() {
 	AM_Schema::maybe_upgrade();
 	AM_Stats_Schema::maybe_upgrade();
 	am_run_upgrade_cleanup();
+	AM_Bulk_Context::init();
 	AM_Logger_Manager::init();
 	AM_Stats_Tracker::init();
 	AM_Stats_Geo_Updater::init();

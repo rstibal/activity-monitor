@@ -96,7 +96,7 @@ class AM_Logger_Media extends AM_Logger_Base {
 				__( 'Media "%1$s" (ID %2$d) permanently deleted.', 'activity-monitor' ),
 				$name,
 				$post_id
-			),
+			) . AM_Bulk_Context::suffix_for( $post_id ),
 			array(
 				'level'       => AM_Log_Levels::WARNING,
 				'object_type' => 'media',
