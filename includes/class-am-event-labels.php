@@ -31,6 +31,7 @@ class AM_Event_Labels {
 		'media.uploaded'                       => 'Media Uploaded',
 		'menu.deleted'                          => 'Menu Deleted',
 		'menu.updated'                          => 'Menu Updated',
+		'option.changed'                        => 'Site Option Changed',
 		'plugin.activated'                     => 'Plugin Activated',
 		'plugin.deactivated'                   => 'Plugin Deactivated',
 		'plugin.deleted'                        => 'Plugin Deleted',
@@ -42,6 +43,7 @@ class AM_Event_Labels {
 		'post.trashed'                           => 'Post Moved to Trash',
 		'post.updated'                           => 'Post Updated',
 		'security.access_denied'                => 'Access Denied',
+		'security.rest_auth_failed'              => 'REST API Authentication Failed',
 		// Session management was removed in 2.4.0 and nothing writes these
 		// any more, but an upgraded site still has session.* rows in
 		// am_events and they have to keep rendering. Dropping these would
@@ -68,6 +70,9 @@ class AM_Event_Labels {
 		'theme.switched'                         => 'Theme Switched',
 		'theme.updated'                          => 'Theme Updated',
 		'user.added_to_site'                    => 'User Added to Site',
+		'user.application_password_created'      => 'Application Password Created',
+		'user.application_password_revoked'      => 'Application Password Revoked',
+		'user.application_password_revoked_all'  => 'All Application Passwords Revoked',
 		'user.auth_error'                        => 'Authentication Error',
 		'user.deleted'                            => 'User Deleted',
 		'user.login'                              => 'User Logged In',
@@ -168,6 +173,7 @@ class AM_Event_Labels {
 		'core'     => 'WordPress Core',
 		'media'    => 'Media',
 		'menu'     => 'Menu',
+		'option'   => 'Option',
 		'plugin'   => 'Plugin',
 		'post'     => 'Post',
 		'security' => 'Security',
