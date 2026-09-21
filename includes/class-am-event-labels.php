@@ -76,6 +76,7 @@ class AM_Event_Labels {
 		'user.application_password_revoked'      => 'Application Password Revoked',
 		'user.application_password_revoked_all'  => 'All Application Passwords Revoked',
 		'user.auth_error'                        => 'Authentication Error',
+		'user.capabilities_changed'              => 'Capabilities Changed',
 		'user.deleted'                            => 'User Deleted',
 		'user.login'                              => 'User Logged In',
 		'user.login_failed'                      => 'Failed Login Attempt',
