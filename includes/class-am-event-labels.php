@@ -44,6 +44,7 @@ class AM_Event_Labels {
 		'post.updated'                           => 'Post Updated',
 		'security.access_denied'                => 'Access Denied',
 		'security.rest_auth_failed'              => 'REST API Authentication Failed',
+		'security.rest_cookie_auth_failed'       => 'REST API Cookie/Nonce Authentication Failed',
 		// Session management was removed in 2.4.0 and nothing writes these
 		// any more, but an upgraded site still has session.* rows in
 		// am_events and they have to keep rendering. Dropping these would
