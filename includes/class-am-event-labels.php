@@ -54,6 +54,7 @@ class AM_Event_Labels {
 		'session.limit_enforced'                => 'Session Limit Enforced',
 		'site.created'                           => 'Site Created',
 		'site.deleted'                           => 'Site Deleted',
+		'system.export'                          => 'Content Exported',
 		'system.fatal_error'                     => 'PHP Fatal Error',
 		'system.file_edit_attempted'             => 'File Editor Used',
 		'system.maintenance_enabled'             => 'Maintenance Mode Enabled',

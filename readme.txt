@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, event log
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.9.14
+Stable tag: 2.9.15
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -75,6 +75,9 @@ Yes. Settings → Privacy offers full addresses, anonymised addresses (the last 
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
 
 == Changelog ==
+
+= 2.9.15 =
+* Added: running WordPress's built-in content exporter (Tools -> Export) is now logged (AM_Logger_Export), including WP-CLI's `wp export`.
 
 = 2.9.14 =
 * Added: successful email sends are now logged (AM_Logger_Mail_Sent), alongside the existing failure logging. Fires for any wp_mail() caller on the site, not just this plugin's own alerts, so a high-mail-volume site will see a correspondingly high volume of these rows.
