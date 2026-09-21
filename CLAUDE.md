@@ -97,8 +97,8 @@ workflow disappears.
   `.am-wrap`.** CSS inheritance only fills a value when nothing else in the
   cascade specifies one for that element — an ancestor's `color:
   var(--am-ink)` never reaches a `<td>` core already colors explicitly,
-  however the token is redefined under `[data-am-theme="dark"]`. Four
-  instances found so far, each with its own wrinkle:
+  however the token is redefined under `[data-am-theme="dark"]`. Recurring
+  bug across most of 2.9.x, each instance its own wrinkle:
   - **2.9.1** — `.wp-list-table` (Activity Log/Visitor Stats/Notification
     Channels tables) and `.form-table`/`.description` (Settings) stayed
     light: core sets explicit colors the toggle never targeted. Fixed with
@@ -134,6 +134,30 @@ workflow disappears.
     `<input type="date">` picker), check `color-scheme` before reaching for
     more color rules — it's the general fix for "the browser draws this
     itself and doesn't know it should be dark."*
+  - **2.9.6** — three more reach gaps in one release: (a) the tables' own
+    outer border was still core's light-gray `widefat` default — the
+    earlier pass recolored cell gridlines, never the table's own border;
+    now matches `.am-card`'s softer border. (b) hovering/focusing a
+    dropdown re-applied core's light-mode border/text at the same
+    specificity, and core wins on source order — selects lost their hover
+    effect (matching text inputs) and focus now sets dark colors
+    explicitly. (c) the Details modal's text was unreadable — the modal
+    overlay renders *outside* `.am-wrap`, so only the dark background
+    (set via the body-level tokens from 2.9.2a) reached it, never the text
+    color.
+  - **2.9.7** — the Details modal's title was still dark-on-dark after
+    2.9.6: core's own `h2` rule sets an explicit color that beats an
+    *inherited* fix, so the modal body's color never reached the heading
+    inside it. Same "explicit beats inherited" lesson as 2.9.1, just found
+    on a heading this time. Fixed by coloring the title explicitly too.
+  - **2.9.10** — `.wp-list-table` cell text itself (Type, Action, User,
+    Message, every ordinary column) had no explicit font-size or
+    font-family at all; 2.9.8/2.9.9's type-system pass only reached form
+    controls, buttons, datetime/IP cells, and pagination — not the table
+    body, which core sizes/fonts itself. Fixed with explicit Public Sans
+    12px on the table body, same "core sets its own value, inheritance
+    from `.am-wrap` never lands" mechanism as the color bugs above, just
+    for a different property.
 
   **2.9.5 — a self-inflicted regression from the 2.9.1 fix, not a new
   browser quirk.** `.am-log-table td { border-color: var(--am-border)
@@ -149,6 +173,17 @@ workflow disappears.
   `background`, `font`, `margin`), check whether any longhand side of it is
   already independently owned by a more specific rule elsewhere — the
   shorthand wins that side too, `!important` or not, and silently.**
+
+  **2.9.8–2.9.11 unified type across the whole identity, independent of the
+  theme toggle.** Before this, sizes were a mix of 12px/12.5px/13px and
+  fonts a mix of IBM Plex Mono/Sans and inherited body text across form
+  inputs, buttons, the Details modal, datetime/IP cells, pagination, the
+  status/level filter links, and Visitor Stats' totals subtitle. Now
+  everything but headings renders at one uniform 12px, Public Sans for
+  ordinary text (IBM Plex Mono stays reserved for data — timestamps, IPs,
+  versions). 2.9.10 (folded into the dark-mode list above) was this same
+  sweep catching the one place core still fully owned the font: `.wp-list-table`
+  cell text itself.
 - **Dead code gets deleted, not commented out or marked unused.**
 
 ## Architecture
@@ -344,6 +379,51 @@ object id (file-editor, fatal-errors) pass `'group' => false`.
 `crc32( "$file:$line" ) & 0x7FFFFFFF`, since `object_id` is an int column —
 so repeats of the same warning collapse while a different warning still gets
 its own row.
+
+**`AM_Bulk_Context` (2.9.13) tags per-item events with the bulk operation
+they were part of, without introducing a new event type or using
+`context`.** WordPress still fires one hook call per object for a
+Posts/Pages, Media, or Comments bulk action (Trash, Delete, Restore, status
+change), so `AM_Logger_Posts`/`Media`/`Comments` still write one row per
+object — the correct audit granularity. `AM_Bulk_Context::suffix_for(
+$object_id )` just appends a short note (`(bulk "trash", 12 items)`) to the
+existing message string, since nothing beyond the diff shape is rendered
+anywhere for context. It hooks the shared `handle_bulk_actions-{screen}`
+filter (core since 4.7) on the three screens that route through it —
+Users.php and Plugins.php process their bulk actions inline instead, so
+they're not covered. A row-level single-item action (e.g. one "Trash" link)
+goes through the same filter with one id; only counted as bulk when more
+than one object is actually affected, to avoid every ordinary single delete
+picking up a spurious "(bulk ..., 1 items)" note.
+
+**Three loggers added in 2.9.12/2.9.14 each carry a scoping or re-entrancy
+gotcha worth knowing before touching them:**
+- **`AM_Logger_Options`** watches a small explicit allowlist
+  (`WATCHED_OPTIONS`: `siteurl`, `home`, `default_role`,
+  `users_can_register`, `admin_email`), not a blanket `updated_option`
+  hook — most of `wp_options` is transient/cache churn that would flood the
+  table if hooked unconditionally. `siteurl`/`home` are classic compromise
+  indicators (silent redirect/hijack); `default_role` flipped to
+  `administrator` is a known self-registration privilege-escalation trick.
+- **`AM_Logger_Rest_Api`** covers application-password create/revoke/revoke-all
+  and failed application-password authentication, but deliberately does
+  **not** hook `wp_update_application_password`. Core fires that both when a
+  password's name/permissions are actually edited *and* on every
+  `WP_Application_Passwords::record_application_password_usage()` bump of
+  last-used/last-ip on a successful authenticated request — there's no cheap
+  way to tell the two apart from the hook's arguments alone, so hooking it
+  would log a row on every single REST call an integration makes. Same
+  noise-avoidance reasoning `AM_Logger_Security` uses to watch a short list
+  of restricted admin pages rather than every denied request.
+- **`AM_Logger_Mail_Sent`** (companion to `AM_Logger_Mail_Failures`, which
+  covers the failure side) requires `skip_notify` — without it, a
+  successful alert email sent by `AM_Notifications::send_email()` would
+  itself fire this logger, which could re-trigger `maybe_notify()` for any
+  channel watching `system` events, sending and logging another email,
+  unbounded. Same re-entrancy class `AM_Notifications::log_slack_failure()`
+  and `AM_Logger_Mail_Failures` already guard against. "Succeeded" means
+  handed off to the configured mail transport without PHPMailer erroring —
+  not proof of inbox delivery.
 
 ## Decisions worth not re-litigating
 
