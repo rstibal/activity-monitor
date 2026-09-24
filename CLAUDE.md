@@ -59,6 +59,10 @@ workflow disappears.
   to `user_login` when empty.
 - **Timestamps** go through `AM_Date_Format::combined()`. CSV/JSON export
   deliberately bypasses it, keeping raw UTC to stay machine-readable.
+  The one alteration CSV makes to stored values: a cell starting with
+  `=` `+` `-` `@` (or tab/CR) gets a leading apostrophe
+  (`AM_Export::csv_safe()`), since failed-login usernames and comment
+  authors are visitor-typed and spreadsheets execute those as formulas.
 - **"Ledger Console" is the plugin's visual identity (2.9.0).** Reverses the
   prior rule (2.3.0–2.8.x: "build on wp-admin's own furniture, don't restyle
   it," adopted after an earlier restyle of buttons/inputs/tables made the
@@ -472,6 +476,14 @@ gotcha worth knowing before touching them:**
   `user_register`).
 
 ## Decisions worth not re-litigating
+
+- **The Visitor Stats beacon (`am_stats_track`) has no nonce, on purpose**
+  (removed in 2.9.19). The beacon exists to count pages served from a full-page
+  cache, and a nonce cached into the page expires after 12–24 hours, after
+  which every hit from that copy was rejected. It also guarded nothing: a
+  logged-out visitor's nonce is the same for everyone and printed in every
+  page. Don't add one back; the three `$_POST` reads carry a
+  `NonceVerification.Missing` suppression pointing at the class doc.
 
 - **The Activity Log's status links are built from the data, not from
   `AM_Log_Levels::ORDER`.** `AM_Event_Query::get_level_counts()` returns

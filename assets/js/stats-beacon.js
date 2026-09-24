@@ -12,7 +12,6 @@
 
 	var data = new FormData();
 	data.append( 'action', 'am_stats_track' );
-	data.append( 'nonce', amStatsData.nonce );
 	data.append( 'url', window.location.pathname + window.location.search );
 	data.append( 'title', document.title );
 	data.append( 'referrer', document.referrer );

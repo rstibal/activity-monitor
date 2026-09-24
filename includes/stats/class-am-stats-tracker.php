@@ -13,13 +13,19 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  * unreliable.
  *
  * Uses the existing wp_ajax_ / wp_ajax_nopriv_ + admin-ajax.php convention
- * this plugin already has (see AM_Admin's am_ajax nonce), rather than
- * introducing a REST route -- there is no register_rest_route() precedent
- * anywhere in this codebase.
+ * this plugin already has, rather than introducing a REST route -- there is
+ * no register_rest_route() precedent anywhere in this codebase.
+ *
+ * Deliberately no nonce (removed in 2.9.19). A nonce printed into the page
+ * is cached along with it and expires after 12-24 hours, after which every
+ * hit from that cached copy failed check_ajax_referer() and was silently
+ * dropped -- defeating the one reason this is a beacon at all. It also
+ * protected nothing: a logged-out visitor's nonce is identical for every
+ * visitor and published in every page's HTML, so anyone wanting to post
+ * fake hits could always fetch one. The endpoint only ever records an
+ * anonymous pageview, and every field it accepts is sanitized below.
  */
 class AM_Stats_Tracker {
-
-	const NONCE_ACTION = 'am_stats_track';
 
 	public static function init() {
 		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'enqueue_beacon' ) );
@@ -39,13 +45,10 @@ class AM_Stats_Tracker {
 		wp_enqueue_script( 'am-stats-beacon', AM_URL . 'assets/js/stats-beacon.js', array(), AM_VERSION, true );
 		wp_localize_script( 'am-stats-beacon', 'amStatsData', array(
 			'ajaxUrl' => admin_url( 'admin-ajax.php' ),
-			'nonce'   => wp_create_nonce( self::NONCE_ACTION ),
 		) );
 	}
 
 	public static function handle_track() {
-		check_ajax_referer( self::NONCE_ACTION, 'nonce' );
-
 		if ( ! (bool) get_option( 'am_stats_enable_tracking', 1 ) ) {
 			wp_send_json_success();
 		}
@@ -60,14 +63,14 @@ class AM_Stats_Tracker {
 			wp_send_json_success();
 		}
 
-		$url   = self::sanitize_path( wp_unslash( $_POST['url'] ?? '' ) );
-		$title = sanitize_text_field( wp_unslash( $_POST['title'] ?? '' ) );
+		$url   = self::sanitize_path( wp_unslash( $_POST['url'] ?? '' ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing -- no nonce by design, see class doc.
+		$title = sanitize_text_field( wp_unslash( $_POST['title'] ?? '' ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing -- no nonce by design, see class doc.
 		if ( '' === $url ) {
 			wp_send_json_success();
 		}
 
 		$referrer_host = '';
-		$referrer      = esc_url_raw( wp_unslash( $_POST['referrer'] ?? '' ) );
+		$referrer      = esc_url_raw( wp_unslash( $_POST['referrer'] ?? '' ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing -- no nonce by design, see class doc.
 		if ( '' !== $referrer ) {
 			$host = wp_parse_url( $referrer, PHP_URL_HOST );
 			// Don't record the site's own host as a "referrer" -- that's

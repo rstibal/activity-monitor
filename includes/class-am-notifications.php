@@ -105,7 +105,7 @@ class AM_Notifications {
 		/* translators: %s: event type and action, e.g. "post.updated" */
 		$body .= sprintf( __( 'Event:        %s', 'activity-monitor' ), $safe_type ) . "\n";
 		/* translators: %s: date and time in UTC */
-		$body .= sprintf( __( 'Time:         %s (UTC)', 'activity-monitor' ), current_time( 'Y-m-d H:i:s' ) ) . "\n";
+		$body .= sprintf( __( 'Time:         %s (UTC)', 'activity-monitor' ), gmdate( 'Y-m-d H:i:s' ) ) . "\n";
 		/* translators: %s: WordPress username */
 		$body .= sprintf( __( 'User:         %s', 'activity-monitor' ), $safe_user ) . "\n";
 		/* translators: %s: IP address */

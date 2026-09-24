@@ -93,9 +93,26 @@ class AM_Export {
 		fwrite( $out, "\xEF\xBB\xBF" ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fwrite -- php://output, see above.
 		fputcsv( $out, self::columns() );
 		foreach ( $items as $row ) {
-			fputcsv( $out, self::row_to_assoc( $row ) );
+			fputcsv( $out, array_map( array( __CLASS__, 'csv_safe' ), self::row_to_assoc( $row ) ) );
 		}
 		fclose( $out ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose -- php://output, see above.
+	}
+
+	/**
+	 * Neutralizes spreadsheet formula injection. Several columns hold text
+	 * typed by anonymous visitors -- a failed login's username, a comment
+	 * author's name -- and Excel/Sheets/LibreOffice run a cell beginning
+	 * with = + - @ (or a tab/CR ahead of one) as a formula when the CSV is
+	 * opened. A leading apostrophe makes the cell plain text. CSV only:
+	 * JSON, HTML and TXT exports are never evaluated, so they keep the
+	 * stored value exactly.
+	 */
+	private static function csv_safe( $value ) {
+		$value = (string) $value;
+		if ( '' !== $value && false !== strpos( "=+-@\t\r", $value[0] ) ) {
+			return "'" . $value;
+		}
+		return $value;
 	}
 
 	private static function to_json( array $items ): string {

@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, event log
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.9.18
+Stable tag: 2.9.19
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -75,6 +75,16 @@ Yes. Settings → Privacy offers full addresses, anonymised addresses (the last 
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
 
 == Changelog ==
+
+= 2.9.19 =
+* Fixed: Visitor Stats stopped recording hits from cached pages once the cached copy was more than a day old — the tracking beacon carried a nonce that expired with the cache. The beacon no longer uses one.
+* Fixed: Visitor Stats' page links doubled the path on sites installed in a subdirectory (/blog/blog/post).
+* Fixed: a search or filter value containing &, # or + broke the Activity Log's pagination, level links, user-filter chip and export links.
+* Fixed: exporting after a search containing an apostrophe or quote exported a different set of rows than the screen showed.
+* Fixed: CSV exports are protected against spreadsheet formula injection — a cell starting with =, +, - or @ (for example a failed-login username typed by a visitor) is prefixed with an apostrophe so spreadsheet apps treat it as text. JSON, HTML and TXT exports are unchanged.
+* Fixed: a GeoLite2 import that died partway through (a PHP timeout or error) stayed "in progress" forever and blocked Update Now. It's now marked as failed after 15 minutes without progress, and can be restarted.
+* Fixed: after the site had been in maintenance mode once, the maintenance-mode entry was logged again on every admin page load.
+* Fixed: the alert email's "Time (UTC)" line showed the site's local time.
 
 = 2.9.18 =
 * Fixed: repeat-event grouping merged different events into one row whenever they had no object ID — bulk-updating ten plugins logged only the first, and failed logins for different usernames (or access-denied hits by different users) collapsed into the first attempt's row. The grouping key now includes the object name and the acting user.
