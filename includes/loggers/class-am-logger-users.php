@@ -5,8 +5,8 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  * AM_Logger_Users — login/logout, registration, profile updates, role
  * changes, deletion, multisite membership.
  *
- * Ported from v1.x AM_Hooks::on_login / on_login_failed / on_authenticate /
- * on_logout / on_user_register / on_profile_update / on_user_delete /
+ * Ported from v1.x AM_Hooks::on_login / on_login_failed / on_authenticate
+ * (folded into on_login_failed in 2.9.18) / on_logout / on_user_register / on_profile_update / on_user_delete /
  * on_role_change / on_add_user_to_blog.
  *
  * Behavior changes from v1.x:
@@ -25,57 +25,13 @@ class AM_Logger_Users extends AM_Logger_Base {
 
 	public function register_hooks() {
 		add_action( 'wp_login', array( $this, 'on_login' ), 10, 2 );
-		add_action( 'wp_login_failed', array( $this, 'on_login_failed' ) );
-		add_filter( 'authenticate', array( $this, 'on_authenticate' ), 30, 3 );
+		add_action( 'wp_login_failed', array( $this, 'on_login_failed' ), 10, 2 );
 		add_action( 'wp_logout', array( $this, 'on_logout' ) );
 		add_action( 'user_register', array( $this, 'on_user_register' ) );
 		add_action( 'profile_update', array( $this, 'on_profile_update' ), 10, 2 );
 		add_action( 'delete_user', array( $this, 'on_user_delete' ) );
 		add_action( 'set_user_role', array( $this, 'on_role_change' ), 10, 3 );
 		add_action( 'add_user_to_blog', array( $this, 'on_add_user_to_blog' ), 10, 3 );
-	}
-
-	/**
-	 * Ported from v1.x AM_Hooks::on_authenticate() -- the last callback
-	 * remaining in the legacy class. This is distinct from
-	 * on_login_failed() (wrong password / wrong username, via
-	 * wp_login_failed): this filter catches ANY WP_Error surfaced by the
-	 * authentication filter chain, which includes things like a disabled
-	 * account, a blocked IP, or a third-party 2FA plugin rejecting the
-	 * login. Kept as its own event type (auth error) rather than merged
-	 * into login_failed, since the underlying causes are meaningfully
-	 * different for someone auditing the log.
-	 *
-	 * Must return $user (or the WP_Error), same as any 'authenticate'
-	 * filter callback -- this is a filter, not an action.
-	 */
-	public function on_authenticate( $user, string $username, string $password ) {
-		if ( empty( $_POST['log'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Missing
-			return $user;
-		}
-
-		if ( is_wp_error( $user ) ) {
-			$this->log(
-				'user',
-				'auth_error',
-				sprintf(
-					/* translators: 1: username, 2: error message */
-					__( 'Authentication error for "%1$s": %2$s', 'activity-monitor' ),
-					$username,
-					$user->get_error_message()
-				),
-				array(
-					'level'       => AM_Log_Levels::WARNING,
-					'object_type' => 'user',
-					'object_name' => $username,
-					// group defaults to true — repeated auth-error attempts
-					// (e.g. against a disabled account) collapse into one row,
-					// same treatment as login_failed.
-				)
-			);
-		}
-
-		return $user;
 	}
 
 	public function on_login( string $user_login, WP_User $user ) {
@@ -97,15 +53,45 @@ class AM_Logger_Users extends AM_Logger_Base {
 		);
 	}
 
-	public function on_login_failed( string $username ) {
-		$this->log(
-			'user',
-			'login_failed',
-			sprintf(
+	/**
+	 * Every rejected login, logged exactly once. Wrong username/password
+	 * becomes login_failed; any other error (a disabled account, a blocked
+	 * IP, a 2FA plugin rejecting the attempt) becomes auth_error, since the
+	 * causes differ for someone auditing the log.
+	 *
+	 * auth_error used to come from a separate 'authenticate' filter
+	 * callback. Core fires wp_login_failed for every WP_Error that chain
+	 * produces (bar empty_username/empty_password), with the error passed
+	 * along since 5.4, so every wrong password was logged twice -- once
+	 * per event type. Splitting by error code here keeps both types from a
+	 * single hook.
+	 *
+	 * @param WP_Error|null $error
+	 */
+	public function on_login_failed( string $username, $error = null ) {
+		$code = is_wp_error( $error ) ? $error->get_error_code() : '';
+
+		if ( '' === $code || in_array( $code, array( 'incorrect_password', 'invalid_username', 'invalid_email' ), true ) ) {
+			$action  = 'login_failed';
+			$message = sprintf(
 				/* translators: %s: username */
 				__( 'Failed login attempt for username "%s".', 'activity-monitor' ),
 				$username
-			),
+			);
+		} else {
+			$action  = 'auth_error';
+			$message = sprintf(
+				/* translators: 1: username, 2: error message */
+				__( 'Authentication error for "%1$s": %2$s', 'activity-monitor' ),
+				$username,
+				$error->get_error_message()
+			);
+		}
+
+		$this->log(
+			'user',
+			$action,
+			$message,
 			array(
 				'level'       => AM_Log_Levels::WARNING,
 				'object_type' => 'user',
@@ -116,9 +102,14 @@ class AM_Logger_Users extends AM_Logger_Base {
 		);
 	}
 
-	public function on_logout() {
-		$user = wp_get_current_user();
-		if ( ! $user->exists() ) {
+	/**
+	 * Reads the user from the hook's own argument: core fires wp_logout
+	 * *after* wp_set_current_user( 0 ), so the current user is already
+	 * nobody here, and the writer is told who acted explicitly.
+	 */
+	public function on_logout( $user_id = 0 ) {
+		$user = get_userdata( (int) $user_id );
+		if ( ! $user ) {
 			return;
 		}
 		$this->log(
@@ -135,6 +126,8 @@ class AM_Logger_Users extends AM_Logger_Base {
 				'object_id'   => $user->ID,
 				'object_name' => $user->user_login,
 				'group'       => false,
+				'user_id'     => $user->ID,
+				'initiator'   => AM_Initiator_Detector::WP_USER,
 			)
 		);
 	}

@@ -85,16 +85,12 @@ class AM_Logger_File_Editor extends AM_Logger_Base {
 				'level'       => AM_Log_Levels::ERROR,
 				'object_type' => $context_type,
 				'object_name' => $context_name . '/' . $file,
-				// Occasion grouping keys on event_type+action+object_id
-				// (see AM_Event_Writer::compute_occasion_id) -- object_id
-				// is a bigint and can't carry a file path, so without this
-				// every file_edit_attempted event within the grouping
-				// window collapses into one row regardless of *which*
-				// file was edited, silently freezing that first row's
-				// level/message even for edits to a completely different
-				// file. Disabled here since each edit is a distinct,
-				// security-relevant action worth its own row, not noise
-				// to collapse.
+				// Each edit is a distinct, security-relevant action worth
+				// its own row, not noise to collapse -- even repeated
+				// saves of the same file, which occasion grouping (keyed
+				// on the object name, see
+				// AM_Event_Writer::compute_occasion_id()) would otherwise
+				// fold into one.
 				'group'       => false,
 			)
 		);

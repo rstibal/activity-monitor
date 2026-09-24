@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, event log
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.9.17
+Stable tag: 2.9.18
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -75,6 +75,12 @@ Yes. Settings → Privacy offers full addresses, anonymised addresses (the last 
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
 
 == Changelog ==
+
+= 2.9.18 =
+* Fixed: repeat-event grouping merged different events into one row whenever they had no object ID — bulk-updating ten plugins logged only the first, and failed logins for different usernames (or access-denied hits by different users) collapsed into the first attempt's row. The grouping key now includes the object name and the acting user.
+* Fixed: an event whose message or object name was longer than its database column (a fatal error's stack trace, a PHP warning with a long path, a very long post title) was silently not logged at all. Over-long values are now truncated to fit, with the full message kept and shown in the Details modal.
+* Fixed: logouts were never logged — WordPress clears the current user before firing its logout hook.
+* Fixed: every wrong-password login was logged twice, as both "Authentication Error" and "Failed Login". Each rejected login is now one row: Failed Login for a wrong username/password, Authentication Error for anything else (disabled account, 2FA rejection, etc.).
 
 = 2.9.17 =
 * Added: failed REST API cookie/nonce authentication (a login cookie present but the nonce missing, invalid, or stale) is now logged, alongside the existing failed application-password authentication logging (AM_Logger_Rest_Api).
