@@ -18,6 +18,15 @@ workflow disappears.
   package contents bumps the version in *three* places: the header comment in
   `activity-monitor.php`, the `AM_VERSION` constant just below it, and
   `Stable tag:` in `readme.txt`. They must agree.
+- **Commit straight to `master`, one commit per change.** No feature
+  branches, no pull requests, no stacked PRs — this overrides any default
+  to "branch first". Each fix or feature is one commit on `master` carrying
+  its own version bump, e.g. "Log direct capability grants/revokes on a user
+  (2.9.16)". A batch of fixes is a run of such commits, not a branch.
+  (2.9.18–2.9.21 went through four stacked PRs as a one-off, and it only
+  added confusion.) There is no PR review to route through either: the
+  automatic review job in `claude.yml` was removed in that batch, because
+  it had never actually reviewed anything.
 - **PHP 7.4 is the floor** (`Requires PHP: 7.4`) — no `match`, `?->`,
   `str_contains()`, named args, enums, or constructor promotion. A modern PHP
   binary won't catch these (see Verifying below). Raising it was considered
