@@ -31,14 +31,20 @@ class AM_Logger_Maintenance_Mode extends AM_Logger_Base {
 	}
 
 	public function on_admin_init() {
-		$is_active  = file_exists( ABSPATH . '.maintenance' );
-		$last_state = get_option( self::STATE_OPTION, false );
+		$is_active = file_exists( ABSPATH . '.maintenance' );
+		// Cast, not compared raw: wp_options stores strings, so a saved
+		// true comes back as '1' and a saved false as '' -- neither ever
+		// === a boolean, which made every admin page load after the first
+		// transition log that transition again. '0' is stored for "off"
+		// (rather than false, which is stored as '') and '' still reads
+		// as off, so values saved by earlier versions keep working.
+		$was_active = (bool) get_option( self::STATE_OPTION, false );
 
-		if ( $is_active === $last_state ) {
+		if ( $is_active === $was_active ) {
 			return;
 		}
 
-		update_option( self::STATE_OPTION, $is_active );
+		update_option( self::STATE_OPTION, $is_active ? '1' : '0' );
 
 		$this->log(
 			'system',

@@ -51,6 +51,14 @@ class AM_Stats_Geo_Updater {
 	 */
 	const MANUAL_TRIGGER_COOLDOWN = 1 * MINUTE_IN_SECONDS;
 
+	/**
+	 * How long an import can go without finishing a tick, with no tick
+	 * running or scheduled, before it's treated as dead. Comfortably more
+	 * than the longest single tick (the download stage's 300-second
+	 * timeout plus its redirect hops) -- see current_progress().
+	 */
+	const STALL_AFTER = 15 * MINUTE_IN_SECONDS;
+
 	public static function init() {
 		add_action( self::CHECK_HOOK, array( __CLASS__, 'maybe_check_for_update' ) );
 		add_action( self::TICK_HOOK, array( __CLASS__, 'process_tick' ) );
@@ -61,7 +69,7 @@ class AM_Stats_Geo_Updater {
 	/** @return array{configured:bool, enabled:bool, in_progress:bool, stage:string, error:string, last_updated:int, row_count:int} */
 	public static function status(): array {
 		global $wpdb;
-		$progress = get_option( self::PROGRESS_OPTION, array() );
+		$progress = self::current_progress();
 		$table    = $wpdb->prefix . AM_Stats_Schema::GEO_RANGES_TABLE;
 
 		return array(
@@ -231,8 +239,42 @@ class AM_Stats_Geo_Updater {
 	}
 
 	private static function import_in_progress(): bool {
-		$progress = get_option( self::PROGRESS_OPTION, array() );
+		$progress = self::current_progress();
 		return ! empty( $progress ) && 'error' !== ( $progress['stage'] ?? '' );
+	}
+
+	/**
+	 * The stored progress, with a dead import converted to an error first.
+	 *
+	 * Each tick schedules the next one only after it finishes, so a tick
+	 * that dies partway (a PHP timeout, running out of memory, a fatal
+	 * error) leaves the progress option saying "in progress" with nothing
+	 * scheduled to continue it. Before 2.9.19 that state was permanent:
+	 * import_in_progress() blocked both the daily check and Update Now,
+	 * and the Settings screen showed "Import in progress" forever. An
+	 * import that isn't running (no lock), isn't queued (no tick
+	 * scheduled) and hasn't advanced for STALL_AFTER is recorded as
+	 * failed here instead, which frees Update Now to start a fresh one.
+	 */
+	private static function current_progress(): array {
+		$progress = (array) get_option( self::PROGRESS_OPTION, array() );
+		if ( empty( $progress ) || 'error' === ( $progress['stage'] ?? '' ) ) {
+			return $progress;
+		}
+
+		$last_advanced = (int) ( $progress['updated_at'] ?? $progress['started_at'] ?? 0 );
+		$stalled       = time() - $last_advanced > self::STALL_AFTER
+			&& false === get_transient( self::LOCK_TRANSIENT )
+			&& ! wp_next_scheduled( self::TICK_HOOK );
+
+		if ( $stalled ) {
+			$progress['stage'] = 'error';
+			$progress['error'] = __( 'The import stopped partway through without finishing. Use Update Now to start it again.', 'activity-monitor' );
+			update_option( self::PROGRESS_OPTION, $progress, false );
+			self::cleanup_working_dir( $progress['dir'] ?? '' );
+		}
+
+		return $progress;
 	}
 
 	private static function start_import() {
@@ -242,6 +284,7 @@ class AM_Stats_Geo_Updater {
 			'dir'        => '',
 			'row_offset' => 0,
 			'started_at' => time(),
+			'updated_at' => time(),
 		), false );
 		wp_schedule_single_event( time(), self::TICK_HOOK );
 	}
@@ -266,6 +309,13 @@ class AM_Stats_Geo_Updater {
 			delete_transient( self::LOCK_TRANSIENT );
 			return;
 		}
+
+		// Stamped as the tick starts, not only as it ends: the stall check
+		// in current_progress() times from this, and WP-Cron can run a
+		// queued tick long after it was scheduled on a quiet site -- a
+		// download that only started late must not look dead partway.
+		$progress['updated_at'] = time();
+		update_option( self::PROGRESS_OPTION, $progress, false );
 
 		try {
 			switch ( $progress['stage'] ) {
@@ -292,12 +342,16 @@ class AM_Stats_Geo_Updater {
 					$progress['stage'] = 'error';
 					$progress['error'] = 'Unknown import stage.';
 			}
-		} catch ( Exception $e ) {
+		} catch ( \Throwable $e ) {
+			// \Throwable, not Exception: a PHP Error (e.g. a TypeError on a
+			// truncated CSV) isn't an Exception, and escaping here would
+			// skip the error state below and leave the import wedged.
 			$progress['stage'] = 'error';
 			$progress['error'] = $e->getMessage();
 			self::cleanup_working_dir( $progress['dir'] ?? '' );
 		}
 
+		$progress['updated_at'] = time();
 		update_option( self::PROGRESS_OPTION, $progress, false );
 		delete_transient( self::LOCK_TRANSIENT );
 
