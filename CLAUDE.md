@@ -396,7 +396,7 @@ goes through the same filter with one id; only counted as bulk when more
 than one object is actually affected, to avoid every ordinary single delete
 picking up a spurious "(bulk ..., 1 items)" note.
 
-**Three loggers added in 2.9.12/2.9.14 each carry a scoping or re-entrancy
+**Three loggers added in 2.9.12/2.9.14 (plus later additions below) each carry a scoping or re-entrancy
 gotcha worth knowing before touching them:**
 - **`AM_Logger_Options`** watches a small explicit allowlist
   (`WATCHED_OPTIONS`: `siteurl`, `home`, `default_role`,
@@ -414,7 +414,18 @@ gotcha worth knowing before touching them:**
   way to tell the two apart from the hook's arguments alone, so hooking it
   would log a row on every single REST call an integration makes. Same
   noise-avoidance reasoning `AM_Logger_Security` uses to watch a short list
-  of restricted admin pages rather than every denied request.
+  of restricted admin pages rather than every denied request. Since 2.9.17
+  it also logs failed REST cookie/nonce authentication
+  (`security.rest_cookie_auth_failed`) via `rest_authentication_errors` at
+  priority 101 — just after core's own `rest_cookie_check_errors()` at 100,
+  as a pure observer that must return `$result` unchanged (it's a gating
+  filter, not an action). It matches only that check's two error codes
+  (`rest_cookie_invalid_nonce`, `rest_cookie_error`), **not** "any
+  `WP_Error` on the filter": application-password failures surface through
+  the same filter and already have their own row, so matching on
+  cookie-specific codes is what prevents double-logging one failed request.
+  Anonymous requests return `null`/`true`, never a `WP_Error`, so they're
+  not logged.
 - **`AM_Logger_Mail_Sent`** (companion to `AM_Logger_Mail_Failures`, which
   covers the failure side) requires `skip_notify` — without it, a
   successful alert email sent by `AM_Notifications::send_email()` would
@@ -424,6 +435,27 @@ gotcha worth knowing before touching them:**
   and `AM_Logger_Mail_Failures` already guard against. "Succeeded" means
   handed off to the configured mail transport without PHPMailer erroring —
   not proof of inbox delivery.
+
+**Two more loggers (2.9.15/2.9.16) with their own scoping notes:**
+- **`AM_Logger_Export`** hooks core's `export_wp` (Tools → Export, also
+  WP-CLI `wp export`), logging `system.export` at WARNING, ungrouped. It's
+  the one built-in way to pull all site content out as a file. No noise
+  concern: the action only fires on an actual export.
+- **`AM_Logger_Capabilities`** logs a capability granted/removed directly
+  (`WP_User::add_cap()`/`remove_cap()`) as `user.capabilities_changed`,
+  closing the gap `set_user_role` leaves — that hook only sees a wholesale
+  role swap, so quietly granting `manage_options` while staying an "Editor"
+  left no trace. It watches `{$wpdb->prefix}capabilities` user meta on
+  `update_user_meta`, which fires *before* the write, so the old value is
+  still readable for the diff (`updated_user_meta` is too late). It only
+  logs when **non-role** keys differ (role slugs come from `wp_roles()`):
+  `WP_User::set_role()` rewrites the same meta key *before* firing
+  `set_user_role`, so hook ordering can't be used to suppress the
+  duplicate, and a role reassignment is indistinguishable from a raw
+  single-role meta write on this hook alone. Scoping to non-role keys
+  avoids needing to tell them apart. `add_user_meta` is deliberately not
+  hooked (initial caps at registration are already covered by
+  `user_register`).
 
 ## Decisions worth not re-litigating
 
