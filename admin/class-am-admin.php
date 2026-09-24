@@ -2631,7 +2631,7 @@ class AM_Admin {
 				printf(
 					/* translators: %s: current import stage, e.g. "blocks_ipv4" */
 					esc_html__( 'Import in progress (stage: %s) — this runs in the background across several page loads and can take a few minutes.', 'activity-monitor' ),
-					'<code>' . esc_html( $status['stage'] ) . '</code>'
+					esc_html( $status['stage'] )
 				);
 				?>
 			<?php elseif ( '' !== $status['error'] ) : ?>
