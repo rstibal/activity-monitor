@@ -30,13 +30,27 @@ jobs:
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          direct_prompt: |
+          # `prompt`, not `direct_prompt`: v1 of the action renamed it, and an
+          # unknown input is only a warning -- the job ran with no prompt,
+          # did nothing, and still reported success, so no PR was actually
+          # reviewed until this was fixed.
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
             Review this pull request to the activity-monitor WordPress plugin.
             Focus on: security (SQL injection, XSS, capability checks, nonce
             verification), WordPress coding standards, correctness, and any
             regressions relative to existing behavior. Be concise — flag real
             issues, don't nitpick style unless it violates WPCS. If the PR
             looks safe to merge, say so plainly.
+
+            Read the diff with `gh pr diff`. Post specific issues as inline
+            comments on the lines concerned, and post your overall verdict
+            as one PR comment with `gh pr comment`.
+          # v1 only lets Claude use the tools listed here. Read the PR and
+          # comment on it -- nothing that can change code.
+          claude_args: '--allowed-tools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"'
 
   # Manually triggered from the Actions tab ("Run workflow" button).
   # You type a task in the prompt box; Claude implements it and opens a PR.
@@ -59,4 +73,4 @@ jobs:
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          direct_prompt: ${{ github.event.inputs.prompt }}
+          prompt: ${{ github.event.inputs.prompt }}
