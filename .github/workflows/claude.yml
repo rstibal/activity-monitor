@@ -51,9 +51,6 @@ jobs:
           # v1 only lets Claude use the tools listed here. Read the PR and
           # comment on it -- nothing that can change code.
           claude_args: '--allowed-tools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"'
-          # TEMPORARY -- diagnosing an API error the default hidden output
-          # conceals. Remove once the review runs.
-          show_full_output: true
 
   # Manually triggered from the Actions tab ("Run workflow" button).
   # You type a task in the prompt box; Claude implements it and opens a PR.
