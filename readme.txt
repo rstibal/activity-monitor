@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, event log
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.9.19
+Stable tag: 2.9.20
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -75,6 +75,13 @@ Yes. Settings → Privacy offers full addresses, anonymised addresses (the last 
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
 
 == Changelog ==
+
+= 2.9.20 =
+* Fixed: a password changed from the Profile or Edit User screen (or by any plugin through wp_update_user()) was never logged. It's now recorded as "Password Set".
+* Fixed: a password reset logged two rows, Password Reset and Password Set. It now logs one.
+* Fixed: on WordPress 6.8 and later, an ordinary login could log "Password Set", because core re-hashes an outdated stored password on login. That's no longer logged, since the password itself didn't change.
+* Fixed: flipping a capability a user was explicitly denied into a grant (for example manage_options from denied to allowed) wasn't logged. Capability changes are now tracked by state — granted, denied or removed — not just by whether the capability is listed.
+* Fixed: an Activity Log link with a malformed am_event_id could stop the screen's JavaScript from working (modals, filters, paging). The value is now checked, and it's dropped from the address bar once used so a reload doesn't reopen the modal.
 
 = 2.9.19 =
 * Fixed: Visitor Stats stopped recording hits from cached pages once the cached copy was more than a day old — the tracking beacon carried a nonce that expired with the cache. The beacon no longer uses one.

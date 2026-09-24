@@ -41,10 +41,23 @@
 	   closed -- the highlight is looked up by the same data-id the
 	   Details button carries, so it only applies if that event's row
 	   is actually rendered on the current (first, unfiltered) page. */
-	var amDeepLinkEventId = new URLSearchParams(window.location.search).get('am_event_id');
-	if (amDeepLinkEventId) {
-		loadEventDetail(amDeepLinkEventId);
-		$('.am-view-detail-v2[data-id="' + amDeepLinkEventId + '"]').closest('tr').addClass('am-row-highlighted');
+	/* Digits only, checked before the value goes anywhere near a selector:
+	   anything else (e.g. 1"]) made the attribute selector below throw,
+	   which aborted this whole file and left every handler after it
+	   unbound. The param is then dropped from the address bar, so a reload
+	   or a back-navigation to this entry doesn't reopen the modal -- and
+	   it's also left out of every link the screen builds (see
+	   AM_Admin::render_log_content()'s $current_url). */
+	var amUrlParams = new URLSearchParams(window.location.search);
+	var amDeepLinkEventId = amUrlParams.get('am_event_id');
+	if (amDeepLinkEventId !== null) {
+		if (/^\d+$/.test(amDeepLinkEventId)) {
+			loadEventDetail(amDeepLinkEventId);
+			$('.am-view-detail-v2[data-id="' + amDeepLinkEventId + '"]').closest('tr').addClass('am-row-highlighted');
+		}
+		amUrlParams.delete('am_event_id');
+		var amCleanQs = amUrlParams.toString();
+		window.history.replaceState(window.history.state, '', window.location.pathname + (amCleanQs ? '?' + amCleanQs : '') + window.location.hash);
 	}
 
 	/* IP address lookup modal. Triggered by clicking any .am-ip-lookup

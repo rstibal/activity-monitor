@@ -1309,7 +1309,12 @@ class AM_Admin {
 		// URL's existing query string but inserts the values it's handed
 		// verbatim, so a search for "R&D" became am_search=R&D -- a search
 		// for "R" plus a stray "D" parameter -- on every link built from it.
-		$current_url = add_query_arg( urlencode_deep( $raw ), admin_url( 'admin.php' ) );
+		//
+		// am_event_id (a Slack alert's deep link) is a one-shot instruction
+		// to open that event's modal, not a filter -- carried into
+		// pagination links, it rode along into the address bar (via
+		// admin.js's pushState) and reopened the modal on any reload.
+		$current_url = add_query_arg( urlencode_deep( array_diff_key( $raw, array( 'am_event_id' => true ) ) ), admin_url( 'admin.php' ) );
 
 		$data      = AM_Event_Query::get_events( compact( 'per_page', 'page', 'level', 'initiator', 'event_type', 'action', 'user', 'date_from', 'date_to', 'search' ) );
 		$items     = $data['items'];

@@ -24,7 +24,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  * set_role() calls update_user_meta() itself, then fires set_user_role) and
  * would otherwise double-log every role change here too. To avoid that,
  * this splits the before/after arrays into role-slug keys (from wp_roles())
- * and everything else, and only logs when the *non-role* keys differ.
+ * and everything else, and only logs when a *non-role* capability changes state.
  * A same-shape "assign exactly one role" write -- which is what a role
  * change and a raw meta write both look like on this hook alone -- is
  * indistinguishable from here anyway; scoping to non-role keys sidesteps
@@ -53,10 +53,26 @@ class AM_Logger_Capabilities extends AM_Logger_Base {
 		$old_extra  = array_diff_key( $old_caps, array_flip( $role_slugs ) );
 		$new_extra  = array_diff_key( $new_caps, array_flip( $role_slugs ) );
 
-		$added   = array_keys( array_diff_key( $new_extra, $old_extra ) );
-		$removed = array_keys( array_diff_key( $old_extra, $new_extra ) );
+		// Compared by state, not just by key: a capability can be present
+		// but explicitly denied ('manage_options' => false, what
+		// add_cap( $cap, false ) writes). Comparing keys alone missed
+		// flipping that denial to a grant -- the key was there both
+		// before and after, so a user quietly gaining manage_options
+		// that way left no row.
+		$changes = array(
+			'granted' => array(),
+			'denied'  => array(),
+			'removed' => array(),
+		);
+		foreach ( array_keys( $old_extra + $new_extra ) as $cap ) {
+			$before = self::cap_state( $old_extra, $cap );
+			$after  = self::cap_state( $new_extra, $cap );
+			if ( $before !== $after ) {
+				$changes[ $after ][] = $cap;
+			}
+		}
 
-		if ( ! $added && ! $removed ) {
+		if ( ! $changes['granted'] && ! $changes['denied'] && ! $changes['removed'] ) {
 			return;
 		}
 
@@ -64,20 +80,24 @@ class AM_Logger_Capabilities extends AM_Logger_Base {
 		$name = $user ? $user->user_login : "user-{$object_id}";
 
 		$parts = array();
-		if ( $added ) {
+		if ( $changes['granted'] ) {
 			/* translators: %s: comma-separated list of capability slugs */
-			$parts[] = sprintf( __( 'added %s', 'activity-monitor' ), implode( ', ', $added ) );
+			$parts[] = sprintf( __( 'granted %s', 'activity-monitor' ), implode( ', ', $changes['granted'] ) );
 		}
-		if ( $removed ) {
+		if ( $changes['denied'] ) {
 			/* translators: %s: comma-separated list of capability slugs */
-			$parts[] = sprintf( __( 'removed %s', 'activity-monitor' ), implode( ', ', $removed ) );
+			$parts[] = sprintf( __( 'denied %s', 'activity-monitor' ), implode( ', ', $changes['denied'] ) );
+		}
+		if ( $changes['removed'] ) {
+			/* translators: %s: comma-separated list of capability slugs */
+			$parts[] = sprintf( __( 'removed %s', 'activity-monitor' ), implode( ', ', $changes['removed'] ) );
 		}
 
 		$this->log(
 			'user',
 			'capabilities_changed',
 			sprintf(
-				/* translators: 1: username, 2: added/removed capability summary */
+				/* translators: 1: username, 2: granted/denied/removed capability summary */
 				__( 'Capabilities changed for user "%1$s": %2$s.', 'activity-monitor' ),
 				$name,
 				implode( '; ', $parts )
@@ -90,13 +110,31 @@ class AM_Logger_Capabilities extends AM_Logger_Base {
 				'context'     => array(
 					'diff' => array(
 						'capabilities' => array(
-							'before' => implode( ', ', array_keys( $old_extra ) ),
-							'after'  => implode( ', ', array_keys( $new_extra ) ),
+							'before' => self::describe( $old_extra ),
+							'after'  => self::describe( $new_extra ),
 						),
 					),
 				),
 				'group'       => false,
 			)
 		);
+	}
+
+	/** 'granted', 'denied' (present but false), or 'removed' (not present). */
+	private static function cap_state( array $caps, string $cap ): string {
+		if ( ! array_key_exists( $cap, $caps ) ) {
+			return 'removed';
+		}
+		return $caps[ $cap ] ? 'granted' : 'denied';
+	}
+
+	/** The diff's before/after text: granted caps bare, denied ones marked. */
+	private static function describe( array $caps ): string {
+		$out = array();
+		foreach ( $caps as $cap => $granted ) {
+			/* translators: %s: capability slug */
+			$out[] = $granted ? (string) $cap : sprintf( __( '%s (denied)', 'activity-monitor' ), $cap );
+		}
+		return implode( ', ', $out );
 	}
 }
