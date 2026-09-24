@@ -63,11 +63,12 @@ class AM_Logger_Fatal_Errors extends AM_Logger_Base {
 						'file' => $error['file'],
 						'line' => $error['line'],
 					),
-					// Same reasoning as AM_Logger_File_Editor: grouping
-					// keys on event_type+action+object_id, and object_id
-					// can't carry a file/line, so without this a second,
-					// genuinely different fatal error within the window
-					// would silently collapse into the first one's row.
+					// Grouping keys on the object (see
+					// AM_Event_Writer::compute_occasion_id()), and the only
+					// object here is the file's basename -- so without this
+					// a second, genuinely different fatal error in the same
+					// file within the window would silently collapse into
+					// the first one's row.
 					'group'       => false,
 				)
 			);

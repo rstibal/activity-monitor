@@ -120,7 +120,7 @@ class AM_Logger_Php_Warnings extends AM_Logger_Base {
 		//
 		// Keyed on the action too, not just file+line: one line can emit
 		// both a warning and a deprecation notice, and those are separate
-		// rows downstream (occasion_id keys on event_type+action+object_id).
+		// rows downstream (occasion_id keys on the action, among others).
 		$key = $action . '|' . $errfile . ':' . $errline;
 		if ( isset( $this->seen[ $key ] ) ) {
 			return;

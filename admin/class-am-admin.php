@@ -721,7 +721,11 @@ class AM_Admin {
 					<?php if ( $row->object_id )   echo ' (ID: ' . esc_html( $row->object_id ) . ')'; ?>
 				</td>
 			</tr>
-			<tr><th><?php esc_html_e( 'Message', 'activity-monitor' ); ?></th><td><?php echo esc_html( $row->message ); ?></td></tr>
+			<?php
+			// full_message is only stored when the message was too long for
+			// its column (see AM_Event_Writer::COLUMN_LIMITS).
+			?>
+			<tr><th><?php esc_html_e( 'Message', 'activity-monitor' ); ?></th><td><?php echo esc_html( isset( $context['full_message'] ) ? (string) $context['full_message'] : $row->message ); ?></td></tr>
 			<?php if ( (int) $row->repeat_count > 1 ) : ?>
 			<tr><th><?php esc_html_e( 'Repeated', 'activity-monitor' ); ?></th><td><?php
 				/* translators: %d: number of times this event was recorded within the grouping window */

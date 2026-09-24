@@ -371,7 +371,13 @@ logger writing through `AM_Event_Writer`, where it inherits the existing
 filters, grouping, and export.
 
 `AM_Event_Writer` collapses repeat events within a window keyed on
-`event_type` + `action` + `object_id` + `initiator`. The window is
+`event_type` + `action` + `object_id` + `object_name` + `user_id` +
+`initiator`. Before 2.9.18 the key stopped at `object_id`, and most loggers
+have no object id to give (plugins, themes, failed logins, access-denied)
+— so a bulk update of ten plugins logged only the first, and failed logins
+for different usernames merged into one row. The IP stays out of the key on
+purpose, so a distributed brute-force burst against one username still
+collapses. The window is
 `am_occasion_window_seconds` (Settings → Logging; 5 minutes by default, 0
 turns grouping off), still filterable on top. Loggers with no meaningful
 object id (file-editor, fatal-errors) pass `'group' => false`.
@@ -379,6 +385,14 @@ object id (file-editor, fatal-errors) pass `'group' => false`.
 `crc32( "$file:$line" ) & 0x7FFFFFFF`, since `object_id` is an int column —
 so repeats of the same warning collapse while a different warning still gets
 its own row.
+
+**`AM_Event_Writer::COLUMN_LIMITS` truncates every text column before the
+insert, and has to track the schema.** `$wpdb->insert()` doesn't truncate an
+over-long value — it rejects the whole row and returns false, silently. Until
+2.9.18 that meant most fatal errors (the message carries a stack trace) were
+never logged at all. A truncated message keeps its full text in the
+`full_message` context key, which the Details modal prefers. Widen a
+`VARCHAR` in `AM_Schema` and the matching limit goes up here too.
 
 **`AM_Bulk_Context` (2.9.13) tags per-item events with the bulk operation
 they were part of, without introducing a new event type or using
