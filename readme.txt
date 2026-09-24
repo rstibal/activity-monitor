@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, event log
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.9.20
+Stable tag: 2.9.21
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -75,6 +75,13 @@ Yes. Settings → Privacy offers full addresses, anonymised addresses (the last 
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
 
 == Changelog ==
+
+= 2.9.21 =
+* Fixed: widget changes weren't logged on most sites. The logger only understood the classic Widgets screen, and the block-based widget editor (WordPress's default since 5.8) saves a different way. It now records widgets added, removed or moved between sidebars, and widget settings saved, from the classic screen, the block editor and the Customizer alike.
+* Fixed: on multisite, creating or deleting a site also logged a PHP deprecation notice, because the plugin listened on hooks WordPress deprecated in 5.1. It now uses their replacements, and names sites by address (domain and path) rather than ID alone.
+* Fixed: widget events and "Activity Log Cleared" showed auto-generated labels instead of proper names.
+* Fixed: GeoLite2 import error messages were HTML-escaped twice, so characters like & showed up as &amp; on the Settings screen.
+* Changed: the GeoLite2 import stage name is shown as plain text rather than as code.
 
 = 2.9.20 =
 * Fixed: a password changed from the Profile or Edit User screen (or by any plugin through wp_update_user()) was never logged. It's now recorded as "Password Set".

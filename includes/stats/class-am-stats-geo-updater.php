@@ -149,7 +149,7 @@ class AM_Stats_Geo_Updater {
 				'redirection' => 0,
 			) );
 			if ( is_wp_error( $response ) ) {
-				throw new Exception( 'Could not resolve the download URL: ' . esc_html( $response->get_error_message() ) );
+				throw new Exception( 'Could not resolve the download URL: ' . $response->get_error_message() ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- stored as plain text in the progress option; escaped where displayed, see field_stats_geo_status().
 			}
 
 			$code = (int) wp_remote_retrieve_response_code( $response );
@@ -168,7 +168,7 @@ class AM_Stats_Geo_Updater {
 					'last_modified' => (string) wp_remote_retrieve_header( $response, 'last-modified' ),
 				);
 			}
-			throw new Exception( 'Unexpected response resolving the download URL: HTTP ' . esc_html( (string) $code ) . esc_html( self::response_detail( $response ) ) );
+			throw new Exception( 'Unexpected response resolving the download URL: HTTP ' . $code . self::response_detail( $response ) ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- stored as plain text in the progress option; escaped where displayed, see field_stats_geo_status().
 		}
 
 		throw new Exception( 'Too many redirects resolving the download URL.' );
@@ -186,9 +186,11 @@ class AM_Stats_Geo_Updater {
 	 * or '' when there isn't one -- a bare "HTTP 401" doesn't distinguish a
 	 * genuinely wrong account ID/license key from a request-construction
 	 * bug like the one this method's callers work around, and MaxMind's API
-	 * reliably explains which it is. Returned unescaped -- callers pass it
-	 * through esc_html() themselves at the point it's concatenated into the
-	 * exception message.
+	 * reliably explains which it is. Returned unescaped, and kept that way
+	 * in the exception message: exception text lands in the progress
+	 * option's 'error' and is escaped once, where the Settings screen
+	 * prints it. Escaping it here too (as through 2.9.20) double-escaped
+	 * it, so an "&" in MaxMind's reply read as "&amp;".
 	 */
 	private static function response_detail( $response ): string {
 		$body = wp_remote_retrieve_body( $response );
@@ -385,7 +387,7 @@ class AM_Stats_Geo_Updater {
 				'redirection' => 0,
 			) );
 			if ( is_wp_error( $response ) ) {
-				throw new Exception( 'Download failed: ' . esc_html( $response->get_error_message() ) );
+				throw new Exception( 'Download failed: ' . $response->get_error_message() ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- stored as plain text in the progress option; escaped where displayed, see field_stats_geo_status().
 			}
 			$code = (int) wp_remote_retrieve_response_code( $response );
 			if ( $code < 300 || $code >= 400 ) {
@@ -400,7 +402,7 @@ class AM_Stats_Geo_Updater {
 		}
 
 		if ( 200 !== (int) wp_remote_retrieve_response_code( $response ) ) {
-			throw new Exception( 'Download failed: HTTP ' . esc_html( (string) wp_remote_retrieve_response_code( $response ) ) . esc_html( self::response_detail( $response ) ) );
+			throw new Exception( 'Download failed: HTTP ' . wp_remote_retrieve_response_code( $response ) . self::response_detail( $response ) ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- stored as plain text in the progress option; escaped where displayed, see field_stats_geo_status().
 		}
 		$last_modified = (string) wp_remote_retrieve_header( $response, 'last-modified' );
 
@@ -412,10 +414,10 @@ class AM_Stats_Geo_Updater {
 		) );
 
 		if ( is_wp_error( $response ) ) {
-			throw new Exception( 'Download failed: ' . esc_html( $response->get_error_message() ) );
+			throw new Exception( 'Download failed: ' . $response->get_error_message() ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- stored as plain text in the progress option; escaped where displayed, see field_stats_geo_status().
 		}
 		if ( 200 !== wp_remote_retrieve_response_code( $response ) ) {
-			throw new Exception( 'Download failed: HTTP ' . esc_html( (string) wp_remote_retrieve_response_code( $response ) ) );
+			throw new Exception( 'Download failed: HTTP ' . wp_remote_retrieve_response_code( $response ) ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- stored as plain text in the progress option; escaped where displayed, see field_stats_geo_status().
 		}
 
 		$progress['dir']           = $dir;
@@ -521,7 +523,7 @@ class AM_Stats_Geo_Updater {
 		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen -- see stage_locations()'s comment on native filesystem calls in this class.
 		$fh = fopen( $path, 'r' );
 		if ( ! $fh ) {
-			throw new Exception( 'Could not read ' . esc_html( $filename ) . '.' );
+			throw new Exception( 'Could not read ' . $filename . '.' ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- stored as plain text in the progress option; escaped where displayed, see field_stats_geo_status().
 		}
 
 		$header = fgetcsv( $fh );

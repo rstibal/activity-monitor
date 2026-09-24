@@ -473,7 +473,28 @@ gotcha worth knowing before touching them:**
   single-role meta write on this hook alone. Scoping to non-role keys
   avoids needing to tell them apart. `add_user_meta` is deliberately not
   hooked (initial caps at registration are already covered by
-  `user_register`).
+  `user_register`). Capabilities are compared by *state* (granted /
+  denied / removed), not key presence, since 2.9.20 — `'cap' => false`
+  is an explicit denial, and flipping it to a grant keeps the key.
+
+**Two loggers rewritten in 2.9.21 because their hooks stopped matching
+how WordPress works:**
+- **`AM_Logger_Widgets`** watches the `sidebars_widgets` option
+  (placements; one row per write listing every change) and each
+  *registered* widget type's `widget_{id_base}` option (settings saves on
+  instances that existed before and after the write — new/deleted
+  instances are placement changes, already logged). It used to inspect
+  the classic Widgets screen's POST, which the block widget editor
+  (default since 5.8, saves over REST) never sends, so on most sites no
+  widget change was logged at all. Watching storage covers the classic
+  screen, the block editor and the Customizer alike.
+- **`AM_Logger_Sites`** uses `wp_initialize_site` (priority 100, after
+  core's own initialization at 10) and `wp_delete_site`. The old
+  `wpmu_new_blog`/`delete_blog` are deprecated since 5.1 and fired through
+  `do_action_deprecated()`, so just listening raised a deprecation notice
+  that `AM_Logger_Php_Warnings` then logged. Site names are
+  `domain + path`, since on a subdirectory network every site shares one
+  domain.
 
 ## Decisions worth not re-litigating
 
@@ -580,9 +601,16 @@ trailing action word. Guards: action ≥4 chars, type half ≥3, matching sorted
 longest-first at runtime.
 
 If labels look wrong, re-run this audit: parse every `$this->log()` /
-`AM_Event_Writer::log()` call under `includes/loggers/` and compare the
-emitted `event_type.action` pairs against `MAP`, and the types against
-`TYPE_MAP`. Last run: 47 pairs, all mapped. The Activity Log's Type dropdown
+`AM_Event_Writer::log()` call under `includes/loggers/` **and `admin/`**
+(`AM_Admin::handle_clear_log()` logs `log.cleared` from there), resolve any
+action passed as a variable to its literal values, and compare the emitted
+`event_type.action` pairs against `MAP`, and the types against `TYPE_MAP`.
+Last run (2.9.21): 62 pairs, all mapped. The run before that claimed "47,
+all mapped" but had missed `widget.saved`/`widget.removed` and
+`log.cleared` entirely, which rendered through the generic fallback. `log`
+is deliberately *not* in `TYPE_MAP`: `type_label()` prefix-matches legacy
+undelimited v1 slugs against it, so any v1 slug beginning "log…" would
+read as "Activity Log …". The Activity Log's Type dropdown
 is also the complete list of distinct `event_type` values in the database.
 
 ## Known issues

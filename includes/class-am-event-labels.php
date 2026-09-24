@@ -26,6 +26,7 @@ class AM_Event_Labels {
 		'comment.edited'                      => 'Comment Edited',
 		'comment.status_changed'              => 'Comment Status Changed',
 		'core.updated'                        => 'WordPress Core Updated',
+		'log.cleared'                            => 'Activity Log Cleared',
 		'media.deleted'                        => 'Media Deleted',
 		'media.updated'                        => 'Media Updated',
 		'media.uploaded'                       => 'Media Uploaded',
@@ -88,6 +89,12 @@ class AM_Event_Labels {
 		'user.registered'                        => 'User Registered',
 		'user.role_changed'                      => 'User Role Changed',
 		'user.updated'                            => 'User Profile Updated',
+		'widget.placement_changed'               => 'Widgets Changed',
+		// 'removed' is only written by the pre-2.9.21 widgets logger; kept
+		// so those rows keep rendering. 'saved' is still written (a widget's
+		// settings saved) and read the same under either version.
+		'widget.removed'                         => 'Widget Removed',
+		'widget.saved'                           => 'Widget Saved',
 	);
 
 	/**
@@ -187,6 +194,7 @@ class AM_Event_Labels {
 		'term'     => 'Term',
 		'theme'    => 'Theme',
 		'user'     => 'User',
+		'widget'   => 'Widget',
 	);
 
 	/**
