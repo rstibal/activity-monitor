@@ -667,7 +667,11 @@ If labels look wrong, re-run this audit: parse every `$this->log()`/
 (`AM_Admin::handle_clear_log()` logs `log.cleared` from there), resolve any
 action passed as a variable to its literal values, and compare the emitted
 `event_type.action` pairs against `MAP`, and the types against `TYPE_MAP`.
-Last run (2.9.21): 62 pairs, all mapped. The run before that claimed "47, all
+Last run (2.9.37): 63 literal pairs plus 29 more from calls whose action is
+a variable (auto-update toggles, install/update failures, privacy, site
+status, role added/removed, maintenance, PHP errors) — all mapped. Variable
+forms are why a regex over literals alone undercounts; resolve them by hand.
+Previous run (2.9.21): 62 pairs, all mapped. The run before that claimed "47, all
 mapped" but had missed `widget.saved`/`widget.removed` and `log.cleared`,
 which rendered through the generic fallback. `log` is deliberately *not* in
 `TYPE_MAP`: `type_label()` prefix-matches legacy undelimited v1 slugs against
