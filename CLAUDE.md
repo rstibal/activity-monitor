@@ -454,6 +454,12 @@ items)".
   the same tier as site deletion. Registers only when `is_multisite()`, same
   guard as `AM_Logger_Sites`.
 
+**`AM_Logger_Auto_Updates` (2.9.31)** diffs the `auto_update_plugins` /
+`auto_update_themes` lists (site options on multisite, hence the extra
+`update_site_option`/`add_site_option` hooks; the first toggle creates the
+option, hence `added_option`). An item that left the list *and* the disk is
+core pruning after a delete, so it isn't logged as "turned off".
+
 **Own settings (2.9.29)** — the plugin's `am_*` options are in
 `AM_Logger_Options::WATCHED_OPTIONS` too (a new setting needs an entry there).
 `HIDDEN_VALUES` (notification channels, MaxMind key) logs the change without
