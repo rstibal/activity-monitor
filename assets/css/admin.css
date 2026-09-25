@@ -104,10 +104,11 @@ body.wp-admin.am-theme-dark {
    -- for anyone who wants this to look like the rest of wp-admin. */
 body.wp-admin.am-style-wordpress {
 	--am-paper: #F0F0F1; --am-surface: #FFFFFF; --am-surface-2: #F6F7F7; --am-surface-3: #F0F0F1;
-	--am-ink: #1D2327; --am-muted: #50575E; --am-faint: #787C82;
-	--am-border: #DCDCDE; --am-border-strong: #C3C4C7;
+	--am-ink: #3C434A; --am-muted: #646970; --am-faint: #787C82;
+	--am-border: #C3C4C7; --am-border-strong: #8C8F94;
 	--am-accent: #2271B1; --am-accent-ink: #135E96; --am-accent-tint: #F0F6FC;
 	--am-danger: #D63638; --am-danger-tint: #FCF0F1; --am-on-accent: #FFFFFF;
+	--am-heading: #1D2327; --am-row-line: #F0F0F1;
 	--am-shadow: 0 1px 1px rgba(0,0,0,.04); --am-color-scheme: light;
 }
 body.wp-admin.am-style-wordpress.am-theme-dark {
@@ -116,6 +117,7 @@ body.wp-admin.am-style-wordpress.am-theme-dark {
 	--am-border: #3C434A; --am-border-strong: #50575E;
 	--am-accent: #72AEE6; --am-accent-ink: #9EC2E6; --am-accent-tint: #0A2A45;
 	--am-danger: #F86368; --am-danger-tint: #3A1A1B; --am-on-accent: #101517;
+	--am-heading: #F0F0F1; --am-row-line: #2C3338;
 	--am-shadow: 0 1px 2px rgba(0,0,0,.35); --am-color-scheme: dark;
 }
 
@@ -278,6 +280,93 @@ body.wp-admin.am-style-wordpress .am-modal-overlay * {
 }
 body.wp-admin.am-style-wordpress .am-wrap .am-version { font-family: monospace !important; }
 body.wp-admin.am-style-wordpress .am-wrap .dashicons { font-family: dashicons !important; }
+
+/* The WordPress style also takes core's proportions, not just its colours:
+   values below are from core's own admin CSS (common.css, list-tables.css,
+   forms.css) -- 13px body text, 14px control text and table headings,
+   30px controls, 3px/4px radii, square cards and tables with a 1px #c3c4c7
+   border and a faint 1px drop shadow, 8px 10px cell padding, and no
+   row-hover highlight. Everything is scoped to this style so the others
+   keep the Ledger proportions. */
+body.wp-admin.am-style-wordpress .am-wrap { font-size: 13px; }
+body.wp-admin.am-style-wordpress .am-wrap h1 {
+	font-size: 23px; font-weight: 400; line-height: 1.3; padding: 9px 0 4px;
+	color: var( --am-heading );
+}
+body.wp-admin.am-style-wordpress .am-wrap h2,
+body.wp-admin.am-style-wordpress .am-wrap h3 { color: var( --am-heading ); }
+body.wp-admin.am-style-wordpress .am-wrap a { text-decoration: none; }
+
+/* Controls */
+body.wp-admin.am-style-wordpress .am-wrap input[type="text"],
+body.wp-admin.am-style-wordpress .am-wrap input[type="search"],
+body.wp-admin.am-style-wordpress .am-wrap input[type="date"],
+body.wp-admin.am-style-wordpress .am-wrap input[type="number"],
+body.wp-admin.am-style-wordpress .am-wrap input[type="password"],
+body.wp-admin.am-style-wordpress .am-wrap select,
+body.wp-admin.am-style-wordpress .am-wrap textarea {
+	font-size: 14px; min-height: 30px; padding: 0 8px; border-radius: 4px;
+	border-color: var( --am-border-strong ); box-shadow: 0 0 0 transparent;
+}
+body.wp-admin.am-style-wordpress .am-wrap textarea { padding: 4px 8px; }
+body.wp-admin.am-style-wordpress .am-wrap select { padding-right: 24px; }
+body.wp-admin.am-style-wordpress .am-wrap .am-heading-controls .am-style-select {
+	font-size: 13px; min-height: 28px;
+}
+body.wp-admin.am-style-wordpress .am-wrap .button:not(.am-btn-danger):not(.button-primary) {
+	font-size: 13px; min-height: 30px; line-height: 2.15384615; padding: 0 10px; border-radius: 3px;
+	color: var( --am-accent ); border-color: var( --am-accent ); background: var( --am-surface-2 );
+}
+body.wp-admin.am-style-wordpress .am-wrap .button:not(.am-btn-danger):not(.button-primary):hover,
+body.wp-admin.am-style-wordpress .am-wrap .button:not(.am-btn-danger):not(.button-primary):focus {
+	color: var( --am-accent-ink ); border-color: var( --am-accent-ink ); background: var( --am-surface-3 );
+}
+body.wp-admin.am-style-wordpress .am-wrap .button-primary {
+	font-size: 13px; min-height: 30px; line-height: 2.15384615; padding: 0 10px; border-radius: 3px;
+	background: var( --am-accent ); border-color: var( --am-accent );
+}
+body.wp-admin.am-style-wordpress .am-wrap .button-primary:hover,
+body.wp-admin.am-style-wordpress .am-wrap .button-primary:focus {
+	background: var( --am-accent-ink ); border-color: var( --am-accent-ink ); filter: none;
+}
+body.wp-admin.am-style-wordpress .am-wrap .button.am-btn-danger { font-size: 13px; min-height: 30px; line-height: 2.15384615; padding: 0 10px; border-radius: 3px; }
+
+/* Tables: square, bordered, faintly shadowed; white header; striped body. */
+body.wp-admin.am-style-wordpress .am-wrap .wp-list-table {
+	border: 1px solid var( --am-border ); box-shadow: 0 1px 1px rgba( 0, 0, 0, .04 );
+}
+body.wp-admin.am-style-wordpress .am-wrap .wp-list-table th,
+body.wp-admin.am-style-wordpress .am-wrap .wp-list-table td {
+	padding: 8px 10px; font-size: 13px; line-height: 1.5em;
+}
+body.wp-admin.am-style-wordpress .am-wrap .wp-list-table thead th,
+body.wp-admin.am-style-wordpress .am-wrap .wp-list-table tfoot th {
+	font-size: 14px; font-weight: 400; line-height: 1.3em;
+	background: var( --am-surface ); color: var( --am-ink );
+}
+body.wp-admin.am-style-wordpress .am-wrap .am-log-table td {
+	border-top-color: var( --am-row-line ) !important;
+	border-right-color: var( --am-row-line ) !important;
+	border-bottom-color: var( --am-row-line ) !important;
+}
+body.wp-admin.am-style-wordpress .am-wrap .wp-list-table tbody tr:hover { background: transparent; }
+body.wp-admin.am-style-wordpress .am-wrap .wp-list-table.striped > tbody > tr:nth-child(odd):hover { background: var( --am-surface-2 ); }
+body.wp-admin.am-style-wordpress .am-wrap .wp-list-table.striped > tbody > tr:nth-child(even):hover { background: var( --am-surface ); }
+body.wp-admin.am-style-wordpress .am-wrap .am-datetime-cell,
+body.wp-admin.am-style-wordpress .am-wrap .am-log-table td.am-ip-cell { font-size: 13px; }
+
+/* Cards read as core postboxes: square, 1px border, faint shadow. */
+body.wp-admin.am-style-wordpress .am-wrap .am-card {
+	border-radius: 0; box-shadow: 0 1px 1px rgba( 0, 0, 0, .04 ); padding: 8px 16px 14px;
+}
+body.wp-admin.am-style-wordpress .am-wrap .am-card > h2:first-child { font-size: 14px; font-weight: 600; margin: 0 0 6px; padding: 8px 0; }
+body.wp-admin.am-style-wordpress .am-wrap .am-card > p:first-of-type { font-size: 13px; }
+
+/* Filter links, tablenav, pagination. */
+body.wp-admin.am-style-wordpress .am-wrap .subsubsub { font-size: 13px; color: var( --am-muted ); }
+body.wp-admin.am-style-wordpress.wp-core-ui .am-wrap .tablenav select { font-size: 14px; }
+body.wp-admin.am-style-wordpress .am-wrap .am-export-label { font-size: 13px; }
+body.wp-admin.am-style-wordpress .tablenav-pages .page-numbers { font-size: 13px; border-radius: 3px; min-height: 30px; line-height: 2.15384615; padding: 0 10px; }
 
 /* High Contrast: a visible, thick focus ring on every control. */
 body.wp-admin.am-style-contrast .am-wrap :focus-visible {

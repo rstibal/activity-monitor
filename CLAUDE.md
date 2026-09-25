@@ -191,7 +191,15 @@ workflow disappears.
   `.am-theme-dark` and wins. `--am-on-accent` is the text colour on the
   accent (dark palettes with a light accent need dark text). Severity and
   initiator colours are meaning, not branding, and don't change per style.
-  "WordPress" is core's palette plus a system font, not the absence of CSS:
+  "WordPress" (2.9.40) takes core's *proportions* too, from core's own
+  `common.css`/`list-tables.css`/`forms.css` (classic Fresh scheme, #2271b1):
+  13px text, 14px controls and table headers, 30px controls, 3px buttons /
+  4px inputs, square bordered tables and cards with a faint shadow, 8px 10px
+  cell padding, no row hover. Those overrides live in a block at the end of
+  its section, scoped to `am-style-wordpress`, and add `--am-heading` and
+  `--am-row-line` tokens only that style defines. Newer core trunk uses a
+  different accent (#3858e9) and 2px inputs; this follows the 6.x look.
+  It is core's palette plus a system font, not the absence of CSS:
   the plugin's layout rules are the same file as the restyle, so a literal
   no-CSS mode would need that file split. It overrides `font-family` with
   `!important` (exempting `.dashicons`). A new style needs an entry in
