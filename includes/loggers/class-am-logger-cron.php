@@ -95,7 +95,11 @@ class AM_Logger_Cron extends AM_Logger_Base {
 	 * @return mixed
 	 */
 	public function on_unschedule_event( $pre, $timestamp, $hook, $args ) {
-		$this->log_unscheduled( $hook );
+		// The filter fires whether or not the event exists, so a plugin
+		// that "makes sure" a task is gone on every request would log every time.
+		if ( is_string( $hook ) && is_array( $args ) && wp_get_scheduled_event( $hook, $args, (int) $timestamp ) ) {
+			$this->log_unscheduled( $hook );
+		}
 		return $pre;
 	}
 
@@ -105,8 +109,20 @@ class AM_Logger_Cron extends AM_Logger_Base {
 	 * @return mixed
 	 */
 	public function on_unschedule_hook( $pre, $hook ) {
-		$this->log_unscheduled( $hook );
+		if ( is_string( $hook ) && $this->hook_has_events( $hook ) ) {
+			$this->log_unscheduled( $hook );
+		}
 		return $pre;
+	}
+
+	/** True if anything is currently scheduled under $hook (this filter runs before the removal). */
+	private function hook_has_events( string $hook ): bool {
+		foreach ( (array) _get_cron_array() as $events ) {
+			if ( is_array( $events ) && isset( $events[ $hook ] ) ) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	private function log_unscheduled( $hook ) {

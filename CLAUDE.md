@@ -581,6 +581,15 @@ hook in `pre_reschedule_event` (which fires first). Without that, every job
 run would log a spurious pair. A plugin cancelling a task from inside a cron
 callback looks identical to the runner's unschedule and isn't logged. All
 hooks are filters and must return their first argument unchanged.
+**Unschedule hooks fire even when nothing exists (2.9.42):**
+`pre_unschedule_event` and `pre_unschedule_hook` run before core looks, so a
+plugin that defensively unschedules on every request (Site Kit's
+`googlesitekit_email_reporting_cleanup` did, a row per page load) logged every
+time. `on_unschedule_event` now requires `wp_get_scheduled_event()` to find
+it and `on_unschedule_hook` requires something scheduled under the hook
+(`_get_cron_array()`); both checks are only valid because the filters run
+first. Occasion grouping would also have collapsed these, but not on a site
+with `am_occasion_window_seconds` at 0.
 `wp_clear_scheduled_hook()` calls `wp_unschedule_event()` per event, so
 `pre_clear_scheduled_hook` is deliberately not hooked (it would double-log);
 `wp_unschedule_hook()` doesn't, hence its own hook.
