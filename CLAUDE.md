@@ -452,6 +452,20 @@ items)".
   the same tier as site deletion. Registers only when `is_multisite()`, same
   guard as `AM_Logger_Sites`.
 
+**`AM_Logger_Cron` (2.9.26) is the one logger with an off switch**
+(`am_log_cron_changes`, Settings → Logging, default on). WP-Cron tampering
+detection was ruled out earlier as too noisy; it shipped once a setting made
+the noise the user's call. It logs `schedule_event` and
+`pre_unschedule_event`/`pre_unschedule_hook` only when a real user is behind
+the request (not `wp_doing_cron()`, user id > 0) and skips `am_*` hooks so the
+plugin never logs its own schedules. It can't tell a person's deliberate
+change from a plugin scheduling itself during activation or a settings save —
+that residual noise is why the switch exists. All three hooks are filters and
+must return their first argument unchanged. `wp_clear_scheduled_hook()` calls
+`wp_unschedule_event()` per event, so `pre_clear_scheduled_hook` is
+deliberately not hooked (it would double-log); `wp_unschedule_hook()` doesn't,
+hence its own hook.
+
 **Two loggers rewritten in 2.9.21 because their hooks stopped matching how
 WordPress works:**
 - **`AM_Logger_Widgets`** watches the `sidebars_widgets` option (placements;

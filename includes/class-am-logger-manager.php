@@ -36,6 +36,7 @@ class AM_Logger_Manager {
 		'AM_Logger_Export',
 		'AM_Logger_Capabilities',
 		'AM_Logger_Super_Admin',
+		'AM_Logger_Cron',
 	);
 
 	public static function init() {

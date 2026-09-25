@@ -26,6 +26,8 @@ class AM_Event_Labels {
 		'comment.edited'                      => 'Comment Edited',
 		'comment.status_changed'              => 'Comment Status Changed',
 		'core.updated'                        => 'WordPress Core Updated',
+		'cron.scheduled'                      => 'Cron Event Scheduled',
+		'cron.unscheduled'                    => 'Cron Event Unscheduled',
 		'log.cleared'                            => 'Activity Log Cleared',
 		'media.deleted'                        => 'Media Deleted',
 		'media.updated'                        => 'Media Updated',
@@ -187,6 +189,7 @@ class AM_Event_Labels {
 	const TYPE_MAP = array(
 		'comment'  => 'Comment',
 		'core'     => 'WordPress Core',
+		'cron'     => 'Cron',
 		'media'    => 'Media',
 		'menu'     => 'Menu',
 		'option'   => 'Option',

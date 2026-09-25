@@ -258,6 +258,12 @@ class AM_Admin {
 			'default'           => AM_Event_Writer::DEFAULT_OCCASION_WINDOW_SECONDS,
 		) );
 
+		register_setting( self::SETTINGS_GROUP, 'am_log_cron_changes', array(
+			'type'              => 'boolean',
+			'sanitize_callback' => array( $this, 'sanitize_checkbox' ),
+			'default'           => 1,
+		) );
+
 		register_setting( self::SETTINGS_GROUP, AM_Date_Format::OPTION, array(
 			'sanitize_callback' => array( $this, 'sanitize_datetime_format' ),
 			'default'           => AM_Date_Format::DEFAULT_KEY,
@@ -323,6 +329,7 @@ class AM_Admin {
 		);
 		add_settings_field( 'am_field_retention', __( 'Keep entries for', 'activity-monitor' ), array( $this, 'field_retention' ), self::PAGE_SETTINGS, 'am_logging' );
 		add_settings_field( 'am_field_grouping', __( 'Group repeat events', 'activity-monitor' ), array( $this, 'field_grouping' ), self::PAGE_SETTINGS, 'am_logging' );
+		add_settings_field( 'am_field_cron', __( 'Scheduled tasks', 'activity-monitor' ), array( $this, 'field_cron' ), self::PAGE_SETTINGS, 'am_logging' );
 
 		add_settings_section(
 			'am_display',
@@ -2422,6 +2429,21 @@ class AM_Admin {
 		<p class="description">
 			<?php esc_html_e( 'The same action, repeated on the same thing by the same person within this window, becomes one entry with a count beside it instead of many. It stops a burst of near-identical activity burying everything else.', 'activity-monitor' ); ?>
 		</p>
+		<?php
+	}
+
+	public function field_cron() {
+		?>
+		<fieldset>
+			<legend class="screen-reader-text"><span><?php esc_html_e( 'Scheduled tasks', 'activity-monitor' ); ?></span></legend>
+			<label>
+				<input type="checkbox" name="am_log_cron_changes" value="1" <?php checked( (bool) get_option( 'am_log_cron_changes', 1 ) ); ?>>
+				<?php esc_html_e( 'Log scheduled tasks (WP-Cron events) being added or removed', 'activity-monitor' ); ?>
+			</label>
+			<p class="description">
+				<?php esc_html_e( 'Only changes made while someone is logged in are recorded — WordPress and plugins rescheduling their own tasks in the background are not. Plugins also add and remove their own tasks during activation and settings changes, so untick this if the log gets noisy.', 'activity-monitor' ); ?>
+			</p>
+		</fieldset>
 		<?php
 	}
 
