@@ -161,7 +161,7 @@ class AM_Logger_Post_Details extends AM_Logger_Base {
 		}
 
 		$post = get_post( $post_id );
-		if ( ! $post || in_array( $post->post_status, array( 'auto-draft', 'inherit' ), true ) || 'revision' === $post->post_type ) {
+		if ( ! $post || in_array( $post->post_status, array( 'auto-draft', 'inherit' ), true ) || in_array( $post->post_type, array( 'revision', 'user_request' ), true ) ) {
 			return;
 		}
 

@@ -454,6 +454,17 @@ items)".
   the same tier as site deletion. Registers only when `is_multisite()`, same
   guard as `AM_Logger_Sites`.
 
+**`AM_Logger_Privacy` (2.9.37)** logs personal data export/erase requests.
+A request is a `user_request` post (`post_name` = `export_personal_data` /
+`remove_personal_data`, `post_title` = requester email) moving through
+`request-pending/confirmed/completed/failed`, so it hooks
+`transition_post_status`; core has no dedicated action for those. The work
+itself has hooks (`wp_privacy_personal_data_export_file_created`,
+`wp_privacy_personal_data_erased`) and gets its own rows, since "completed"
+doesn't say data left the site or was destroyed. `AM_Logger_Posts` and
+`AM_Logger_Post_Details` skip `user_request`, or every transition would also
+log as a generic post edit. `privacy` is in `TYPE_MAP`.
+
 **Post field diffs (2.9.35)** — `AM_Logger_Posts::on_post_updated()` diffs
 the columns on `WP_Post` (title, content, status, slug, author, date, parent,
 excerpt, comment/ping status, menu order, password). Password shows only

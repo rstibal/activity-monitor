@@ -31,7 +31,7 @@ class AM_Logger_Posts extends AM_Logger_Base {
 	}
 
 	private function skip_post( WP_Post $post ): bool {
-		return in_array( $post->post_status, array( 'auto-draft', 'inherit' ), true ) || 'revision' === $post->post_type;
+		return in_array( $post->post_status, array( 'auto-draft', 'inherit' ), true ) || in_array( $post->post_type, array( 'revision', 'user_request' ), true );
 	}
 
 	public function on_post_updated( int $post_id, WP_Post $post_after, WP_Post $post_before ) {

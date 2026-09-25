@@ -40,6 +40,7 @@ class AM_Logger_Manager {
 		'AM_Logger_Auto_Updates',
 		'AM_Logger_Update_Failures',
 		'AM_Logger_Post_Details',
+		'AM_Logger_Privacy',
 	);
 
 	public static function init() {
