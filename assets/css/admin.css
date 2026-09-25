@@ -378,6 +378,9 @@ body.wp-admin.am-style-contrast .am-wrap :focus-visible {
    rule rather than relying on inheritance reaching it. Only repainted on
    this plugin's own screens: the am-theme-dark class is scoped to those in
    filter_admin_body_class(), so no other admin screen's background moves. */
+body.wp-admin.am-theme-light #wpcontent,
+body.wp-admin.am-theme-light #wpbody,
+body.wp-admin.am-theme-light #wpbody-content,
 body.wp-admin.am-theme-dark #wpcontent,
 body.wp-admin.am-theme-dark #wpbody,
 body.wp-admin.am-theme-dark #wpbody-content {

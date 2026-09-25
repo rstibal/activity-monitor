@@ -330,7 +330,7 @@
 		var $wrap = $(this).closest('.am-wrap');
 		var next = $wrap.attr('data-am-theme') === 'dark' ? 'light' : 'dark';
 		$wrap.attr('data-am-theme', next);
-		$('body').toggleClass('am-theme-dark', next === 'dark');
+		$('body').toggleClass('am-theme-dark', next === 'dark').toggleClass('am-theme-light', next === 'light');
 		$(this).attr('aria-pressed', next === 'dark' ? 'true' : 'false');
 		$(this).find('.am-tt-label').text(next === 'dark' ? 'Dark' : 'Light');
 		$.post(amData.ajaxUrl, { action: 'am_save_theme', theme: next, nonce: amData.nonce });

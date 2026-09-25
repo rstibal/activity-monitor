@@ -172,6 +172,13 @@ workflow disappears.
      table body, which core sizes and fonts itself. Fixed with explicit Public
      Sans 12px.
 
+  **Page background (2.9.41):** the `#wpcontent`/`#wpbody`/`#wpbody-content`
+  repaint applies to *both* `am-theme-light` and `am-theme-dark`. It was
+  dark-only until 2.9.41, so every light style stopped at `.am-wrap` with core's
+  gray showing around it. The toggle's JS must therefore flip both classes
+  (`am-theme-light` is only server-rendered, so a dark→light click would
+  otherwise lose the background until reload).
+
   **Styles (2.9.38, ten as of 2.9.39)** sit beside the light/dark toggle:
   `AM_Admin::STYLES` (wordpress, ledger, harbor, paper, forest, plum,
   graphite, solarized, nord, contrast). **The default is per-install, not
