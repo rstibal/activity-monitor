@@ -53,6 +53,29 @@ class AM_Logger_Posts extends AM_Logger_Base {
 			$diff['slug'] = array( 'before' => $post_before->post_name, 'after' => $post_after->post_name );
 		}
 
+		$fields = array(
+			'author'         => 'post_author',
+			'date'           => 'post_date',
+			'parent'         => 'post_parent',
+			'excerpt'        => 'post_excerpt',
+			'comment_status' => 'comment_status',
+			'ping_status'    => 'ping_status',
+			'menu_order'     => 'menu_order',
+		);
+		foreach ( $fields as $label => $property ) {
+			if ( (string) $post_before->$property !== (string) $post_after->$property ) {
+				$diff[ $label ] = array( 'before' => (string) $post_before->$property, 'after' => (string) $post_after->$property );
+			}
+		}
+
+		// The password itself never goes in the log, only that it changed.
+		if ( $post_before->post_password !== $post_after->post_password ) {
+			$diff['password'] = array(
+				'before' => '' === $post_before->post_password ? __( 'none', 'activity-monitor' ) : __( 'set', 'activity-monitor' ),
+				'after'  => '' === $post_after->post_password ? __( 'none', 'activity-monitor' ) : __( 'set', 'activity-monitor' ),
+			);
+		}
+
 		if ( empty( $diff ) ) {
 			return;
 		}

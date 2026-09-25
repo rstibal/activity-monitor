@@ -454,6 +454,12 @@ items)".
   the same tier as site deletion. Registers only when `is_multisite()`, same
   guard as `AM_Logger_Sites`.
 
+**Post field diffs (2.9.35)** — `AM_Logger_Posts::on_post_updated()` diffs
+the columns on `WP_Post` (title, content, status, slug, author, date, parent,
+excerpt, comment/ping status, menu order, password). Password shows only
+none/set, never the value. Template, featured image, sticky and terms aren't
+columns; they live in post meta / an option / taxonomies.
+
 **Network settings (2.9.34)** — `AM_Logger_Options::NETWORK_OPTIONS` covers
 sitemeta options, which never fire `updated_option`. They hook
 `update_site_option`, whose args are `( $option, $new, $old )` — new before
