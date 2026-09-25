@@ -89,6 +89,7 @@ class AM_Event_Labels {
 		'user.password_retrieve_requested'      => 'Password Reset Requested',
 		'user.password_set'                      => 'Password Set',
 		'user.registered'                        => 'User Registered',
+		'user.removed_from_site'                 => 'User Removed from Site',
 		'user.role_changed'                      => 'User Role Changed',
 		'user.super_admin_granted'               => 'Super Admin Granted',
 		'user.super_admin_revoked'               => 'Super Admin Revoked',

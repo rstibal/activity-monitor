@@ -32,6 +32,7 @@ class AM_Logger_Users extends AM_Logger_Base {
 		add_action( 'delete_user', array( $this, 'on_user_delete' ) );
 		add_action( 'set_user_role', array( $this, 'on_role_change' ), 10, 3 );
 		add_action( 'add_user_to_blog', array( $this, 'on_add_user_to_blog' ), 10, 3 );
+		add_action( 'remove_user_from_blog', array( $this, 'on_remove_user_from_blog' ), 10, 2 );
 	}
 
 	public function on_login( string $user_login, WP_User $user ) {
@@ -256,6 +257,31 @@ class AM_Logger_Users extends AM_Logger_Base {
 				$user->user_login,
 				$blog_id,
 				$role
+			),
+			array(
+				'level'       => AM_Log_Levels::NOTICE,
+				'object_type' => 'user',
+				'object_id'   => $user_id,
+				'object_name' => $user->user_login,
+			)
+		);
+	}
+
+	// Fires before the removal, so the user record is still readable.
+	public function on_remove_user_from_blog( int $user_id, int $blog_id ) {
+		$user = get_userdata( $user_id );
+		if ( ! $user ) {
+			return;
+		}
+
+		$this->log(
+			'user',
+			'removed_from_site',
+			sprintf(
+				/* translators: 1: username, 2: site ID */
+				__( 'User "%1$s" removed from site ID %2$d.', 'activity-monitor' ),
+				$user->user_login,
+				$blog_id
 			),
 			array(
 				'level'       => AM_Log_Levels::NOTICE,
