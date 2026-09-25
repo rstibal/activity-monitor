@@ -32,7 +32,31 @@ class AM_Logger_Options extends AM_Logger_Base {
 		'permalink_structure' => AM_Log_Levels::NOTICE,
 		'timezone_string'    => AM_Log_Levels::NOTICE,
 		'WPLANG'             => AM_Log_Levels::NOTICE,
+
+		// This plugin's own settings. Shortening retention or turning off IP
+		// storage / channels is how someone quietly blunts the audit trail.
+		'am_retention_days'           => AM_Log_Levels::WARNING,
+		'am_ip_storage'               => AM_Log_Levels::WARNING,
+		'am_notification_channels'    => AM_Log_Levels::WARNING,
+		'am_occasion_window_seconds'  => AM_Log_Levels::NOTICE,
+		'am_log_cron_changes'         => AM_Log_Levels::NOTICE,
+		'am_log_cron_background'      => AM_Log_Levels::NOTICE,
+		'am_datetime_format'          => AM_Log_Levels::NOTICE,
+		'am_ip_lookup_enabled'        => AM_Log_Levels::NOTICE,
+		'am_delete_data_on_uninstall' => AM_Log_Levels::NOTICE,
+		'am_stats_enable_tracking'    => AM_Log_Levels::NOTICE,
+		'am_stats_exclude_roles'      => AM_Log_Levels::NOTICE,
+		'am_stats_retention_days'     => AM_Log_Levels::NOTICE,
+		'am_stats_geo_enabled'        => AM_Log_Levels::NOTICE,
+		'am_stats_geo_account_id'     => AM_Log_Levels::NOTICE,
+		'am_stats_geo_license_key'    => AM_Log_Levels::NOTICE,
 	);
+
+	/**
+	 * Options whose values are credentials or contain them (webhook URLs, a
+	 * license key): the change is logged, the values are not.
+	 */
+	const HIDDEN_VALUES = array( 'am_notification_channels', 'am_stats_geo_license_key' );
 
 	public function register_hooks() {
 		add_action( 'updated_option', array( $this, 'on_option_updated' ), 10, 3 );
@@ -52,6 +76,11 @@ class AM_Logger_Options extends AM_Logger_Base {
 
 		if ( $old === $new ) {
 			return;
+		}
+
+		if ( in_array( $option, self::HIDDEN_VALUES, true ) ) {
+			$old = __( '(hidden)', 'activity-monitor' );
+			$new = $old;
 		}
 
 		$this->log(

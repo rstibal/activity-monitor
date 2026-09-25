@@ -452,6 +452,12 @@ items)".
   the same tier as site deletion. Registers only when `is_multisite()`, same
   guard as `AM_Logger_Sites`.
 
+**Own settings (2.9.29)** — the plugin's `am_*` options are in
+`AM_Logger_Options::WATCHED_OPTIONS` too (a new setting needs an entry there).
+`HIDDEN_VALUES` (notification channels, MaxMind key) logs the change without
+the values. Limitation: `updated_option` doesn't fire when an option is first
+created, so the very first Settings save isn't logged.
+
 **Role membership (2.9.28)** — `AM_Logger_Users` hooks `add_user_role` /
 `remove_user_role` (`user.role_added`/`_removed`, WARNING), closing the gap
 where `WP_User::add_role()` left no trace. `WP_User::set_role()` fires both
