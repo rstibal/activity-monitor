@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, event log
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.9.33
+Stable tag: 2.9.34
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -75,6 +75,9 @@ Yes. Settings → Privacy offers full addresses, anonymised addresses (the last 
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
 
 == Changelog ==
+
+= 2.9.34 =
+* Added: on multisite, changes to key network settings (open registration, who can add users, allowed upload file types, enabled plugin menus, email domain limits, reserved names, upload size, network name) are now logged.
 
 = 2.9.33 =
 * Added: on multisite, a site being archived, marked as spam, deactivated, or made public/private (and each of those reversed) is now logged.

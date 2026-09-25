@@ -73,8 +73,41 @@ class AM_Logger_Options extends AM_Logger_Base {
 	 */
 	const HIDDEN_VALUES = array( 'am_notification_channels', 'am_stats_geo_license_key' );
 
+	/**
+	 * Network (multisite) options, which live in sitemeta and never reach
+	 * updated_option. Same idea: the few that change who can sign up, what can
+	 * be uploaded, or who is on the network.
+	 */
+	const NETWORK_OPTIONS = array(
+		'registration'            => AM_Log_Levels::WARNING,
+		'add_new_users'           => AM_Log_Levels::WARNING,
+		'upload_filetypes'        => AM_Log_Levels::WARNING,
+		'menu_items'              => AM_Log_Levels::WARNING,
+		'limited_email_domains'   => AM_Log_Levels::NOTICE,
+		'banned_email_domains'    => AM_Log_Levels::NOTICE,
+		'illegal_names'           => AM_Log_Levels::NOTICE,
+		'fileupload_maxk'         => AM_Log_Levels::NOTICE,
+		'registrationnotification' => AM_Log_Levels::NOTICE,
+		'site_name'               => AM_Log_Levels::NOTICE,
+	);
+
 	public function register_hooks() {
 		add_action( 'updated_option', array( $this, 'on_option_updated' ), 10, 3 );
+		if ( is_multisite() ) {
+			add_action( 'update_site_option', array( $this, 'on_network_option_updated' ), 10, 3 );
+		}
+	}
+
+	/**
+	 * Unlike updated_option, update_site_option passes ( $option, $new, $old ).
+	 *
+	 * @param mixed $value
+	 * @param mixed $old_value
+	 */
+	public function on_network_option_updated( string $option, $value, $old_value ) {
+		if ( isset( self::NETWORK_OPTIONS[ $option ] ) ) {
+			$this->record_change( 'network:' . $option, self::NETWORK_OPTIONS[ $option ], $old_value, $value );
+		}
 	}
 
 	/**
@@ -82,10 +115,16 @@ class AM_Logger_Options extends AM_Logger_Base {
 	 * @param mixed $value
 	 */
 	public function on_option_updated( string $option, $old_value, $value ) {
-		if ( ! isset( self::WATCHED_OPTIONS[ $option ] ) ) {
-			return;
+		if ( isset( self::WATCHED_OPTIONS[ $option ] ) ) {
+			$this->record_change( $option, self::WATCHED_OPTIONS[ $option ], $old_value, $value );
 		}
+	}
 
+	/**
+	 * @param mixed $old_value
+	 * @param mixed $value
+	 */
+	private function record_change( string $option, string $level, $old_value, $value ) {
 		$old = is_scalar( $old_value ) ? (string) $old_value : wp_json_encode( $old_value );
 		$new = is_scalar( $value ) ? (string) $value : wp_json_encode( $value );
 
@@ -109,7 +148,7 @@ class AM_Logger_Options extends AM_Logger_Base {
 				$new
 			),
 			array(
-				'level'       => self::WATCHED_OPTIONS[ $option ],
+				'level'       => $level,
 				'object_type' => 'option',
 				'object_name' => $option,
 				'context'     => array(

@@ -454,6 +454,13 @@ items)".
   the same tier as site deletion. Registers only when `is_multisite()`, same
   guard as `AM_Logger_Sites`.
 
+**Network settings (2.9.34)** — `AM_Logger_Options::NETWORK_OPTIONS` covers
+sitemeta options, which never fire `updated_option`. They hook
+`update_site_option`, whose args are `( $option, $new, $old )` — new before
+old, the reverse of `updated_option`. Logged under the name `network:<option>`.
+Network signup/activation isn't separately logged: activation already yields
+`user.registered` / `site.created`.
+
 **Site status (2.9.33)** — `AM_Logger_Sites` hooks `wp_update_site` and diffs
 `archived`/`spam`/`deleted`/`public`. The per-status actions (`archive_blog`,
 `make_spam_blog`, …) all fire from that same call, so hooking them too would
