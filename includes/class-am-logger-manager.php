@@ -38,6 +38,7 @@ class AM_Logger_Manager {
 		'AM_Logger_Super_Admin',
 		'AM_Logger_Cron',
 		'AM_Logger_Auto_Updates',
+		'AM_Logger_Update_Failures',
 	);
 
 	public static function init() {

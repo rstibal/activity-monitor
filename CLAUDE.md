@@ -454,6 +454,14 @@ items)".
   the same tier as site deletion. Registers only when `is_multisite()`, same
   guard as `AM_Logger_Sites`.
 
+**`AM_Logger_Update_Failures` (2.9.32)** — `upgrader_process_complete` only
+fires on success. Hooks `upgrader_install_package_result` and
+`upgrader_source_selection` (both filters, priority 999, return arg 1
+unchanged; core returns a source error before the result filter, so one failure
+hits one hook) plus `automatic_updates_complete` for background runs, deduped
+per request by `type|plugin file or theme slug`. A failed *download* has no
+hook and isn't covered.
+
 **`AM_Logger_Auto_Updates` (2.9.31)** diffs the `auto_update_plugins` /
 `auto_update_themes` lists (site options on multisite, hence the extra
 `update_site_option`/`add_site_option` hooks; the first toggle creates the

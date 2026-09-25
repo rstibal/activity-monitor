@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, event log
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.9.31
+Stable tag: 2.9.32
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -75,6 +75,9 @@ Yes. Settings → Privacy offers full addresses, anonymised addresses (the last 
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
 
 == Changelog ==
+
+= 2.9.32 =
+* Added: plugin and theme installs or updates that fail (bad package, copy error, or a failed background auto-update) are now logged as warnings. Failed downloads are not covered.
 
 = 2.9.31 =
 * Added: switching auto-updates on or off for an individual plugin or theme is now logged. Turning them off is logged as a warning.
