@@ -25,6 +25,26 @@ class AM_Event_Writer {
 	const DEFAULT_OCCASION_WINDOW_SECONDS = 300;
 
 	/**
+	 * Character limits of the am_events VARCHAR columns written from
+	 * caller-supplied text (see AM_Schema::create_or_upgrade_tables()).
+	 * Enforced here because $wpdb->insert() doesn't truncate an over-long
+	 * value -- it refuses the whole row and returns false, so a fatal
+	 * error's stack trace or a long post title would otherwise silently
+	 * lose the event entirely.
+	 */
+	const COLUMN_LIMITS = array(
+		'user_login'        => 60,
+		'user_display_name' => 250,
+		'user_role'         => 100,
+		'ip_address'        => 45,
+		'event_type'        => 100,
+		'action'            => 100,
+		'object_type'       => 100,
+		'object_name'       => 250,
+		'message'           => 255,
+	);
+
+	/**
 	 * Log one event.
 	 *
 	 * @param string $event_type e.g. 'post', 'user', 'plugin', 'session'.
@@ -68,6 +88,12 @@ class AM_Event_Writer {
 			// AM_Initiator_Detector::AUTO_UPDATE). Null means "detect as
 			// usual"; every other caller leaves this at the default.
 			'initiator'   => null,
+			// Explicit acting user (a user ID), for the rare hook that
+			// fires after core has already cleared the current user --
+			// currently only wp_logout (see AM_Logger_Users::on_logout()).
+			// Null means "whoever is logged in"; every other caller leaves
+			// this at the default.
+			'user_id'     => null,
 			// Set true only when logging a notification-delivery failure
 			// itself (see AM_Notifications::log_slack_failure and
 			// AM_Logger_Mail_Failures) -- without this, a failing
@@ -88,17 +114,12 @@ class AM_Event_Writer {
 		$initiator = ( null !== $args['initiator'] && in_array( $args['initiator'], AM_Initiator_Detector::all(), true ) )
 			? $args['initiator']
 			: AM_Initiator_Detector::detect();
-		$user      = wp_get_current_user();
-		$events_table = $wpdb->prefix . AM_Schema::EVENTS_TABLE;
-
-		$occasion_id = null;
-		if ( $args['group'] ) {
-			$occasion_id = self::compute_occasion_id( $event_type, $action, (int) $args['object_id'], $initiator );
-
-			if ( self::maybe_increment_existing( $occasion_id ) ) {
-				return false; // Collapsed into an existing row — no new event id, nothing further to write.
-			}
+		$user = null !== $args['user_id'] ? get_userdata( absint( $args['user_id'] ) ) : wp_get_current_user();
+		if ( ! $user ) {
+			$user = new WP_User( 0 );
 		}
+		$events_table = $wpdb->prefix . AM_Schema::EVENTS_TABLE;
+		$full_message = sanitize_textarea_field( $message );
 
 		$row = array(
 			'date'              => current_time( 'mysql', true ),
@@ -114,10 +135,27 @@ class AM_Event_Writer {
 			'object_type'       => sanitize_text_field( $args['object_type'] ),
 			'object_id'         => absint( $args['object_id'] ),
 			'object_name'       => sanitize_text_field( $args['object_name'] ),
-			'message'           => sanitize_textarea_field( $message ),
-			'occasion_id'       => $occasion_id,
+			'message'           => $full_message,
+			'occasion_id'       => null,
 			'repeat_count'      => 1,
 		);
+		foreach ( self::COLUMN_LIMITS as $column => $limit ) {
+			$row[ $column ] = self::fit( $row[ $column ], $limit );
+		}
+
+		// Nothing is lost by the truncation above: the untruncated message
+		// goes into context, where the Details modal reads it back.
+		if ( $row['message'] !== $full_message ) {
+			$args['context']['full_message'] = $full_message;
+		}
+
+		if ( $args['group'] ) {
+			$row['occasion_id'] = self::compute_occasion_id( $row );
+
+			if ( self::maybe_increment_existing( $row['occasion_id'] ) ) {
+				return false; // Collapsed into an existing row — no new event id, nothing further to write.
+			}
+		}
 
 		$wpdb->insert( $events_table, $row );
 		$event_id = $wpdb->insert_id;
@@ -138,7 +176,7 @@ class AM_Event_Writer {
 				$row['level'],
 				$row['event_type'],
 				$row['action'],
-				$row['message'],
+				$full_message,
 				array(
 					'user_login'        => $row['user_login'],
 					'user_display_name' => $row['user_display_name'],
@@ -200,8 +238,34 @@ class AM_Event_Writer {
 		return true;
 	}
 
-	private static function compute_occasion_id( string $event_type, string $action, int $object_id, string $initiator ): string {
-		return md5( $event_type . '|' . $action . '|' . $object_id . '|' . $initiator );
+	/**
+	 * What counts as "the same event again". object_name and user_id are
+	 * part of the key, not just object_id: many loggers have no object id
+	 * to give (plugins, themes, failed logins, access-denied), so keying on
+	 * object_id alone collapsed every one of those into whichever row came
+	 * first -- a bulk update of ten plugins read as the first plugin
+	 * updated ten times, and failed logins for different usernames, or
+	 * denied pages hit by different users, merged into one row naming only
+	 * the first. The IP is deliberately left out, so a distributed
+	 * brute-force burst against one username still collapses to one row.
+	 */
+	private static function compute_occasion_id( array $row ): string {
+		return md5( implode( '|', array(
+			$row['event_type'],
+			$row['action'],
+			$row['object_id'],
+			$row['object_name'],
+			$row['user_id'],
+			$row['initiator'],
+		) ) );
+	}
+
+	/** Truncates to a column's character limit, marking the cut with an ellipsis. */
+	private static function fit( string $value, int $limit ): string {
+		if ( mb_strlen( $value ) <= $limit ) {
+			return $value;
+		}
+		return mb_substr( $value, 0, $limit - 1 ) . '…';
 	}
 
 	private static function write_context( int $event_id, array $context ) {

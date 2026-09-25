@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, event log
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.9.15
+Stable tag: 2.9.22
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -76,8 +76,47 @@ Yes. Settings → Privacy offers full addresses, anonymised addresses (the last 
 
 == Changelog ==
 
-= 2.9.15 =
+= 2.9.22 =
 * Added: multisite super admin grants and revocations are now logged, at Critical severity (AM_Logger_Super_Admin).
+
+= 2.9.21 =
+* Fixed: widget changes weren't logged on most sites. The logger only understood the classic Widgets screen, and the block-based widget editor (WordPress's default since 5.8) saves a different way. It now records widgets added, removed or moved between sidebars, and widget settings saved, from the classic screen, the block editor and the Customizer alike.
+* Fixed: on multisite, creating or deleting a site also logged a PHP deprecation notice, because the plugin listened on hooks WordPress deprecated in 5.1. It now uses their replacements, and names sites by address (domain and path) rather than ID alone.
+* Fixed: widget events and "Activity Log Cleared" showed auto-generated labels instead of proper names.
+* Fixed: GeoLite2 import error messages were HTML-escaped twice, so characters like & showed up as &amp; on the Settings screen.
+* Changed: the GeoLite2 import stage name is shown as plain text rather than as code.
+
+= 2.9.20 =
+* Fixed: a password changed from the Profile or Edit User screen (or by any plugin through wp_update_user()) was never logged. It's now recorded as "Password Set".
+* Fixed: a password reset logged two rows, Password Reset and Password Set. It now logs one.
+* Fixed: on WordPress 6.8 and later, an ordinary login could log "Password Set", because core re-hashes an outdated stored password on login. That's no longer logged, since the password itself didn't change.
+* Fixed: flipping a capability a user was explicitly denied into a grant (for example manage_options from denied to allowed) wasn't logged. Capability changes are now tracked by state — granted, denied or removed — not just by whether the capability is listed.
+* Fixed: an Activity Log link with a malformed am_event_id could stop the screen's JavaScript from working (modals, filters, paging). The value is now checked, and it's dropped from the address bar once used so a reload doesn't reopen the modal.
+
+= 2.9.19 =
+* Fixed: Visitor Stats stopped recording hits from cached pages once the cached copy was more than a day old — the tracking beacon carried a nonce that expired with the cache. The beacon no longer uses one.
+* Fixed: Visitor Stats' page links doubled the path on sites installed in a subdirectory (/blog/blog/post).
+* Fixed: a search or filter value containing &, # or + broke the Activity Log's pagination, level links, user-filter chip and export links.
+* Fixed: exporting after a search containing an apostrophe or quote exported a different set of rows than the screen showed.
+* Fixed: CSV exports are protected against spreadsheet formula injection — a cell starting with =, +, - or @ (for example a failed-login username typed by a visitor) is prefixed with an apostrophe so spreadsheet apps treat it as text. JSON, HTML and TXT exports are unchanged.
+* Fixed: a GeoLite2 import that died partway through (a PHP timeout or error) stayed "in progress" forever and blocked Update Now. It's now marked as failed after 15 minutes without progress, and can be restarted.
+* Fixed: after the site had been in maintenance mode once, the maintenance-mode entry was logged again on every admin page load.
+* Fixed: the alert email's "Time (UTC)" line showed the site's local time.
+
+= 2.9.18 =
+* Fixed: repeat-event grouping merged different events into one row whenever they had no object ID — bulk-updating ten plugins logged only the first, and failed logins for different usernames (or access-denied hits by different users) collapsed into the first attempt's row. The grouping key now includes the object name and the acting user.
+* Fixed: an event whose message or object name was longer than its database column (a fatal error's stack trace, a PHP warning with a long path, a very long post title) was silently not logged at all. Over-long values are now truncated to fit, with the full message kept and shown in the Details modal.
+* Fixed: logouts were never logged — WordPress clears the current user before firing its logout hook.
+* Fixed: every wrong-password login was logged twice, as both "Authentication Error" and "Failed Login". Each rejected login is now one row: Failed Login for a wrong username/password, Authentication Error for anything else (disabled account, 2FA rejection, etc.).
+
+= 2.9.17 =
+* Added: failed REST API cookie/nonce authentication (a login cookie present but the nonce missing, invalid, or stale) is now logged, alongside the existing failed application-password authentication logging (AM_Logger_Rest_Api).
+
+= 2.9.16 =
+* Added: a capability granted or removed on a user directly (independent of a role change) is now logged (AM_Logger_Capabilities).
+
+= 2.9.15 =
+* Added: running WordPress's built-in content exporter (Tools -> Export) is now logged (AM_Logger_Export), including WP-CLI's `wp export`.
 
 = 2.9.14 =
 * Added: successful email sends are now logged (AM_Logger_Mail_Sent), alongside the existing failure logging. Fires for any wp_mail() caller on the site, not just this plugin's own alerts, so a high-mail-volume site will see a correspondingly high volume of these rows.

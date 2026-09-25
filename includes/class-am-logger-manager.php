@@ -33,6 +33,8 @@ class AM_Logger_Manager {
 		'AM_Logger_Mail_Sent',
 		'AM_Logger_Rest_Api',
 		'AM_Logger_Options',
+		'AM_Logger_Export',
+		'AM_Logger_Capabilities',
 		'AM_Logger_Super_Admin',
 	);
 

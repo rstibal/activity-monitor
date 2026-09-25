@@ -608,28 +608,34 @@ class AM_Admin {
 			wp_die( esc_html__( 'Unauthorized.', 'activity-monitor' ) );
 		}
 
-		$format = sanitize_key( $_GET['am_format'] ?? 'csv' );
+		// Unslashed once up front, the same as render_log_screen() does:
+		// WordPress adds slashes to $_GET, so reading am_search directly
+		// turned a search for O'Brien into O\'Brien and exported a
+		// different set of rows than the screen the export came from.
+		$get = wp_unslash( $_GET );
+
+		$format = sanitize_key( $get['am_format'] ?? 'csv' );
 
 		// am_type is the same combined value the Activity Log's Type
 		// filter uses -- either a bare event_type or "type|action" --
 		// so it needs the same parsing here. sanitize_key() would strip
 		// the separator and export a different (empty) set than the
 		// screen the export was launched from.
-		$export_type   = self::sanitize_type_filter( $_GET['am_type'] ?? '' );
-		$export_action = sanitize_key( $_GET['am_export_action'] ?? '' );
+		$export_type   = self::sanitize_type_filter( $get['am_type'] ?? '' );
+		$export_action = sanitize_key( $get['am_export_action'] ?? '' );
 		if ( false !== strpos( $export_type, '|' ) ) {
 			list( $export_type, $export_action ) = explode( '|', $export_type, 2 );
 		}
 
 		$filters = array(
-			'level'      => sanitize_key( $_GET['am_level'] ?? '' ),
-			'initiator'  => sanitize_key( $_GET['am_initiator'] ?? '' ),
+			'level'      => sanitize_key( $get['am_level'] ?? '' ),
+			'initiator'  => sanitize_key( $get['am_initiator'] ?? '' ),
 			'event_type' => $export_type,
 			'action'     => $export_action,
-			'user'       => sanitize_user( wp_unslash( $_GET['am_user'] ?? '' ) ),
-			'date_from'  => sanitize_text_field( $_GET['am_from'] ?? '' ),
-			'date_to'    => sanitize_text_field( $_GET['am_to'] ?? '' ),
-			'search'     => sanitize_text_field( $_GET['am_search'] ?? '' ),
+			'user'       => sanitize_user( $get['am_user'] ?? '' ),
+			'date_from'  => sanitize_text_field( $get['am_from'] ?? '' ),
+			'date_to'    => sanitize_text_field( $get['am_to'] ?? '' ),
+			'search'     => sanitize_text_field( $get['am_search'] ?? '' ),
 		);
 
 		AM_Export::stream( $format, $filters );
@@ -721,7 +727,11 @@ class AM_Admin {
 					<?php if ( $row->object_id )   echo ' (ID: ' . esc_html( $row->object_id ) . ')'; ?>
 				</td>
 			</tr>
-			<tr><th><?php esc_html_e( 'Message', 'activity-monitor' ); ?></th><td><?php echo esc_html( $row->message ); ?></td></tr>
+			<?php
+			// full_message is only stored when the message was too long for
+			// its column (see AM_Event_Writer::COLUMN_LIMITS).
+			?>
+			<tr><th><?php esc_html_e( 'Message', 'activity-monitor' ); ?></th><td><?php echo esc_html( isset( $context['full_message'] ) ? (string) $context['full_message'] : $row->message ); ?></td></tr>
 			<?php if ( (int) $row->repeat_count > 1 ) : ?>
 			<tr><th><?php esc_html_e( 'Repeated', 'activity-monitor' ); ?></th><td><?php
 				/* translators: %d: number of times this event was recorded within the grouping window */
@@ -841,7 +851,7 @@ class AM_Admin {
 				<tr>
 					<td colspan="2" style="text-align:right;">
 						<a href="<?php echo esc_url( add_query_arg(
-							array( 'page' => self::PAGE_LOG, 'am_user' => $user->user_login ),
+							array( 'page' => self::PAGE_LOG, 'am_user' => rawurlencode( $user->user_login ) ),
 							admin_url( 'admin.php' )
 						) ); ?>" class="button button-small">
 							<?php esc_html_e( 'View this user’s activity', 'activity-monitor' ); ?>
@@ -1293,7 +1303,18 @@ class AM_Admin {
 		// filter form's hidden input, or from the previous pagination
 		// link's own href), so this reproduces the log screen's URL
 		// exactly for both the initial page load and every AJAX refresh.
-		$current_url = add_query_arg( $raw, admin_url( 'admin.php' ) );
+		//
+		// urlencode_deep() here and on every other filter-carrying
+		// add_query_arg() call on this screen: add_query_arg() re-encodes a
+		// URL's existing query string but inserts the values it's handed
+		// verbatim, so a search for "R&D" became am_search=R&D -- a search
+		// for "R" plus a stray "D" parameter -- on every link built from it.
+		//
+		// am_event_id (a Slack alert's deep link) is a one-shot instruction
+		// to open that event's modal, not a filter -- carried into
+		// pagination links, it rode along into the address bar (via
+		// admin.js's pushState) and reopened the modal on any reload.
+		$current_url = add_query_arg( urlencode_deep( array_diff_key( $raw, array( 'am_event_id' => true ) ) ), admin_url( 'admin.php' ) );
 
 		$data      = AM_Event_Query::get_events( compact( 'per_page', 'page', 'level', 'initiator', 'event_type', 'action', 'user', 'date_from', 'date_to', 'search' ) );
 		$items     = $data['items'];
@@ -1371,7 +1392,7 @@ class AM_Admin {
 			'am_to'        => $date_to,
 			'am_search'    => $search,
 		) );
-		$level_base_url  = add_query_arg( $level_link_args, $base_url );
+		$level_base_url  = add_query_arg( urlencode_deep( $level_link_args ), $base_url );
 
 		$initiator_options = array();
 		foreach ( AM_Initiator_Detector::all() as $init ) {
@@ -1536,14 +1557,14 @@ class AM_Admin {
 				// remove_query_arg() on the current URI, matching how every
 				// other URL on this screen is composed.
 				$clear_user_url = add_query_arg(
-					array_filter( array(
+					urlencode_deep( array_filter( array(
 						'am_level'     => $level,
 						'am_initiator' => $initiator,
 						'am_type'      => $type_filter,
 						'am_from'      => $date_from,
 						'am_to'        => $date_to,
 						'am_search'    => $search,
-					) ),
+					) ) ),
 					$base_url
 				);
 			?>
@@ -1618,7 +1639,7 @@ class AM_Admin {
 					foreach ( array( 'csv' => 'CSV', 'json' => 'JSON', 'html' => 'HTML', 'txt' => 'TXT' ) as $fmt => $label ) :
 						$export_url = wp_nonce_url(
 							add_query_arg(
-								array_merge( $export_filter_args, array( 'action' => 'am_export_log', 'am_format' => $fmt ) ),
+								urlencode_deep( array_merge( $export_filter_args, array( 'action' => 'am_export_log', 'am_format' => $fmt ) ) ),
 								admin_url( 'admin-post.php' )
 							),
 							AM_Export::NONCE_ACTION
@@ -1897,7 +1918,7 @@ class AM_Admin {
 				// while the stored title itself is left untouched since
 				// AM_Stats_Tracker keeps it current with document.title
 				// verbatim.
-				$full_url = home_url( $row->url );
+				$full_url = self::stats_page_url( (string) $row->url );
 				$title    = self::display_title( (string) $row->title );
 				return array(
 					'<a class="am-stats-truncate" href="' . esc_url( $full_url ) . '" target="_blank" rel="noopener noreferrer" title="' . esc_attr( $title ) . '">' . esc_html( $title ?: '—' ) . '</a>',
@@ -2026,7 +2047,7 @@ class AM_Admin {
 			$current_url,
 			$columns,
 			static function ( $row ) use ( $geo_enabled ) {
-				$full_url = home_url( $row->url );
+				$full_url = self::stats_page_url( (string) $row->url );
 				$label    = self::display_title( (string) $row->title ) ?: $row->url;
 				$cells    = array(
 					esc_html( wp_date( AM_Date_Format::combined(), strtotime( $row->date . ' UTC' ) ) ),
@@ -2056,6 +2077,22 @@ class AM_Admin {
 	 * untouched title if the site name isn't found at the end, e.g. a
 	 * cached hit from before the site's name changed.
 	 */
+	/**
+	 * Absolute URL for a path stored in am_stats_urls. That path is the
+	 * browser's full window.location.pathname, which already includes any
+	 * subdirectory WordPress is installed in -- so it's joined to the home
+	 * URL's scheme and host only. home_url( $path ) would add the
+	 * subdirectory a second time (/blog/blog/post).
+	 */
+	private static function stats_page_url( string $path ): string {
+		$home   = wp_parse_url( home_url() );
+		$origin = ( $home['scheme'] ?? 'https' ) . '://' . ( $home['host'] ?? '' );
+		if ( ! empty( $home['port'] ) ) {
+			$origin .= ':' . $home['port'];
+		}
+		return $origin . '/' . ltrim( $path, '/' );
+	}
+
 	private static function display_title( string $title ): string {
 		$site = get_bloginfo( 'name' );
 		if ( '' === $title || '' === $site ) {
@@ -2594,7 +2631,7 @@ class AM_Admin {
 				printf(
 					/* translators: %s: current import stage, e.g. "blocks_ipv4" */
 					esc_html__( 'Import in progress (stage: %s) — this runs in the background across several page loads and can take a few minutes.', 'activity-monitor' ),
-					'<code>' . esc_html( $status['stage'] ) . '</code>'
+					esc_html( $status['stage'] )
 				);
 				?>
 			<?php elseif ( '' !== $status['error'] ) : ?>

@@ -1,8 +1,11 @@
 name: Claude Code
 
+# There is deliberately no automatic PR review job. One existed until
+# 2.9.18, but it never reviewed anything: its instructions went through an
+# input claude-code-action v1 no longer reads, so it exited in seconds and
+# reported success. Changes to this plugin are committed straight to master
+# rather than through PRs, so it was removed rather than repaired.
 on:
-  pull_request:
-    types: [opened, synchronize]
   workflow_dispatch:
     inputs:
       prompt:
@@ -11,33 +14,6 @@ on:
         type: string
 
 jobs:
-  # Automatically reviews every new or updated PR — read-only, no code changes.
-  # Does NOT require the Claude GitHub App to be installed.
-  auto-review:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: write
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Run Claude Code Review
-        uses: anthropics/claude-code-action@v1
-        with:
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          direct_prompt: |
-            Review this pull request to the activity-monitor WordPress plugin.
-            Focus on: security (SQL injection, XSS, capability checks, nonce
-            verification), WordPress coding standards, correctness, and any
-            regressions relative to existing behavior. Be concise — flag real
-            issues, don't nitpick style unless it violates WPCS. If the PR
-            looks safe to merge, say so plainly.
-
   # Manually triggered from the Actions tab ("Run workflow" button).
   # You type a task in the prompt box; Claude implements it and opens a PR.
   # Does NOT require the Claude GitHub App or @claude comment parsing.
@@ -59,4 +35,4 @@ jobs:
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          direct_prompt: ${{ github.event.inputs.prompt }}
+          prompt: ${{ github.event.inputs.prompt }}

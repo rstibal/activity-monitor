@@ -2,13 +2,15 @@
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 /**
- * AM_Logger_Rest_Api — application password lifecycle and failed
- * application-password authentication.
+ * AM_Logger_Rest_Api — application password lifecycle, failed
+ * application-password authentication, and failed REST cookie/nonce
+ * authentication.
  *
- * Deliberately scoped to application passwords rather than generic REST
- * traffic: logging every unauthenticated REST hit would just be bot noise,
- * the same reasoning AM_Logger_Security uses to watch a short list of
- * restricted admin pages rather than every denied request.
+ * Deliberately scoped rather than generic REST traffic: logging every
+ * unauthenticated REST hit would just be bot noise, the same reasoning
+ * AM_Logger_Security uses to watch a short list of restricted admin pages
+ * rather than every denied request. Both authentication-failure paths here
+ * pick out a specific, unambiguous WP_Error rather than hooking broadly.
  *
  * wp_update_application_password is NOT hooked here. Core fires it both
  * when a password's name/permissions are edited AND every time
@@ -17,14 +19,35 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  * would log a row on every single REST call an integration makes. There's
  * no cheap way to tell the two apart from the hook's arguments alone, so
  * this logger only covers create/revoke/revoke-all, which are unambiguous.
+ *
+ * on_cookie_auth_failed() covers the other REST auth path: a request
+ * carrying a WordPress login cookie but a missing/invalid/stale nonce (a
+ * forged or replayed request, or just a stale tab). Core's own
+ * rest_cookie_check_errors() (hooked to 'rest_authentication_errors' at
+ * priority 100) is what decides that; this hooks the same filter at 101 so
+ * it runs strictly after and can read the already-decided $result, purely
+ * as an observer — it must return $result unchanged, since this is a
+ * filter WordPress uses to gate the request, not an action.
+ *
+ * Scoped to the two error codes core's cookie check actually returns
+ * ('rest_cookie_invalid_nonce', 'rest_cookie_error') rather than "any
+ * WP_Error seen on this filter": application-password failures also
+ * surface through the same filter (via a different check hooked onto it),
+ * and already have their own row from on_auth_failed() below — matching on
+ * cookie-specific codes is what keeps the two from double-logging the same
+ * failed request, without needing to depend on hook-priority ordering
+ * between the two checks to tell them apart.
  */
 class AM_Logger_Rest_Api extends AM_Logger_Base {
+
+	const COOKIE_AUTH_ERROR_CODES = array( 'rest_cookie_invalid_nonce', 'rest_cookie_error' );
 
 	public function register_hooks() {
 		add_action( 'wp_create_application_password', array( $this, 'on_created' ), 10, 3 );
 		add_action( 'wp_delete_application_password', array( $this, 'on_revoked' ), 10, 2 );
 		add_action( 'wp_delete_application_passwords', array( $this, 'on_revoked_all' ) );
 		add_action( 'application_password_failed_authentication', array( $this, 'on_auth_failed' ) );
+		add_filter( 'rest_authentication_errors', array( $this, 'on_cookie_auth_failed' ), 101 );
 	}
 
 	public function on_created( int $user_id, array $new_item, string $new_password ) {
@@ -120,5 +143,32 @@ class AM_Logger_Rest_Api extends AM_Logger_Base {
 				// repeat_count, same as AM_Logger_Users::on_login_failed().
 			)
 		);
+	}
+
+	/**
+	 * @param mixed $result The current authentication result from earlier
+	 *              filters on 'rest_authentication_errors' -- null (no
+	 *              opinion), true (already authenticated), or a WP_Error.
+	 * @return mixed $result, unchanged -- this is a filter, not an action.
+	 */
+	public function on_cookie_auth_failed( $result ) {
+		if ( ! is_wp_error( $result ) || ! in_array( $result->get_error_code(), self::COOKIE_AUTH_ERROR_CODES, true ) ) {
+			return $result;
+		}
+
+		$this->log(
+			'security',
+			'rest_cookie_auth_failed',
+			__( 'Failed REST API cookie/nonce authentication.', 'activity-monitor' ),
+			array(
+				'level'       => AM_Log_Levels::WARNING,
+				'object_type' => 'security',
+				// group defaults to true — same reasoning as on_auth_failed()
+				// above: a burst of these (forged/replayed requests, or a
+				// stale tab hammering the REST API) collapses into one row.
+			)
+		);
+
+		return $result;
 	}
 }

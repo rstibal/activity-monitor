@@ -26,6 +26,7 @@ class AM_Event_Labels {
 		'comment.edited'                      => 'Comment Edited',
 		'comment.status_changed'              => 'Comment Status Changed',
 		'core.updated'                        => 'WordPress Core Updated',
+		'log.cleared'                            => 'Activity Log Cleared',
 		'media.deleted'                        => 'Media Deleted',
 		'media.updated'                        => 'Media Updated',
 		'media.uploaded'                       => 'Media Uploaded',
@@ -44,6 +45,7 @@ class AM_Event_Labels {
 		'post.updated'                           => 'Post Updated',
 		'security.access_denied'                => 'Access Denied',
 		'security.rest_auth_failed'              => 'REST API Authentication Failed',
+		'security.rest_cookie_auth_failed'       => 'REST API Cookie/Nonce Authentication Failed',
 		// Session management was removed in 2.4.0 and nothing writes these
 		// any more, but an upgraded site still has session.* rows in
 		// am_events and they have to keep rendering. Dropping these would
@@ -54,6 +56,7 @@ class AM_Event_Labels {
 		'session.limit_enforced'                => 'Session Limit Enforced',
 		'site.created'                           => 'Site Created',
 		'site.deleted'                           => 'Site Deleted',
+		'system.export'                          => 'Content Exported',
 		'system.fatal_error'                     => 'PHP Fatal Error',
 		'system.file_edit_attempted'             => 'File Editor Used',
 		'system.maintenance_enabled'             => 'Maintenance Mode Enabled',
@@ -75,6 +78,7 @@ class AM_Event_Labels {
 		'user.application_password_revoked'      => 'Application Password Revoked',
 		'user.application_password_revoked_all'  => 'All Application Passwords Revoked',
 		'user.auth_error'                        => 'Authentication Error',
+		'user.capabilities_changed'              => 'Capabilities Changed',
 		'user.deleted'                            => 'User Deleted',
 		'user.login'                              => 'User Logged In',
 		'user.login_failed'                      => 'Failed Login Attempt',
@@ -87,6 +91,12 @@ class AM_Event_Labels {
 		'user.super_admin_granted'               => 'Super Admin Granted',
 		'user.super_admin_revoked'               => 'Super Admin Revoked',
 		'user.updated'                            => 'User Profile Updated',
+		'widget.placement_changed'               => 'Widgets Changed',
+		// 'removed' is only written by the pre-2.9.21 widgets logger; kept
+		// so those rows keep rendering. 'saved' is still written (a widget's
+		// settings saved) and read the same under either version.
+		'widget.removed'                         => 'Widget Removed',
+		'widget.saved'                           => 'Widget Saved',
 	);
 
 	/**
@@ -186,6 +196,7 @@ class AM_Event_Labels {
 		'term'     => 'Term',
 		'theme'    => 'Theme',
 		'user'     => 'User',
+		'widget'   => 'Widget',
 	);
 
 	/**
