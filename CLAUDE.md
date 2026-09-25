@@ -458,7 +458,14 @@ items)".
 the columns on `WP_Post` (title, content, status, slug, author, date, parent,
 excerpt, comment/ping status, menu order, password). Password shows only
 none/set, never the value. Template, featured image, sticky and terms aren't
-columns; they live in post meta / an option / taxonomies.
+columns; they live in post meta / an option / taxonomies, and are
+`AM_Logger_Post_Details` (2.9.36): `_wp_page_template`, `_thumbnail_id`,
+the `sticky_posts` option and `set_object_terms`, each its own
+`post.details_changed` row. It ignores everything between
+`wp_insert_post_data` (new post, empty ID) and the `wp_insert_post` action,
+since a new post gets its default category/template in that one call and
+that isn't an edit; without the guard every new post logged a bogus
+"category: none → Uncategorized".
 
 **Network settings (2.9.34)** — `AM_Logger_Options::NETWORK_OPTIONS` covers
 sitemeta options, which never fire `updated_option`. They hook

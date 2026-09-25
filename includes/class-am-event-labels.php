@@ -53,6 +53,7 @@ class AM_Event_Labels {
 		'post.restored'                          => 'Post Restored from Trash',
 		'post.trashed'                           => 'Post Moved to Trash',
 		'post.updated'                           => 'Post Updated',
+		'post.details_changed'                   => 'Post Details Changed',
 		'security.access_denied'                => 'Access Denied',
 		'security.rest_auth_failed'              => 'REST API Authentication Failed',
 		'security.rest_cookie_auth_failed'       => 'REST API Cookie/Nonce Authentication Failed',
