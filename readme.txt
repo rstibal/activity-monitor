@@ -77,7 +77,7 @@ Yes. Settings → Privacy offers full addresses, anonymised addresses (the last 
 == Changelog ==
 
 = 2.9.27 =
-* Added: an optional setting to also log scheduled tasks that WordPress and plugins add for themselves in the background (Settings → Logging → Scheduled tasks). Off by default because it can be high-volume; repeat runs of an already-scheduled task are not logged, only new tasks.
+* Added: scheduled tasks that WordPress and plugins add for themselves in the background are now logged too (Settings → Logging → Scheduled tasks). On by default; untick it if the log gets noisy. Repeat runs of an already-scheduled task are not logged, only new tasks.
 
 = 2.9.26 =
 * Added: scheduled tasks (WP-Cron events) being added or removed by a logged-in user are now logged (AM_Logger_Cron). Background rescheduling by WordPress and plugins isn't logged. Turn it off under Settings → Logging → Scheduled tasks.

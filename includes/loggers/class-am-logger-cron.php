@@ -7,9 +7,9 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  * Two independent Settings → Logging switches:
  *  - am_log_cron_changes (default on): a change made in a request with a
  *    real user behind it.
- *  - am_log_cron_background (default off): a change made with nobody logged
+ *  - am_log_cron_background (default on): a change made with nobody logged
  *    in — WordPress or a plugin scheduling itself, on a cron run or a visitor
- *    request. High volume, so opt-in.
+ *    request. Higher volume, hence its own switch.
  * This plugin's own am_* hooks are always skipped so it never logs itself.
  *
  * The cron runner (wp-cron.php) does two things to every job it executes:
@@ -139,6 +139,6 @@ class AM_Logger_Cron extends AM_Logger_Base {
 		if ( 0 !== get_current_user_id() && ! wp_doing_cron() ) {
 			return (bool) get_option( 'am_log_cron_changes', 1 );
 		}
-		return (bool) get_option( 'am_log_cron_background', 0 );
+		return (bool) get_option( 'am_log_cron_background', 1 );
 	}
 }

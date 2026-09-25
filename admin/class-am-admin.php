@@ -267,7 +267,7 @@ class AM_Admin {
 		register_setting( self::SETTINGS_GROUP, 'am_log_cron_background', array(
 			'type'              => 'boolean',
 			'sanitize_callback' => array( $this, 'sanitize_checkbox' ),
-			'default'           => 0,
+			'default'           => 1,
 		) );
 
 		register_setting( self::SETTINGS_GROUP, AM_Date_Format::OPTION, array(
@@ -2451,11 +2451,11 @@ class AM_Admin {
 			</p>
 			<br>
 			<label>
-				<input type="checkbox" name="am_log_cron_background" value="1" <?php checked( (bool) get_option( 'am_log_cron_background', 0 ) ); ?>>
+				<input type="checkbox" name="am_log_cron_background" value="1" <?php checked( (bool) get_option( 'am_log_cron_background', 1 ) ); ?>>
 				<?php esc_html_e( 'Also log tasks WordPress and plugins schedule for themselves in the background', 'activity-monitor' ); ?>
 			</label>
 			<p class="description">
-				<?php esc_html_e( 'Changes made with nobody logged in — scheduled runs and visitor requests. Off by default: WordPress and plugins do this constantly, so it can add a lot of entries. Repeat runs of a task already scheduled are not logged, only new tasks.', 'activity-monitor' ); ?>
+				<?php esc_html_e( 'Changes made with nobody logged in — scheduled runs and visitor requests. WordPress and plugins do this constantly, so untick this if the log gets noisy. Repeat runs of a task already scheduled are not logged, only new tasks.', 'activity-monitor' ); ?>
 			</p>
 		</fieldset>
 		<?php

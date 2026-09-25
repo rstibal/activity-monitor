@@ -456,7 +456,7 @@ items)".
 WP-Cron tampering detection was ruled out earlier as too noisy; it shipped
 once settings made the noise the user's call. Two independent options in
 Settings → Logging: `am_log_cron_changes` (default on) for changes with a real
-user behind the request, and `am_log_cron_background` (default off) for
+user behind the request, and `am_log_cron_background` (default on too) for
 nobody-logged-in changes — WordPress/plugins scheduling themselves on a cron
 run or visitor request. It hooks `schedule_event`,
 `pre_unschedule_event`, `pre_unschedule_hook` and `pre_reschedule_event`, and
