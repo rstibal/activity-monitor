@@ -32,6 +32,21 @@ class AM_Logger_Options extends AM_Logger_Base {
 		'permalink_structure' => AM_Log_Levels::NOTICE,
 		'timezone_string'    => AM_Log_Levels::NOTICE,
 		'WPLANG'             => AM_Log_Levels::NOTICE,
+		'new_admin_email'    => AM_Log_Levels::WARNING,
+		'blogname'           => AM_Log_Levels::NOTICE,
+		'blogdescription'    => AM_Log_Levels::NOTICE,
+		'site_icon'          => AM_Log_Levels::NOTICE,
+		'show_on_front'      => AM_Log_Levels::NOTICE,
+		'page_on_front'      => AM_Log_Levels::NOTICE,
+		'page_for_posts'     => AM_Log_Levels::NOTICE,
+		'date_format'        => AM_Log_Levels::NOTICE,
+		'time_format'        => AM_Log_Levels::NOTICE,
+		'default_comment_status'     => AM_Log_Levels::NOTICE,
+		'comment_moderation'         => AM_Log_Levels::NOTICE,
+		'comment_registration'       => AM_Log_Levels::NOTICE,
+		'comment_previously_approved' => AM_Log_Levels::NOTICE,
+		'require_name_email'         => AM_Log_Levels::NOTICE,
+		'close_comments_for_old_posts' => AM_Log_Levels::NOTICE,
 
 		// This plugin's own settings. Shortening retention or turning off IP
 		// storage / channels is how someone quietly blunts the audit trail.

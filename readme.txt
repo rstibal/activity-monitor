@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, event log
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.9.29
+Stable tag: 2.9.30
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -75,6 +75,9 @@ Yes. Settings → Privacy offers full addresses, anonymised addresses (the last 
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
 
 == Changelog ==
+
+= 2.9.30 =
+* Added: more site settings are now watched: pending admin email change, site title, tagline, site icon, front page / posts page, date and time formats, and the main discussion (comment) settings.
 
 = 2.9.29 =
 * Added: changes to Activity Monitor's own settings (retention, IP storage, notification channels, grouping, cron and stats options) are now logged as Site Option Changed. Notification channels and the MaxMind license key are logged without their values.

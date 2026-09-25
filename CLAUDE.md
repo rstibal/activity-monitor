@@ -393,7 +393,9 @@ items)".
 - **`AM_Logger_Options`** watches a small explicit allowlist
   (`WATCHED_OPTIONS`: `siteurl`, `home`, `default_role`, `blog_public`,
   `users_can_register`, `admin_email`, `permalink_structure`,
-  `timezone_string`, `WPLANG`), not a blanket `updated_option` hook —
+  `timezone_string`, `WPLANG`, plus (2.9.30) `new_admin_email`, site
+  title/tagline/icon, front-page settings, date/time formats and the main
+  discussion options), not a blanket `updated_option` hook —
   most of `wp_options` is transient/cache churn that would flood the table.
   `siteurl`/`home` are classic compromise indicators (silent redirect/hijack);
   `default_role` flipped to `administrator` is a known self-registration
