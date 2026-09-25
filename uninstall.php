@@ -76,6 +76,9 @@ delete_option( 'am_datetime_format' );
 delete_option( 'am_ip_storage' );
 delete_option( 'am_ip_lookup_enabled' );
 delete_option( 'am_default_style' );
+// Hourly throttle markers written by AM_Logger_Cron; expire on their own but
+// are cleared here so nothing is left behind.
+$wpdb->query( "DELETE FROM `{$wpdb->options}` WHERE option_name LIKE '\\_transient\\_am\\_cron\\_noop\\_%' OR option_name LIKE '\\_transient\\_timeout\\_am\\_cron\\_noop\\_%'" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- core table name, fixed pattern.
 delete_option( 'am_log_cron_changes' );
 delete_option( 'am_log_cron_background' );
 delete_option( 'am_delete_data_on_uninstall' );

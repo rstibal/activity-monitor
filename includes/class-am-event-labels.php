@@ -27,6 +27,7 @@ class AM_Event_Labels {
 		'comment.status_changed'              => 'Comment Status Changed',
 		'core.updated'                        => 'WordPress Core Updated',
 		'cron.scheduled'                      => 'Cron Event Scheduled',
+		'cron.unschedule_attempted'              => 'Cron Unschedule Attempted',
 		'cron.unscheduled'                    => 'Cron Event Unscheduled',
 		'log.cleared'                            => 'Activity Log Cleared',
 		'media.deleted'                        => 'Media Deleted',

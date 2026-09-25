@@ -581,6 +581,15 @@ hook in `pre_reschedule_event` (which fires first). Without that, every job
 run would log a spurious pair. A plugin cancelling a task from inside a cron
 callback looks identical to the runner's unschedule and isn't logged. All
 hooks are filters and must return their first argument unchanged.
+**2.9.43 revises the below: a no-op unschedule is signal, not noise.** The
+Site Kit flood (one row per page load, from a plugin that was unconfigured and
+clearing tasks it never had) was how the owner learned it needed reconnecting;
+2.9.42's outright suppression would have hidden that. Now an attempt on a task
+that doesn't exist logs `cron.unschedule_attempted`, throttled to once an hour
+per hook by a transient (`am_cron_noop_<md5>`, plus a per-request set so a burst
+doesn't cost a read each), while a real removal logs `cron.unscheduled` every
+time. Don't throttle the real one.
+
 **Unschedule hooks fire even when nothing exists (2.9.42):**
 `pre_unschedule_event` and `pre_unschedule_hook` run before core looks, so a
 plugin that defensively unschedules on every request (Site Kit's

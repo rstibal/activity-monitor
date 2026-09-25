@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, event log
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.9.42
+Stable tag: 2.9.43
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -75,6 +75,9 @@ Yes. Settings → Privacy offers full addresses, anonymised addresses (the last 
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
 
 == Changelog ==
+
+= 2.9.43 =
+* Changed: when something tries to unschedule a task that isn't scheduled, it is now logged once an hour per task ("unschedule attempted, but nothing was scheduled") instead of not at all. A broken or unconfigured plugin that does this on every page load is worth seeing; 2.9.42 had hidden it. Real removals are still logged every time.
 
 = 2.9.42 =
 * Fixed: a plugin that "makes sure" a scheduled task is gone on every page load (Site Kit's email reporting cleanup, for one) flooded the log with "unscheduled" rows even though nothing was scheduled. Unscheduling is now logged only when there was actually something to remove.

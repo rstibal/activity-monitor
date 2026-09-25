@@ -32,6 +32,9 @@ class AM_Logger_Cron extends AM_Logger_Base {
 	/** @var array<string,true> Hooks the runner is rescheduling right now. */
 	private $rescheduling = array();
 
+	/** @var array<string,true> Transient keys already logged this request, so a burst doesn't cost a read each. */
+	private $noop_seen = array();
+
 	public function register_hooks() {
 		add_filter( 'pre_reschedule_event', array( $this, 'on_pre_reschedule' ), 10, 2 );
 		add_filter( 'schedule_event', array( $this, 'on_schedule' ) );
@@ -95,10 +98,8 @@ class AM_Logger_Cron extends AM_Logger_Base {
 	 * @return mixed
 	 */
 	public function on_unschedule_event( $pre, $timestamp, $hook, $args ) {
-		// The filter fires whether or not the event exists, so a plugin
-		// that "makes sure" a task is gone on every request would log every time.
-		if ( is_string( $hook ) && is_array( $args ) && wp_get_scheduled_event( $hook, $args, (int) $timestamp ) ) {
-			$this->log_unscheduled( $hook );
+		if ( is_string( $hook ) && is_array( $args ) ) {
+			$this->log_unscheduled( $hook, (bool) wp_get_scheduled_event( $hook, $args, (int) $timestamp ) );
 		}
 		return $pre;
 	}
@@ -109,8 +110,8 @@ class AM_Logger_Cron extends AM_Logger_Base {
 	 * @return mixed
 	 */
 	public function on_unschedule_hook( $pre, $hook ) {
-		if ( is_string( $hook ) && $this->hook_has_events( $hook ) ) {
-			$this->log_unscheduled( $hook );
+		if ( is_string( $hook ) ) {
+			$this->log_unscheduled( $hook, $this->hook_has_events( $hook ) );
 		}
 		return $pre;
 	}
@@ -125,8 +126,40 @@ class AM_Logger_Cron extends AM_Logger_Base {
 		return false;
 	}
 
-	private function log_unscheduled( $hook ) {
+	/**
+	 * The unschedule filters fire whether or not there was anything to remove.
+	 * A real removal is always logged. An attempt on a task that isn't there
+	 * is logged at most once an hour per hook: it's worth seeing (a plugin
+	 * that is broken or unconfigured does this on every request -- Site Kit
+	 * did until it was reconnected), but not once per request.
+	 */
+	private function log_unscheduled( $hook, bool $existed ) {
 		if ( wp_doing_cron() || ! is_string( $hook ) || ! $this->should_log( $hook ) ) {
+			return;
+		}
+
+		if ( ! $existed ) {
+			$key = 'am_cron_noop_' . md5( $hook );
+			if ( isset( $this->noop_seen[ $key ] ) || false !== get_transient( $key ) ) {
+				return;
+			}
+			$this->noop_seen[ $key ] = true;
+			set_transient( $key, 1, HOUR_IN_SECONDS );
+
+			$this->log(
+				'cron',
+				'unschedule_attempted',
+				sprintf(
+					/* translators: %s: cron hook name */
+					__( 'Cron event "%s" unschedule attempted, but nothing was scheduled.', 'activity-monitor' ),
+					$hook
+				),
+				array(
+					'level'       => AM_Log_Levels::NOTICE,
+					'object_type' => 'cron',
+					'object_name' => $hook,
+				)
+			);
 			return;
 		}
 
