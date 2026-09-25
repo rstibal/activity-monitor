@@ -39,6 +39,25 @@ workflow disappears.
   tested. Paid for itself immediately by deleting a `version_compare()` around
   the screen-option save hook. Keep the floor at something actually exercised;
   `Tested up to:` should track it.
+- **Releasing.** On "push and release": `git fetch`, confirm what's ahead of
+  origin, `git push origin master`, then
+  `gh release create vX.Y.Z --target master` with a short note pointing at the
+  readme changelog. `.github/workflows/release.yml` builds and attaches
+  `activity-monitor-X.Y.Z.zip`; confirm with `gh run list --workflow=release.yml`
+  and `gh release view vX.Y.Z --json assets`. One release can cover several
+  unreleased versions (2.9.33–2.9.37 shipped as v2.9.37). A change to
+  `CLAUDE.md` alone doesn't touch the package and doesn't bump the version.
+- **A failed edit in a batch doesn't stop the commit that follows it.**
+  Edits and the `phpcs && git commit` step often run in one go, and a
+  non-matching edit (tab/space drift) reports an error while the rest carry on
+  and get committed. Before committing, confirm every edit reported success;
+  2.9.34 was committed once with a missed `'level'` line and had to be
+  amended (it hadn't been pushed). `git commit --amend` is fine for that only
+  while the commit is unpushed.
+- **New event types need a label** (`AM_Event_Labels::MAP`, and `TYPE_MAP`
+  for a new type) in the same commit, and any new `am_*` option needs its
+  `uninstall.php` line. New per-user preferences (`am_theme`, `am_style`)
+  are usermeta and are removed with `delete_metadata()` there.
 - **`<code>` is only for actual code** (HTML, JS, SQL), never data values — IPs,
   URLs, slugs, IDs, hashes render as plain text. No CSS override of core's grey
   `<code>` background; real code wants it.
@@ -581,24 +600,22 @@ hook in `pre_reschedule_event` (which fires first). Without that, every job
 run would log a spurious pair. A plugin cancelling a task from inside a cron
 callback looks identical to the runner's unschedule and isn't logged. All
 hooks are filters and must return their first argument unchanged.
-**2.9.43 revises the below: a no-op unschedule is signal, not noise.** The
-Site Kit flood (one row per page load, from a plugin that was unconfigured and
-clearing tasks it never had) was how the owner learned it needed reconnecting;
-2.9.42's outright suppression would have hidden that. Now an attempt on a task
-that doesn't exist logs `cron.unschedule_attempted`, throttled to once an hour
-per hook by a transient (`am_cron_noop_<md5>`, plus a per-request set so a burst
-doesn't cost a read each), while a real removal logs `cron.unscheduled` every
-time. Don't throttle the real one.
-
-**Unschedule hooks fire even when nothing exists (2.9.42):**
-`pre_unschedule_event` and `pre_unschedule_hook` run before core looks, so a
-plugin that defensively unschedules on every request (Site Kit's
-`googlesitekit_email_reporting_cleanup` did, a row per page load) logged every
-time. `on_unschedule_event` now requires `wp_get_scheduled_event()` to find
-it and `on_unschedule_hook` requires something scheduled under the hook
-(`_get_cron_array()`); both checks are only valid because the filters run
-first. Occasion grouping would also have collapsed these, but not on a site
-with `am_occasion_window_seconds` at 0.
+**Unschedule filters fire even when nothing exists — and that is signal
+(2.9.42 → 2.9.43).** `pre_unschedule_event` / `pre_unschedule_hook` run
+*before* core looks, so a plugin that unschedules a task it never had fires
+them every time. Site Kit did this on every page load
+(`googlesitekit_email_reporting_cleanup`) while it was unconfigured; the
+flood was how the owner found out it needed reconnecting, and once they did,
+the unschedules stopped and its five real tasks showed up as `scheduled`.
+2.9.42 suppressed no-ops outright and would have hidden exactly that; 2.9.43
+replaced it. Now `log_unscheduled( $hook, $existed )` decides: the existence
+check (`wp_get_scheduled_event()` for a single event, `_get_cron_array()` for a
+whole hook) is only valid because the filters run first. A real removal logs
+`cron.unscheduled` **every time — never throttle it.** A no-op logs
+`cron.unschedule_attempted`, at most once an hour per hook (transient
+`am_cron_noop_<md5>`, plus a per-request set so a burst costs no repeated
+reads). Occasion grouping alone wasn't enough: it collapses these only when
+`am_occasion_window_seconds` is above 0, and the affected site had it off.
 `wp_clear_scheduled_hook()` calls `wp_unschedule_event()` per event, so
 `pre_clear_scheduled_hook` is deliberately not hooked (it would double-log);
 `wp_unschedule_hook()` doesn't, hence its own hook.
@@ -621,6 +638,15 @@ WordPress works:**
   on a subdirectory network every site shares one domain.
 
 ## Decisions worth not re-litigating
+
+- **Rate-limit noise, never blind it.** When a logger turns out to be noisy,
+  the first instinct is to suppress the event. Check first whether the noise
+  *is* the finding: an unconfigured Site Kit unscheduling a task it never had,
+  on every request, was the only visible sign it was broken (2.9.42 hid it,
+  2.9.43 fixed that). The pattern to prefer is "log it once per interval,
+  labelled for what it is" over "don't log it", and never throttle the
+  event that represents a real state change. Occasion grouping is not a
+  substitute: it does nothing when `am_occasion_window_seconds` is 0.
 
 - **The Visitor Stats beacon (`am_stats_track`) has no nonce, on purpose**
   (removed in 2.9.19). The beacon exists to count pages served from a
@@ -745,6 +771,24 @@ None currently tracked. The one long-standing entry was resolved in 2.2.1:
 the user filter now renders a removable chip in the filter bar (it's still
 set only from the profile modal, never a visible input, which is why the
 chip matters).
+
+**Known logging limits** (not bugs; each is a core limitation, noted where the
+logger is described):
+- Failed plugin/theme *downloads* have no hook and aren't logged.
+- `updated_option` doesn't fire when an option is first created, so the very
+  first Settings save isn't logged.
+- A plugin cancelling a cron task from inside a cron callback looks like the
+  runner's own unschedule and isn't logged.
+- Network signup/activation has no row of its own; activation already yields
+  `user.registered` / `site.created`.
+- A network user delete logs one "removed from site" row per site plus
+  "User Deleted".
+
+The gap list these came from was a comparison against WP Security Audit Log
+5.6.7 (core events in its `defaults.php`, sensors under
+`classes/WPSensors/`). It is fully implemented through 2.9.37; ruled out and
+not to be re-proposed: file-integrity scanning, 2FA lifecycle, generic REST
+request logging, raw high-volume hooks (transients, every REST call).
 
 ## Verifying changes
 
