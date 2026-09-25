@@ -172,6 +172,25 @@ workflow disappears.
      table body, which core sizes and fonts itself. Fixed with explicit Public
      Sans 12px.
 
+  **Styles (2.9.38)** sit beside the light/dark toggle: `AM_Admin::STYLES`
+  (ledger, wordpress, harbor, paper, contrast), per-user `am_style` usermeta
+  (`user_style()`, `ajax_save_style()`, cleaned up in `uninstall.php`), a
+  `am-style-<slug>` body class next to `am-theme-*`, swapped by the
+  `.am-style-select` handler in `admin.js`. A style is a full token set in a
+  light and a dark block in `admin.css`; Ledger Console is the base tokens
+  and needs no class. **A style block must define every token** — the light
+  one is declared after the base *dark* block at equal specificity, so a
+  skipped token would silently inherit the dark value; the dark block adds
+  `.am-theme-dark` and wins. `--am-on-accent` is the text colour on the
+  accent (dark palettes with a light accent need dark text). Severity and
+  initiator colours are meaning, not branding, and don't change per style.
+  "WordPress" is core's palette plus a system font, not the absence of CSS:
+  the plugin's layout rules are the same file as the restyle, so a literal
+  no-CSS mode would need that file split. It overrides `font-family` with
+  `!important` (exempting `.dashicons`). A new style needs an entry in
+  `STYLES` and its two blocks. The picker and the toggle appear on every
+  screen and combine freely.
+
   **2.9.8–2.9.11 unified type across the whole identity, independent of the
   theme toggle.** Sizes had been a mix of 12/12.5/13px and fonts a mix of Plex
   Mono/Sans and inherited body text (inputs, buttons, Details modal,

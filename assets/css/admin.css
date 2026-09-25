@@ -66,6 +66,7 @@ body.wp-admin {
 	--am-accent-tint: #E3F1EE;
 	--am-danger:     #B23A3A;
 	--am-danger-tint: #F7E7E7;
+	--am-on-accent:  #FFFFFF;
 	--am-shadow: 0 1px 2px rgba(22,32,44,.06), 0 1px 1px rgba(22,32,44,.04);
 	--am-color-scheme: light;
 }
@@ -84,8 +85,114 @@ body.wp-admin.am-theme-dark {
 	--am-accent-tint: #15332E;
 	--am-danger:     #E0726E;
 	--am-danger-tint: #3A1F20;
+	--am-on-accent:  #FFFFFF;
 	--am-shadow: 0 1px 2px rgba(0,0,0,.35);
 	--am-color-scheme: dark;
+}
+
+/* ── Styles ────────────────────────────────────────────────────────────── */
+/* "Ledger Console" is the block above (no am-style class needed to get it).
+   Every other style is a complete token set in a light and a dark block,
+   keyed on am-style-<slug> (AM_Admin::STYLES, user_style()). Each style block
+   redefines *every* token: the light one is declared after the base dark
+   block at the same specificity, so a style that skipped a token would
+   inherit the base *dark* value under light. The dark block adds
+   .am-theme-dark, which is more specific and wins. Severity/initiator colors
+   are meaning, not branding, so they stay put across styles. */
+
+/* WordPress: core admin's own palette and system font, no Plex/Public Sans
+   -- for anyone who wants this to look like the rest of wp-admin. */
+body.wp-admin.am-style-wordpress {
+	--am-paper: #F0F0F1; --am-surface: #FFFFFF; --am-surface-2: #F6F7F7; --am-surface-3: #F0F0F1;
+	--am-ink: #1D2327; --am-muted: #50575E; --am-faint: #787C82;
+	--am-border: #DCDCDE; --am-border-strong: #C3C4C7;
+	--am-accent: #2271B1; --am-accent-ink: #135E96; --am-accent-tint: #F0F6FC;
+	--am-danger: #D63638; --am-danger-tint: #FCF0F1; --am-on-accent: #FFFFFF;
+	--am-shadow: 0 1px 1px rgba(0,0,0,.04); --am-color-scheme: light;
+}
+body.wp-admin.am-style-wordpress.am-theme-dark {
+	--am-paper: #101517; --am-surface: #1D2327; --am-surface-2: #2C3338; --am-surface-3: #3C434A;
+	--am-ink: #F0F0F1; --am-muted: #A7AAAD; --am-faint: #8C8F94;
+	--am-border: #3C434A; --am-border-strong: #50575E;
+	--am-accent: #72AEE6; --am-accent-ink: #9EC2E6; --am-accent-tint: #0A2A45;
+	--am-danger: #F86368; --am-danger-tint: #3A1A1B; --am-on-accent: #101517;
+	--am-shadow: 0 1px 2px rgba(0,0,0,.35); --am-color-scheme: dark;
+}
+
+/* Harbor: cool navy and blue. */
+body.wp-admin.am-style-harbor {
+	--am-paper: #EAF0F7; --am-surface: #FFFFFF; --am-surface-2: #F3F7FB; --am-surface-3: #E4ECF5;
+	--am-ink: #14243A; --am-muted: #52657D; --am-faint: #8497AE;
+	--am-border: #D0DBE8; --am-border-strong: #B8C7D9;
+	--am-accent: #1F5FBF; --am-accent-ink: #164A94; --am-accent-tint: #E4EDFA;
+	--am-danger: #B23A3A; --am-danger-tint: #F7E7E7; --am-on-accent: #FFFFFF;
+	--am-shadow: 0 1px 2px rgba(20,36,58,.08); --am-color-scheme: light;
+}
+body.wp-admin.am-style-harbor.am-theme-dark {
+	--am-paper: #0D1626; --am-surface: #142033; --am-surface-2: #1A2A44; --am-surface-3: #21334F;
+	--am-ink: #E6EDF7; --am-muted: #9DB0C8; --am-faint: #7189A6;
+	--am-border: #28405E; --am-border-strong: #35506F;
+	--am-accent: #5AA2F5; --am-accent-ink: #9CC9FA; --am-accent-tint: #12294A;
+	--am-danger: #E0726E; --am-danger-tint: #3A1F20; --am-on-accent: #0B1626;
+	--am-shadow: 0 1px 2px rgba(0,0,0,.4); --am-color-scheme: dark;
+}
+
+/* Paper: warm cream stock with a rust accent. */
+body.wp-admin.am-style-paper {
+	--am-paper: #F2EDE2; --am-surface: #FBF8F1; --am-surface-2: #F5F0E4; --am-surface-3: #EBE4D4;
+	--am-ink: #2B2620; --am-muted: #6B6254; --am-faint: #9A907E;
+	--am-border: #DDD4C1; --am-border-strong: #C9BEA7;
+	--am-accent: #9A4B12; --am-accent-ink: #74380D; --am-accent-tint: #F4E6D8;
+	--am-danger: #A63232; --am-danger-tint: #F5E1DE; --am-on-accent: #FFFFFF;
+	--am-shadow: 0 1px 2px rgba(43,38,32,.08); --am-color-scheme: light;
+}
+body.wp-admin.am-style-paper.am-theme-dark {
+	--am-paper: #1B1712; --am-surface: #241F18; --am-surface-2: #2C261D; --am-surface-3: #352E23;
+	--am-ink: #EFE6D4; --am-muted: #B3A78F; --am-faint: #8A7F6A;
+	--am-border: #3D3527; --am-border-strong: #4C4230;
+	--am-accent: #E0A05A; --am-accent-ink: #F0C08A; --am-accent-tint: #3A2A16;
+	--am-danger: #E0726E; --am-danger-tint: #3A1F20; --am-on-accent: #1B1712;
+	--am-shadow: 0 1px 2px rgba(0,0,0,.4); --am-color-scheme: dark;
+}
+
+/* High Contrast: pure black on white (or the reverse), strong borders, no
+   shadows. Meets AAA for body text; the accent is chosen to stay legible
+   against both surfaces. */
+body.wp-admin.am-style-contrast {
+	--am-paper: #FFFFFF; --am-surface: #FFFFFF; --am-surface-2: #F0F0F0; --am-surface-3: #E0E0E0;
+	--am-ink: #000000; --am-muted: #1A1A1A; --am-faint: #333333;
+	--am-border: #1A1A1A; --am-border-strong: #000000;
+	--am-accent: #0033CC; --am-accent-ink: #001F7A; --am-accent-tint: #E6ECFF;
+	--am-danger: #B00020; --am-danger-tint: #FFE6EA; --am-on-accent: #FFFFFF;
+	--am-shadow: none; --am-color-scheme: light;
+}
+body.wp-admin.am-style-contrast.am-theme-dark {
+	--am-paper: #000000; --am-surface: #0A0A0A; --am-surface-2: #141414; --am-surface-3: #1F1F1F;
+	--am-ink: #FFFFFF; --am-muted: #F0F0F0; --am-faint: #CFCFCF;
+	--am-border: #E0E0E0; --am-border-strong: #FFFFFF;
+	--am-accent: #FFD400; --am-accent-ink: #FFE766; --am-accent-tint: #332B00;
+	--am-danger: #FF6B6B; --am-danger-tint: #3A0F0F; --am-on-accent: #000000;
+	--am-shadow: none; --am-color-scheme: dark;
+}
+
+/* The WordPress style drops the Ledger type system for whatever wp-admin
+   itself uses. `inherit` on every descendant walks back up to <body>'s own
+   font; !important because the Plex/Public Sans declarations are spread over
+   dozens of rules of varying specificity, and this is the one place that
+   wants to beat all of them at once. */
+body.wp-admin.am-style-wordpress .am-wrap,
+body.wp-admin.am-style-wordpress .am-wrap *,
+body.wp-admin.am-style-wordpress .am-modal-overlay,
+body.wp-admin.am-style-wordpress .am-modal-overlay * {
+	font-family: inherit !important;
+}
+body.wp-admin.am-style-wordpress .am-wrap .am-version { font-family: monospace !important; }
+body.wp-admin.am-style-wordpress .am-wrap .dashicons { font-family: dashicons !important; }
+
+/* High Contrast: a visible, thick focus ring on every control. */
+body.wp-admin.am-style-contrast .am-wrap :focus-visible {
+	outline: 3px solid var( --am-accent );
+	outline-offset: 2px;
 }
 /* The page background directly around .am-wrap -- core's own chrome, not
    ours, so (like .wp-list-table/.form-table before it) it needs an explicit
@@ -122,8 +229,14 @@ body.wp-admin.am-theme-dark #wpbody-content {
 /* Sits beside the version tag on every screen (render_screen_open()). A
    binary switch, not a 3-state artifact-style theme -- this is a stored
    usermeta preference, so "system" has no meaning here. */
-.am-theme-toggle {
+.am-heading-controls {
 	margin-left: auto;
+	display: flex;
+	align-items: center;
+	gap: 14px;
+}
+.am-heading-controls .am-style-select { min-height: 28px; padding: 2px 24px 2px 8px; }
+.am-theme-toggle {
 	display: inline-flex;
 	align-items: center;
 	gap: 8px;
@@ -234,7 +347,7 @@ body.wp-admin.am-theme-dark #wpbody-content {
 .am-wrap .button-primary {
 	background: var( --am-accent );
 	border-color: var( --am-accent );
-	color: #fff;
+	color: var( --am-on-accent );
 }
 .am-wrap .button-primary:hover { filter: brightness( 1.08 ); background: var( --am-accent ); border-color: var( --am-accent ); }
 

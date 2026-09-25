@@ -336,4 +336,15 @@
 		$.post(amData.ajaxUrl, { action: 'am_save_theme', theme: next, nonce: amData.nonce });
 	});
 
+	/* Style picker, next to the light/dark toggle. A style is a token set keyed
+	   on an am-style-<slug> class on <body> (same ancestor-reach reason as
+	   am-theme-dark above), so switching swaps that one class and saves over
+	   AJAX -- see AM_Admin::ajax_save_style(). */
+	$(document).on('change', '.am-style-select', function () {
+		var next = $(this).val();
+		var $body = $('body');
+		$body.attr('class', $body.attr('class').replace(/\bam-style-\S+/g, '').replace(/\s+/g, ' ') + ' am-style-' + next);
+		$.post(amData.ajaxUrl, { action: 'am_save_style', style: next, nonce: amData.nonce });
+	});
+
 }(jQuery));

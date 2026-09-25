@@ -70,6 +70,7 @@ class AM_Admin {
 		add_action( 'wp_ajax_am_log_table',                   array( $instance, 'ajax_log_table' ) );
 		add_action( 'wp_ajax_am_stats_content',               array( $instance, 'ajax_stats_content' ) );
 		add_action( 'wp_ajax_am_save_theme',                  array( $instance, 'ajax_save_theme' ) );
+		add_action( 'wp_ajax_am_save_style',                  array( $instance, 'ajax_save_style' ) );
 	}
 
 	// ── Menu ───────────────────────────────────────────────────────────
@@ -221,7 +222,7 @@ class AM_Admin {
 		if ( ! $screen || ! in_array( $screen->id, self::$screen_hooks, true ) ) {
 			return $classes;
 		}
-		return $classes . ' am-theme-' . self::user_theme() . ' ';
+		return $classes . ' am-theme-' . self::user_theme() . ' am-style-' . self::user_style() . ' ';
 	}
 
 	// ── Settings registration ────────────────────────────────────────────
@@ -1173,10 +1174,18 @@ class AM_Admin {
 			<div class="am-heading-row">
 				<h1 class="wp-heading-inline"><?php echo esc_html( $title ); ?></h1>
 				<span class="am-version">v<?php echo esc_html( AM_VERSION ); ?></span>
-				<button type="button" class="am-theme-toggle" aria-pressed="<?php echo 'dark' === $theme ? 'true' : 'false'; ?>">
+				<div class="am-heading-controls">
+					<label class="screen-reader-text" for="am-style-select"><?php esc_html_e( 'Style', 'activity-monitor' ); ?></label>
+					<select id="am-style-select" class="am-style-select">
+						<?php foreach ( self::STYLES as $slug => $label ) : ?>
+							<option value="<?php echo esc_attr( $slug ); ?>" <?php selected( self::user_style(), $slug ); ?>><?php echo esc_html( $label ); ?></option>
+						<?php endforeach; ?>
+					</select>
+					<button type="button" class="am-theme-toggle" aria-pressed="<?php echo 'dark' === $theme ? 'true' : 'false'; ?>">
 					<span class="am-tt-track"><span class="am-tt-thumb"></span></span>
 					<span class="am-tt-label"><?php echo 'dark' === $theme ? esc_html__( 'Dark', 'activity-monitor' ) : esc_html__( 'Light', 'activity-monitor' ); ?></span>
-				</button>
+					</button>
+				</div>
 			</div>
 			<hr class="wp-header-end">
 		<?php
@@ -1208,6 +1217,41 @@ class AM_Admin {
 		$user_id = get_current_user_id();
 		if ( $user_id ) {
 			update_user_meta( $user_id, 'am_theme', $theme );
+		}
+		wp_send_json_success();
+	}
+
+	/**
+	 * Visual styles, slug => label. Each one is a token set in admin.css
+	 * (light and dark), keyed on the am-style-<slug> body class. The slugs are
+	 * a whitelist for the stored value and for the AJAX save; a new style
+	 * needs an entry here and its two token blocks in admin.css.
+	 */
+	const STYLES = array(
+		'ledger'   => 'Ledger Console',
+		'wordpress' => 'WordPress',
+		'harbor'   => 'Harbor',
+		'paper'    => 'Paper',
+		'contrast' => 'High Contrast',
+	);
+
+	/** Per-user style, in usermeta like am_theme; anything unrecognised falls back to Ledger Console. */
+	private static function user_style(): string {
+		$user_id = get_current_user_id();
+		$stored  = $user_id ? (string) get_user_meta( $user_id, 'am_style', true ) : '';
+		return isset( self::STYLES[ $stored ] ) ? $stored : 'ledger';
+	}
+
+	/** Persists the style dropdown -- see admin.js's am-style-select handler. */
+	public function ajax_save_style() {
+		check_ajax_referer( 'am_ajax', 'nonce' );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( '-1' );
+		}
+		$style   = sanitize_key( wp_unslash( (string) ( $_POST['style'] ?? '' ) ) );
+		$user_id = get_current_user_id();
+		if ( $user_id && isset( self::STYLES[ $style ] ) ) {
+			update_user_meta( $user_id, 'am_style', $style );
 		}
 		wp_send_json_success();
 	}

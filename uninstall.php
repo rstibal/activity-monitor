@@ -86,6 +86,7 @@ delete_option( 'am_maintenance_mode_last_state' );
 // removed for every user, not left in place.
 delete_metadata( 'user', 0, 'am_log_per_page', '', true );
 delete_metadata( 'user', 0, 'am_theme', '', true );
+delete_metadata( 'user', 0, 'am_style', '', true );
 
 // Session management was removed in 2.4.0; these are its two leftover
 // settings. Note what is deliberately NOT here: the session_tokens user
