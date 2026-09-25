@@ -1228,18 +1228,33 @@ class AM_Admin {
 	 * needs an entry here and its two token blocks in admin.css.
 	 */
 	const STYLES = array(
-		'ledger'   => 'Ledger Console',
 		'wordpress' => 'WordPress',
-		'harbor'   => 'Harbor',
-		'paper'    => 'Paper',
-		'contrast' => 'High Contrast',
+		'ledger'    => 'Ledger Console',
+		'harbor'    => 'Harbor',
+		'paper'     => 'Paper',
+		'forest'    => 'Forest',
+		'plum'      => 'Plum',
+		'graphite'  => 'Graphite',
+		'solarized' => 'Solarized',
+		'nord'      => 'Nord',
+		'contrast'  => 'High Contrast',
 	);
 
-	/** Per-user style, in usermeta like am_theme; anything unrecognised falls back to Ledger Console. */
+	/**
+	 * Per-user style, in usermeta like am_theme. A user who hasn't picked one
+	 * gets the site default: am_default_style, which a fresh activation sets
+	 * to the core-look style (see am_set_default_style()) and which is absent on any
+	 * install that predates it -- those keep Ledger Console, the look their
+	 * users already have. Anything unrecognised also falls back to that.
+	 */
 	private static function user_style(): string {
 		$user_id = get_current_user_id();
 		$stored  = $user_id ? (string) get_user_meta( $user_id, 'am_style', true ) : '';
-		return isset( self::STYLES[ $stored ] ) ? $stored : 'ledger';
+		if ( isset( self::STYLES[ $stored ] ) ) {
+			return $stored;
+		}
+		$default = (string) get_option( 'am_default_style', 'ledger' );
+		return isset( self::STYLES[ $default ] ) ? $default : 'ledger';
 	}
 
 	/** Persists the style dropdown -- see admin.js's am-style-select handler. */

@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, event log
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.9.38
+Stable tag: 2.9.39
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -75,6 +75,10 @@ Yes. Settings → Privacy offers full addresses, anonymised addresses (the last 
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
 
 == Changelog ==
+
+= 2.9.39 =
+* Changed: new installs now start on the WordPress style. Existing installs keep Ledger Console until a user picks something else.
+* Added: five more styles: Forest, Plum, Graphite, Solarized and Nord, each in light and dark.
 
 = 2.9.38 =
 * Added: a Style picker next to the Light/Dark toggle with five styles: Ledger Console (the existing look), WordPress (core admin colors and system font), Harbor, Paper, and High Contrast. Each works in light and dark, and your choice is remembered per user.

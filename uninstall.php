@@ -75,6 +75,7 @@ delete_option( 'am_occasion_window_seconds' );
 delete_option( 'am_datetime_format' );
 delete_option( 'am_ip_storage' );
 delete_option( 'am_ip_lookup_enabled' );
+delete_option( 'am_default_style' );
 delete_option( 'am_log_cron_changes' );
 delete_option( 'am_log_cron_background' );
 delete_option( 'am_delete_data_on_uninstall' );

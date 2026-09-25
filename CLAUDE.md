@@ -172,8 +172,15 @@ workflow disappears.
      table body, which core sizes and fonts itself. Fixed with explicit Public
      Sans 12px.
 
-  **Styles (2.9.38)** sit beside the light/dark toggle: `AM_Admin::STYLES`
-  (ledger, wordpress, harbor, paper, contrast), per-user `am_style` usermeta
+  **Styles (2.9.38, ten as of 2.9.39)** sit beside the light/dark toggle:
+  `AM_Admin::STYLES` (wordpress, ledger, harbor, paper, forest, plum,
+  graphite, solarized, nord, contrast). **The default is per-install, not
+  global:** `am_default_style` is set to `wordpress` by
+  `am_set_default_style()` on a *fresh activation only* (no `am_db_version`
+  yet — it's registered before `AM_Schema::install()` because that sets it),
+  and absent on anything older, which keeps `ledger`. Upgrading by replacing
+  files never runs the activation hook, so existing sites don't change look
+  under their users. A user's own pick (`am_style` usermeta) always wins. per-user `am_style` usermeta
   (`user_style()`, `ajax_save_style()`, cleaned up in `uninstall.php`), a
   `am-style-<slug>` body class next to `am-theme-*`, swapped by the
   `.am-style-select` handler in `admin.js`. A style is a full token set in a

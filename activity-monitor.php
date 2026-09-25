@@ -3,7 +3,7 @@
  * Plugin Name: Activity Monitor
  * Plugin URI:  https://robstibal.com
  * Description: Comprehensive WordPress audit log – tracks logins, content changes, settings updates, security events, and more. Includes real-time visitor/traffic stats with optional country-level geolocation.
- * Version:     2.9.38
+ * Version:     2.9.39
  * Author:      Rob Stibal
  * Author URI:  http://robstibal.com
  * License:     GPL v2 or later
@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'AM_VERSION', '2.9.38' );
+define( 'AM_VERSION', '2.9.39' );
 define( 'AM_FILE',    __FILE__ );
 define( 'AM_DIR',     plugin_dir_path( __FILE__ ) );
 define( 'AM_URL',     plugin_dir_url( __FILE__ ) );
@@ -85,6 +85,15 @@ require_once AM_DIR . 'includes/stats/class-am-stats-tracker.php';
 require_once AM_DIR . 'includes/stats/class-am-stats-query.php';
 
 // ── Activation / deactivation ────────────────────────────────────────────
+// New installs start on the core-look style. Registered before
+// AM_Schema::install() on purpose: "is this a fresh install"
+// is answered by am_db_version not existing yet, and install() sets it.
+function am_set_default_style() {
+	if ( false === get_option( 'am_db_version' ) && false === get_option( 'am_default_style' ) ) {
+		add_option( 'am_default_style', 'wordpress' ); // phpcs:ignore WordPress.WP.CapitalPDangit.MisspelledInText -- a style slug, not prose.
+	}
+}
+register_activation_hook( AM_FILE, 'am_set_default_style' );
 register_activation_hook( AM_FILE, array( 'AM_Schema', 'install' ) );
 register_activation_hook( AM_FILE, array( 'AM_Stats_Schema', 'install' ) );
 // No deactivation cleanup needed -- v2.0 data is intentionally kept on
