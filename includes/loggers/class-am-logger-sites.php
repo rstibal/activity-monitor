@@ -29,6 +29,65 @@ class AM_Logger_Sites extends AM_Logger_Base {
 		// (hooked at the default 10) has already run when this logs.
 		add_action( 'wp_initialize_site', array( $this, 'on_site_created' ), 100 );
 		add_action( 'wp_delete_site', array( $this, 'on_site_deleted' ) );
+		add_action( 'wp_update_site', array( $this, 'on_site_updated' ), 10, 2 );
+	}
+
+	/**
+	 * Every status change (archive, spam, deactivate, public) goes through
+	 * wp_update_site(), so one hook and a diff of the flags covers them; the
+	 * separate archive_blog / make_spam_blog / ... actions all fire from the
+	 * same call and would just repeat it.
+	 *
+	 * flag => array( action when set, action when cleared, level when set ).
+	 * 'deleted' is core's name for "deactivated": the site is only hidden,
+	 * not removed (removal is wp_delete_site above).
+	 */
+	const FLAGS = array(
+		'archived' => array( 'archived', 'unarchived', AM_Log_Levels::WARNING ),
+		'spam'     => array( 'marked_spam', 'unmarked_spam', AM_Log_Levels::WARNING ),
+		'deleted'  => array( 'deactivated', 'reactivated', AM_Log_Levels::WARNING ),
+		'public'   => array( 'made_public', 'made_private', AM_Log_Levels::NOTICE ),
+	);
+
+	public function on_site_updated( WP_Site $new_site, WP_Site $old_site ) {
+		$blog_id = (int) $new_site->blog_id;
+		$name    = self::site_name( $new_site );
+
+		foreach ( self::FLAGS as $flag => $config ) {
+			$before = (int) $old_site->$flag;
+			$after  = (int) $new_site->$flag;
+			if ( $before === $after ) {
+				continue;
+			}
+
+			$set    = 1 === $after;
+			$action = $set ? $config[0] : $config[1];
+
+			// 'public' is the odd one: 1 is the open state, so its "set"
+			// direction is the routine one and clearing it is the notable one.
+			$level = 'public' === $flag
+				? ( $set ? AM_Log_Levels::NOTICE : AM_Log_Levels::WARNING )
+				: ( $set ? $config[2] : AM_Log_Levels::NOTICE );
+
+			$this->log(
+				'site',
+				$action,
+				sprintf(
+					/* translators: 1: site address, 2: site/blog ID, 3: what happened, e.g. "archived" */
+					__( 'Site %1$s (ID %2$d) %3$s.', 'activity-monitor' ),
+					$name,
+					$blog_id,
+					str_replace( '_', ' ', $action )
+				),
+				array(
+					'level'       => $level,
+					'object_type' => 'site',
+					'object_id'   => $blog_id,
+					'object_name' => $name,
+					'group'       => false,
+				)
+			);
+		}
 	}
 
 	/**

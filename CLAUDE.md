@@ -454,6 +454,12 @@ items)".
   the same tier as site deletion. Registers only when `is_multisite()`, same
   guard as `AM_Logger_Sites`.
 
+**Site status (2.9.33)** — `AM_Logger_Sites` hooks `wp_update_site` and diffs
+`archived`/`spam`/`deleted`/`public`. The per-status actions (`archive_blog`,
+`make_spam_blog`, …) all fire from that same call, so hooking them too would
+double-log. Core's `deleted` flag means *deactivated* (hidden, not removed);
+real removal is `wp_delete_site`, logged separately.
+
 **`AM_Logger_Update_Failures` (2.9.32)** — `upgrader_process_complete` only
 fires on success. Hooks `upgrader_install_package_result` and
 `upgrader_source_selection` (both filters, priority 999, return arg 1
