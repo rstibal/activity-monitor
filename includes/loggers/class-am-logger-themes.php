@@ -2,7 +2,7 @@
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 /**
- * AM_Logger_Themes — theme switch, Customizer saves, theme updates.
+ * AM_Logger_Themes — theme switch, install, delete, Customizer saves, updates.
  *
  * Ported from v1.x AM_Hooks::on_theme_switch / on_customizer_save, and the
  * 'theme' branch of on_upgrader_complete(). AM_Logger_Plugins already
@@ -21,10 +21,44 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  */
 class AM_Logger_Themes extends AM_Logger_Base {
 
+	/** @var array<string,string> Stylesheet => display name, captured before the files are gone. */
+	private $pending_deletes = array();
+
 	public function register_hooks() {
 		add_action( 'switch_theme', array( $this, 'on_theme_switch' ), 10, 3 );
 		add_action( 'customize_save_after', array( $this, 'on_customizer_save' ) );
 		add_action( 'upgrader_process_complete', array( $this, 'on_upgrader_complete' ), 10, 2 );
+		add_action( 'delete_theme', array( $this, 'on_before_delete' ) );
+		add_action( 'deleted_theme', array( $this, 'on_deleted' ), 10, 2 );
+	}
+
+	public function on_before_delete( $stylesheet ) {
+		$theme = wp_get_theme( $stylesheet );
+		$this->pending_deletes[ $stylesheet ] = $theme->exists() ? (string) $theme->get( 'Name' ) : (string) $stylesheet;
+	}
+
+	public function on_deleted( $stylesheet, $deleted ) {
+		$name = $this->pending_deletes[ $stylesheet ] ?? (string) $stylesheet;
+		unset( $this->pending_deletes[ $stylesheet ] );
+		if ( ! $deleted ) {
+			return;
+		}
+
+		$this->log(
+			'theme',
+			'deleted',
+			sprintf(
+				/* translators: %s: theme name */
+				__( 'Theme "%s" deleted.', 'activity-monitor' ),
+				$name
+			),
+			array(
+				'level'       => AM_Log_Levels::WARNING,
+				'object_type' => 'theme',
+				'object_name' => $name,
+				'group'       => false,
+			)
+		);
 	}
 
 	public function on_theme_switch( string $new_name, WP_Theme $new_theme, WP_Theme $old_theme ) {
@@ -70,7 +104,34 @@ class AM_Logger_Themes extends AM_Logger_Base {
 	 * AM_Logger_Plugins; core updates by AM_Logger_Core. See class doc.
 	 */
 	public function on_upgrader_complete( $upgrader, array $data ) {
-		if ( empty( $data['type'] ) || 'theme' !== $data['type'] || empty( $data['themes'] ) ) {
+		if ( empty( $data['type'] ) || 'theme' !== $data['type'] ) {
+			return;
+		}
+
+		if ( 'install' === ( $data['action'] ?? '' ) ) {
+			$stylesheet = ( $upgrader instanceof Theme_Upgrader ) ? $upgrader->theme_info() : false;
+			if ( ! $stylesheet ) {
+				return;
+			}
+			$name = $stylesheet instanceof WP_Theme ? $stylesheet->get( 'Name' ) : (string) $stylesheet;
+			$this->log(
+				'theme',
+				'installed',
+				sprintf(
+					/* translators: %s: theme name */
+					__( 'Theme "%s" installed.', 'activity-monitor' ),
+					$name
+				),
+				array(
+					'level'       => AM_Log_Levels::NOTICE,
+					'object_type' => 'theme',
+					'object_name' => $name,
+				)
+			);
+			return;
+		}
+
+		if ( empty( $data['themes'] ) ) {
 			return;
 		}
 

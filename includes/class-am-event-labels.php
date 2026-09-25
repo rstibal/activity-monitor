@@ -71,6 +71,8 @@ class AM_Event_Labels {
 		'term.deleted'                           => 'Term Deleted',
 		'term.updated'                           => 'Term Updated',
 		'theme.customized'                      => 'Theme Customized',
+		'theme.deleted'                          => 'Theme Deleted',
+		'theme.installed'                        => 'Theme Installed',
 		'theme.switched'                         => 'Theme Switched',
 		'theme.updated'                          => 'Theme Updated',
 		'user.added_to_site'                    => 'User Added to Site',
