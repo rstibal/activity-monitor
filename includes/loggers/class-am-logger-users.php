@@ -31,6 +31,8 @@ class AM_Logger_Users extends AM_Logger_Base {
 		add_action( 'profile_update', array( $this, 'on_profile_update' ), 10, 2 );
 		add_action( 'delete_user', array( $this, 'on_user_delete' ) );
 		add_action( 'set_user_role', array( $this, 'on_role_change' ), 10, 3 );
+		add_action( 'add_user_role', array( $this, 'on_add_user_role' ), 10, 2 );
+		add_action( 'remove_user_role', array( $this, 'on_remove_user_role' ), 10, 2 );
 		add_action( 'add_user_to_blog', array( $this, 'on_add_user_to_blog' ), 10, 3 );
 		add_action( 'remove_user_from_blog', array( $this, 'on_remove_user_from_blog' ), 10, 2 );
 	}
@@ -211,6 +213,46 @@ class AM_Logger_Users extends AM_Logger_Base {
 				'object_type' => 'user',
 				'object_id'   => $user_id,
 				'object_name' => $name,
+			)
+		);
+	}
+
+	public function on_add_user_role( int $user_id, string $role ) {
+		/* translators: 1: username, 2: role */
+		$this->log_role_membership( $user_id, $role, 'role_added', __( 'User "%1$s" given additional role "%2$s".', 'activity-monitor' ) );
+	}
+
+	public function on_remove_user_role( int $user_id, string $role ) {
+		/* translators: 1: username, 2: role */
+		$this->log_role_membership( $user_id, $role, 'role_removed', __( 'User "%1$s" had role "%2$s" removed.', 'activity-monitor' ) );
+	}
+
+	private function log_role_membership( int $user_id, string $role, string $action, string $format ) {
+		// WP_User::set_role() fires add/remove for each role it swaps and then
+		// set_user_role, which on_role_change() already logs; the hooks fire
+		// first, so the only way to tell is to look at who is calling.
+		foreach ( debug_backtrace( DEBUG_BACKTRACE_IGNORE_ARGS, 10 ) as $frame ) { // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_debug_backtrace
+			if ( isset( $frame['class'], $frame['function'] ) && 'WP_User' === $frame['class'] && 'set_role' === $frame['function'] ) {
+				return;
+			}
+		}
+
+		$user = get_userdata( $user_id );
+		if ( ! $user ) {
+			return;
+		}
+
+		$this->log(
+			'user',
+			$action,
+			sprintf( $format, $user->user_login, $role ),
+			array(
+				'level'       => AM_Log_Levels::WARNING,
+				'object_type' => 'user',
+				'object_id'   => $user_id,
+				'object_name' => $user->user_login,
+				'context'     => array( 'role' => $role ),
+				'group'       => false,
 			)
 		);
 	}

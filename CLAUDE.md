@@ -452,6 +452,13 @@ items)".
   the same tier as site deletion. Registers only when `is_multisite()`, same
   guard as `AM_Logger_Sites`.
 
+**Role membership (2.9.28)** — `AM_Logger_Users` hooks `add_user_role` /
+`remove_user_role` (`user.role_added`/`_removed`, WARNING), closing the gap
+where `WP_User::add_role()` left no trace. `WP_User::set_role()` fires both
+hooks per swapped role *before* `set_user_role` (which `on_role_change()`
+already logs), so `log_role_membership()` skips any call with `WP_User::set_role`
+in its backtrace rather than double-log.
+
 **`AM_Logger_Cron` (2.9.26/2.9.27) is the one logger with off switches.**
 WP-Cron tampering detection was ruled out earlier as too noisy; it shipped
 once settings made the noise the user's call. Two independent options in

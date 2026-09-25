@@ -93,6 +93,8 @@ class AM_Event_Labels {
 		'user.registered'                        => 'User Registered',
 		'user.removed_from_site'                 => 'User Removed from Site',
 		'user.role_changed'                      => 'User Role Changed',
+		'user.role_added'                        => 'User Role Added',
+		'user.role_removed'                      => 'User Role Removed',
 		'user.super_admin_granted'               => 'Super Admin Granted',
 		'user.super_admin_revoked'               => 'Super Admin Revoked',
 		'user.updated'                            => 'User Profile Updated',
