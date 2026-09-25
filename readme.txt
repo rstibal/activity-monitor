@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, event log
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.9.26
+Stable tag: 2.9.27
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -75,6 +75,9 @@ Yes. Settings → Privacy offers full addresses, anonymised addresses (the last 
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
 
 == Changelog ==
+
+= 2.9.27 =
+* Added: an optional setting to also log scheduled tasks that WordPress and plugins add for themselves in the background (Settings → Logging → Scheduled tasks). Off by default because it can be high-volume; repeat runs of an already-scheduled task are not logged, only new tasks.
 
 = 2.9.26 =
 * Added: scheduled tasks (WP-Cron events) being added or removed by a logged-in user are now logged (AM_Logger_Cron). Background rescheduling by WordPress and plugins isn't logged. Turn it off under Settings → Logging → Scheduled tasks.

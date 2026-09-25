@@ -264,6 +264,12 @@ class AM_Admin {
 			'default'           => 1,
 		) );
 
+		register_setting( self::SETTINGS_GROUP, 'am_log_cron_background', array(
+			'type'              => 'boolean',
+			'sanitize_callback' => array( $this, 'sanitize_checkbox' ),
+			'default'           => 0,
+		) );
+
 		register_setting( self::SETTINGS_GROUP, AM_Date_Format::OPTION, array(
 			'sanitize_callback' => array( $this, 'sanitize_datetime_format' ),
 			'default'           => AM_Date_Format::DEFAULT_KEY,
@@ -2441,7 +2447,15 @@ class AM_Admin {
 				<?php esc_html_e( 'Log scheduled tasks (WP-Cron events) being added or removed', 'activity-monitor' ); ?>
 			</label>
 			<p class="description">
-				<?php esc_html_e( 'Only changes made while someone is logged in are recorded — WordPress and plugins rescheduling their own tasks in the background are not. Plugins also add and remove their own tasks during activation and settings changes, so untick this if the log gets noisy.', 'activity-monitor' ); ?>
+				<?php esc_html_e( 'Changes made while someone is logged in. Plugins also add and remove their own tasks during activation and settings changes, so untick this if the log gets noisy.', 'activity-monitor' ); ?>
+			</p>
+			<br>
+			<label>
+				<input type="checkbox" name="am_log_cron_background" value="1" <?php checked( (bool) get_option( 'am_log_cron_background', 0 ) ); ?>>
+				<?php esc_html_e( 'Also log tasks WordPress and plugins schedule for themselves in the background', 'activity-monitor' ); ?>
+			</label>
+			<p class="description">
+				<?php esc_html_e( 'Changes made with nobody logged in — scheduled runs and visitor requests. Off by default: WordPress and plugins do this constantly, so it can add a lot of entries. Repeat runs of a task already scheduled are not logged, only new tasks.', 'activity-monitor' ); ?>
 			</p>
 		</fieldset>
 		<?php

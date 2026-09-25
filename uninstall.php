@@ -76,6 +76,7 @@ delete_option( 'am_datetime_format' );
 delete_option( 'am_ip_storage' );
 delete_option( 'am_ip_lookup_enabled' );
 delete_option( 'am_log_cron_changes' );
+delete_option( 'am_log_cron_background' );
 delete_option( 'am_delete_data_on_uninstall' );
 delete_option( 'am_maintenance_mode_last_state' );
 // Activity Log rows-per-page choice (2.8.20) and the Ledger Console theme

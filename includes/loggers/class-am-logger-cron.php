@@ -2,24 +2,53 @@
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 /**
- * AM_Logger_Cron — WP-Cron events scheduled or unscheduled by a logged-in user.
+ * AM_Logger_Cron — WP-Cron events scheduled or unscheduled.
  *
- * Plugins and core schedule and reschedule cron events constantly, mostly
- * from unattended cron runs, so those are skipped: only a change made in a
- * request with a real user behind it is logged. That still includes a
- * plugin doing its own housekeeping during an admin request (activation,
- * settings saves), which is why Settings → Logging can switch this off.
- * This plugin's own am_* hooks are skipped so it never logs itself.
+ * Two independent Settings → Logging switches:
+ *  - am_log_cron_changes (default on): a change made in a request with a
+ *    real user behind it.
+ *  - am_log_cron_background (default off): a change made with nobody logged
+ *    in — WordPress or a plugin scheduling itself, on a cron run or a visitor
+ *    request. High volume, so opt-in.
+ * This plugin's own am_* hooks are always skipped so it never logs itself.
  *
- * All five hooks are filters: each must hand its first argument back
- * unchanged, or it would short-circuit or alter the scheduling call.
+ * The cron runner (wp-cron.php) does two things to every job it executes:
+ * wp_reschedule_event() for a recurring one (which ends by calling
+ * wp_schedule_event(), so it hits the schedule_event filter) and then
+ * wp_unschedule_event() for the run itself. Neither is a schedule change,
+ * so inside a cron request they're skipped: reschedules by marking the hook
+ * from pre_reschedule_event (which fires first), unschedules outright. What
+ * remains in the background are tasks plugins genuinely schedule for
+ * themselves; a plugin cancelling a task from inside a cron callback is
+ * indistinguishable from the runner's unschedule and isn't logged.
+ *
+ * All hooks are filters: each must hand its first argument back unchanged,
+ * or it would short-circuit or alter the scheduling call. wp_clear_scheduled_hook()
+ * calls wp_unschedule_event() per event, so pre_clear_scheduled_hook is
+ * deliberately not hooked; wp_unschedule_hook() doesn't, so it has its own.
  */
 class AM_Logger_Cron extends AM_Logger_Base {
 
+	/** @var array<string,true> Hooks the runner is rescheduling right now. */
+	private $rescheduling = array();
+
 	public function register_hooks() {
+		add_filter( 'pre_reschedule_event', array( $this, 'on_pre_reschedule' ), 10, 2 );
 		add_filter( 'schedule_event', array( $this, 'on_schedule' ) );
 		add_filter( 'pre_unschedule_event', array( $this, 'on_unschedule_event' ), 10, 4 );
 		add_filter( 'pre_unschedule_hook', array( $this, 'on_unschedule_hook' ), 10, 2 );
+	}
+
+	/**
+	 * @param mixed  $pre
+	 * @param object $event
+	 * @return mixed
+	 */
+	public function on_pre_reschedule( $pre, $event ) {
+		if ( wp_doing_cron() && is_object( $event ) && ! empty( $event->hook ) ) {
+			$this->rescheduling[ $event->hook ] = true;
+		}
+		return $pre;
 	}
 
 	/**
@@ -27,7 +56,16 @@ class AM_Logger_Cron extends AM_Logger_Base {
 	 * @return object|false
 	 */
 	public function on_schedule( $event ) {
-		if ( ! is_object( $event ) || empty( $event->hook ) || ! $this->should_log( $event->hook ) ) {
+		if ( ! is_object( $event ) || empty( $event->hook ) ) {
+			return $event;
+		}
+
+		if ( isset( $this->rescheduling[ $event->hook ] ) ) {
+			unset( $this->rescheduling[ $event->hook ] );
+			return $event;
+		}
+
+		if ( ! $this->should_log( $event->hook ) ) {
 			return $event;
 		}
 
@@ -51,9 +89,6 @@ class AM_Logger_Cron extends AM_Logger_Base {
 	}
 
 	/**
-	 * Covers wp_unschedule_event() and, since wp_clear_scheduled_hook() calls
-	 * it once per event, that too.
-	 *
 	 * @param mixed  $pre
 	 * @param int    $timestamp
 	 * @param string $hook
@@ -65,9 +100,6 @@ class AM_Logger_Cron extends AM_Logger_Base {
 	}
 
 	/**
-	 * wp_unschedule_hook() strips every event for a hook directly, without
-	 * calling wp_unschedule_event().
-	 *
 	 * @param mixed  $pre
 	 * @param string $hook
 	 * @return mixed
@@ -78,7 +110,7 @@ class AM_Logger_Cron extends AM_Logger_Base {
 	}
 
 	private function log_unscheduled( $hook ) {
-		if ( ! is_string( $hook ) || ! $this->should_log( $hook ) ) {
+		if ( wp_doing_cron() || ! is_string( $hook ) || ! $this->should_log( $hook ) ) {
 			return;
 		}
 
@@ -99,13 +131,14 @@ class AM_Logger_Cron extends AM_Logger_Base {
 	}
 
 	private function should_log( $hook ) {
-		// Explicit default: cron changes happen on requests that never load the admin.
-		if ( ! get_option( 'am_log_cron_changes', 1 ) ) {
+		if ( 0 === strpos( (string) $hook, 'am_' ) ) {
 			return false;
 		}
-		if ( wp_doing_cron() || 0 === get_current_user_id() ) {
-			return false;
+
+		// Explicit defaults: cron changes happen on requests that never load the admin.
+		if ( 0 !== get_current_user_id() && ! wp_doing_cron() ) {
+			return (bool) get_option( 'am_log_cron_changes', 1 );
 		}
-		return 0 !== strpos( (string) $hook, 'am_' );
+		return (bool) get_option( 'am_log_cron_background', 0 );
 	}
 }
