@@ -18,14 +18,20 @@ class AM_Logger_Options extends AM_Logger_Base {
 	 * siteurl/home: a classic compromise indicator (silent redirect/hijack).
 	 * default_role: changing this to 'administrator' is a known
 	 * self-registration privilege-escalation trick.
-	 * users_can_register / admin_email: lower severity, still worth a record.
+	 * blog_public: "discourage search engines" — silently de-indexes the site.
+	 * users_can_register / admin_email / permalink_structure /
+	 * timezone_string / WPLANG: lower severity, still worth a record.
 	 */
 	const WATCHED_OPTIONS = array(
-		'siteurl'           => AM_Log_Levels::WARNING,
-		'home'              => AM_Log_Levels::WARNING,
-		'default_role'      => AM_Log_Levels::WARNING,
+		'siteurl'            => AM_Log_Levels::WARNING,
+		'home'               => AM_Log_Levels::WARNING,
+		'default_role'       => AM_Log_Levels::WARNING,
+		'blog_public'        => AM_Log_Levels::WARNING,
 		'users_can_register' => AM_Log_Levels::NOTICE,
-		'admin_email'       => AM_Log_Levels::NOTICE,
+		'admin_email'        => AM_Log_Levels::NOTICE,
+		'permalink_structure' => AM_Log_Levels::NOTICE,
+		'timezone_string'    => AM_Log_Levels::NOTICE,
+		'WPLANG'             => AM_Log_Levels::NOTICE,
 	);
 
 	public function register_hooks() {
