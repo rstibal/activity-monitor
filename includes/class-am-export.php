@@ -91,9 +91,9 @@ class AM_Export {
 		// UTF-8 BOM so Excel opens the file with correct encoding rather
 		// than guessing (a common gotcha with plain UTF-8 CSVs on Windows).
 		fwrite( $out, "\xEF\xBB\xBF" ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fwrite -- php://output, see above.
-		fputcsv( $out, self::columns() );
+		fputcsv( $out, self::columns(), ',', '"', '\\' );
 		foreach ( $items as $row ) {
-			fputcsv( $out, array_map( array( __CLASS__, 'csv_safe' ), self::row_to_assoc( $row ) ) );
+			fputcsv( $out, array_map( array( __CLASS__, 'csv_safe' ), self::row_to_assoc( $row ) ), ',', '"', '\\' );
 		}
 		fclose( $out ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose -- php://output, see above.
 	}

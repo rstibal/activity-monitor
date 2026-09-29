@@ -489,7 +489,7 @@ class AM_Stats_Geo_Updater {
 			throw new Exception( 'Could not read GeoLite2-Country-Locations-en.csv.' );
 		}
 
-		$header = fgetcsv( $fh );
+		$header = fgetcsv( $fh, 0, ',', '"', '\\' );
 		$idx    = array_flip( $header );
 		$map    = array();
 		// false !== ( $row = fgetcsv( $fh ) ), not a separate read-then-
@@ -497,7 +497,7 @@ class AM_Stats_Geo_Updater {
 		// the assignment has to happen inside the loop condition to test
 		// it every iteration without reading each line twice.
 		// phpcs:ignore Generic.CodeAnalysis.AssignmentInCondition.FoundInWhileCondition -- see comment above.
-		while ( false !== ( $row = fgetcsv( $fh ) ) ) {
+		while ( false !== ( $row = fgetcsv( $fh, 0, ',', '"', '\\' ) ) ) {
 			$geoname_id = $row[ $idx['geoname_id'] ] ?? '';
 			$iso        = $row[ $idx['country_iso_code'] ] ?? '';
 			if ( '' !== $geoname_id && '' !== $iso ) {
@@ -526,7 +526,7 @@ class AM_Stats_Geo_Updater {
 			throw new Exception( 'Could not read ' . $filename . '.' ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- stored as plain text in the progress option; escaped where displayed, see field_stats_geo_status().
 		}
 
-		$header = fgetcsv( $fh );
+		$header = fgetcsv( $fh, 0, ',', '"', '\\' );
 		$idx    = array_flip( $header );
 		$map    = get_option( 'am_stats_geo_locations_map', array() );
 
@@ -536,7 +536,7 @@ class AM_Stats_Geo_Updater {
 		// resumption, and the cost stays bounded by the same constant that
 		// bounds each tick's actual work.
 		for ( $i = 0; $i < $progress['row_offset']; $i++ ) {
-			if ( false === fgetcsv( $fh ) ) {
+			if ( false === fgetcsv( $fh, 0, ',', '"', '\\' ) ) {
 				break;
 			}
 		}
@@ -544,7 +544,7 @@ class AM_Stats_Geo_Updater {
 		$batch     = array();
 		$processed = 0;
 		// phpcs:ignore Generic.CodeAnalysis.AssignmentInCondition.FoundInWhileCondition -- see stage_locations()'s comment on this same pattern.
-		while ( $processed < self::BATCH_ROWS && false !== ( $row = fgetcsv( $fh ) ) ) {
+		while ( $processed < self::BATCH_ROWS && false !== ( $row = fgetcsv( $fh, 0, ',', '"', '\\' ) ) ) {
 			$network    = $row[ $idx['network'] ] ?? '';
 			$geoname_id = $row[ $idx['geoname_id'] ] ?? '';
 			if ( '' === $geoname_id ) {
