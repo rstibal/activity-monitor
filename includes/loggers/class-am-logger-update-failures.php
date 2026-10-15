@@ -36,7 +36,7 @@ class AM_Logger_Update_Failures extends AM_Logger_Base {
 	public function on_install_package_result( $result, $hook_extra ) {
 		if ( is_wp_error( $result ) && is_array( $hook_extra ) ) {
 			$this->log_failure(
-				(string) ( $hook_extra['type'] ?? '' ),
+				self::type_from_extra( $hook_extra ),
 				(string) ( $hook_extra['action'] ?? '' ),
 				(string) ( $hook_extra['plugin'] ?? $hook_extra['theme'] ?? '' ),
 				$result->get_error_message()
@@ -58,7 +58,7 @@ class AM_Logger_Update_Failures extends AM_Logger_Base {
 		}
 
 		$hook_extra = is_array( $hook_extra ) ? $hook_extra : array();
-		$type       = (string) ( $hook_extra['type'] ?? '' );
+		$type       = self::type_from_extra( $hook_extra );
 		if ( '' === $type ) {
 			if ( $upgrader instanceof Plugin_Upgrader ) {
 				$type = 'plugin';
@@ -105,6 +105,29 @@ class AM_Logger_Update_Failures extends AM_Logger_Base {
 				);
 			}
 		}
+	}
+
+	/**
+	 * 'plugin' or 'theme' for an upgrader run. Plugin_Upgrader/Theme_Upgrader's
+	 * bulk_upgrade() -- what "Update now" on the Plugins screen and the
+	 * Updates screen both use -- passes only the plugin file / theme slug in
+	 * hook_extra, with no 'type' or 'action', so the key that is present is
+	 * the type. A missing action then reads as an update, which is all
+	 * bulk_upgrade() does.
+	 *
+	 * @param array $hook_extra
+	 */
+	private static function type_from_extra( array $hook_extra ): string {
+		if ( ! empty( $hook_extra['type'] ) ) {
+			return (string) $hook_extra['type'];
+		}
+		if ( ! empty( $hook_extra['plugin'] ) ) {
+			return 'plugin';
+		}
+		if ( ! empty( $hook_extra['theme'] ) ) {
+			return 'theme';
+		}
+		return '';
 	}
 
 	private function log_failure( string $type, string $action, string $name, string $reason, $initiator = null ) {
