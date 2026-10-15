@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, event log
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.9.45
+Stable tag: 2.9.46
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -75,6 +75,9 @@ Yes. Settings → Privacy offers full addresses, anonymised addresses (the last 
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
 
 == Changelog ==
+
+= 2.9.46 =
+* Fixed: a logged-out visitor could post the theme/plugin file editor's form fields to admin-ajax.php and create a fake "File editor" Error entry (and alert) naming any file. File editor saves are now only logged for logged-in users.
 
 = 2.9.45 =
 * Fixed: a request to the Visitor Stats beacon with a field sent as a list (for example url[]=x) crashed with a PHP fatal error, which was then logged as an Error row and could send an alert -- one per request, from anyone. Such fields are now ignored.

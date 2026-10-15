@@ -50,12 +50,21 @@ class AM_Logger_File_Editor extends AM_Logger_Base {
 	}
 
 	public function on_admin_init() {
+		// admin_init also fires for logged-out admin-ajax.php and
+		// admin-post.php requests, so without this anyone could post the
+		// right fields and write an ungrouped ERROR row (and an alert)
+		// naming any file they liked. A real save needs a logged-in user
+		// with edit_themes/edit_plugins; a logged-in user without them is
+		// still logged, which is the attempt worth seeing.
+		if ( ! is_user_logged_in() ) {
+			return;
+		}
 		// See class doc for why both action values are accepted and
 		// why file+newcontent (not action) is the primary signal.
 		if ( empty( $_POST['file'] ) || ! isset( $_POST['newcontent'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Missing -- detection only, see class doc; not acted on.
 			return;
 		}
-		$posted_action = (string) ( $_POST['action'] ?? '' ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
+		$posted_action = $_POST['action'] ?? ''; // phpcs:ignore WordPress.Security.NonceVerification.Missing, WordPress.Security.ValidatedSanitizedInput -- compared against two literals only.
 		if ( ! in_array( $posted_action, array( 'update', 'edit-theme-plugin-file' ), true ) ) {
 			return;
 		}
