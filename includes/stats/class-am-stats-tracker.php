@@ -63,14 +63,14 @@ class AM_Stats_Tracker {
 			wp_send_json_success();
 		}
 
-		$url   = self::sanitize_path( wp_unslash( $_POST['url'] ?? '' ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing -- no nonce by design, see class doc.
-		$title = sanitize_text_field( wp_unslash( $_POST['title'] ?? '' ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing -- no nonce by design, see class doc.
+		$url   = self::sanitize_path( self::posted_string( 'url' ) );
+		$title = sanitize_text_field( self::posted_string( 'title' ) );
 		if ( '' === $url ) {
 			wp_send_json_success();
 		}
 
 		$referrer_host = '';
-		$referrer      = esc_url_raw( wp_unslash( $_POST['referrer'] ?? '' ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing -- no nonce by design, see class doc.
+		$referrer      = esc_url_raw( self::posted_string( 'referrer' ) );
 		if ( '' !== $referrer ) {
 			$host = wp_parse_url( $referrer, PHP_URL_HOST );
 			// Don't record the site's own host as a "referrer" -- that's
@@ -113,6 +113,18 @@ class AM_Stats_Tracker {
 		self::upsert_visitor( $visitor_hash );
 
 		wp_send_json_success();
+	}
+
+	/**
+	 * One beacon field, unslashed, or '' when it is missing or not a string.
+	 * Anyone can post here, and a field sent as an array (url[]=x) used to
+	 * reach the string-typed sanitizers and end the request with a TypeError,
+	 * which AM_Logger_Fatal_Errors then logged as an ungrouped ERROR row --
+	 * one row, and one alert, per forged request.
+	 */
+	private static function posted_string( string $key ): string {
+		$value = $_POST[ $key ] ?? ''; // phpcs:ignore WordPress.Security.NonceVerification.Missing, WordPress.Security.ValidatedSanitizedInput -- no nonce by design (see class doc); sanitized by each caller.
+		return is_string( $value ) ? wp_unslash( $value ) : '';
 	}
 
 	/** Strips scheme/host/query, keeping just the path -- never store a full URL with query string. */

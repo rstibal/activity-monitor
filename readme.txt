@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, event log
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.9.44
+Stable tag: 2.9.45
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -75,6 +75,9 @@ Yes. Settings → Privacy offers full addresses, anonymised addresses (the last 
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
 
 == Changelog ==
+
+= 2.9.45 =
+* Fixed: a request to the Visitor Stats beacon with a field sent as a list (for example url[]=x) crashed with a PHP fatal error, which was then logged as an Error row and could send an alert -- one per request, from anyone. Such fields are now ignored.
 
 = 2.9.44 =
 * Fixed: on PHP 8.4 and later, the GeoIP database update and the CSV export each triggered a "the $escape parameter must be provided" deprecation notice, which was logged as a PHP Deprecated event (and could end up inside an exported CSV). The CSV escape character is now passed explicitly; parsing and output are unchanged.
