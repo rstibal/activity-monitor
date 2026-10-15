@@ -7,6 +7,9 @@ standards (readme.txt format, WordPress-Extra/PHPCompatibilityWP coding
 standards via `phpcs`), since those are good discipline regardless of where
 it ships.
 
+**Local checkout:** `C:\code\activity-monitor` (Windows; `/c/code/activity-monitor`
+in Git Bash), cloned from `github.com/rstibal/activity-monitor`.
+
 **The repo root is the plugin root.** `.github/workflows/claude.yml` and
 `.gitignore` also live here and are *not* part of the distributable plugin —
 never sync by clearing the tree and dropping in a plugin folder, or the CI
