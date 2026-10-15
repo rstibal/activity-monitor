@@ -47,6 +47,14 @@ workflow disappears.
   and `gh release view vX.Y.Z --json assets`. One release can cover several
   unreleased versions (2.9.33–2.9.37 shipped as v2.9.37). A change to
   `CLAUDE.md` alone doesn't touch the package and doesn't bump the version.
+- **A local copy of the release zip follows every commit.** A git
+  `post-commit` hook (`.git/hooks/post-commit`) builds
+  `activity-monitor-X.Y.Z.zip` in the repo root from `HEAD` — `git archive
+  --prefix=activity-monitor/` over the same six paths release.yml copies,
+  version read from the committed `AM_VERSION` — and deletes any older
+  `activity-monitor-*.zip`. `*.zip` is in `.gitignore`. Hooks aren't
+  version-controlled, so a fresh clone doesn't have it; recreate it from this
+  description if it's missing. It never fails a commit.
 - **A failed edit in a batch doesn't stop the commit that follows it.**
   Edits and the `phpcs && git commit` step often run in one go, and a
   non-matching edit (tab/space drift) reports an error while the rest carry on
@@ -92,7 +100,12 @@ workflow disappears.
   one alteration to stored values: a cell starting with `=` `+` `-` `@` (or
   tab/CR) gets a leading apostrophe (`AM_Export::csv_safe()`), since
   failed-login usernames and comment authors are visitor-typed and
-  spreadsheets execute those as formulas.
+  spreadsheets execute those as formulas. The From/To date filter (screen
+  and export alike) means whole days *in the site's timezone*:
+  `AM_Event_Query::local_day_bound()` turns each picked Y-m-d into its local
+  00:00:00 / 23:59:59 and converts that to UTC with `get_gmt_from_date()`.
+  Through 2.9.50 it read them as UTC days, so on any non-UTC site the range
+  disagreed with the times the table itself shows.
 - **"Ledger Console" is this plugin's visual identity (2.9.0)**, reversing the
   2.3.0–2.8.x rule ("build on wp-admin's furniture, don't restyle it") after
   that earlier approach left the plugin reading as a separate product embedded
@@ -536,7 +549,15 @@ the `sticky_posts` option and `set_object_terms`, each its own
 `wp_insert_post_data` (new post, empty ID) and the `wp_insert_post` action,
 since a new post gets its default category/template in that one call and
 that isn't an edit; without the guard every new post logged a bogus
-"category: none → Uncategorized".
+"category: none → Uncategorized". **That guard alone missed the editors
+(fixed 2.9.49):** both create a new post as an auto-draft first, so the save
+that really creates it is an update *with* an ID — and that is where core
+assigns the default category (auto-drafts get none). On top of that, the
+block editor's REST save sets terms, template and featured image *after*
+`wp_update_post()` returns. So `on_insert_data()` also records any post
+whose stored status is still `auto-draft` in `$first_saves`, and `record()`
+skips it for the rest of the request (the filter runs before the row is
+written, so the old status is still readable).
 
 **Network settings (2.9.34)** — `AM_Logger_Options::NETWORK_OPTIONS` covers
 sitemeta options, which never fire `updated_option`. They hook
@@ -557,7 +578,20 @@ fires on success. Hooks `upgrader_install_package_result` and
 unchanged; core returns a source error before the result filter, so one failure
 hits one hook) plus `automatic_updates_complete` for background runs, deduped
 per request by `type|plugin file or theme slug`. A failed *download* has no
-hook and isn't covered.
+hook and isn't covered. `bulk_upgrade()` — which "Update now" on the Plugins
+screen (AJAX) and Dashboard → Updates both use — passes only `plugin` /
+`theme` in `hook_extra`, no `type` or `action`; `type_from_extra()` infers
+the type from whichever key is present (2.9.48 — before that, every manual
+update failure at the copy step was dropped). A missing action reads as an
+update.
+
+**`AM_Logger_Core` (2.9.47)** takes the new version from
+`_core_updated_successfully`, not the global `$wp_version`: `update_core()`
+loads the new `version.php` into its *own* scope, so the global still holds
+the old version for the rest of that request ("updated to" named the version
+just replaced). `Core_Upgrader::upgrade()` fires `upgrader_process_complete`
+whether or not the update succeeded, so no success action means nothing is
+logged.
 
 **`AM_Logger_Auto_Updates` (2.9.31)** diffs the `auto_update_plugins` /
 `auto_update_themes` lists (site options on multisite, hence the extra
@@ -653,8 +687,26 @@ WordPress works:**
   full-page cache, and a nonce cached into the page expires after 12–24 hours,
   after which every hit from that copy was rejected. It also guarded nothing:
   a logged-out visitor's nonce is the same for everyone and printed in every
-  page. Don't add one back; the three `$_POST` reads carry a
-  `NonceVerification.Missing` suppression pointing at the class doc.
+  page. Don't add one back; every `$_POST` read goes through
+  `AM_Stats_Tracker::posted_string()`, which carries the
+  `NonceVerification.Missing` suppression pointing at the class doc. Paths are
+  stored percent-encoded as `window.location.pathname` sends them, not through
+  `sanitize_text_field()` — that deletes every `%XX`, so `/caf%C3%A9/` was
+  stored as `/caf/` (fixed 2.9.50); `AM_Admin::stats_path_label()` decodes them
+  for display only. Titles are cut to the 255-character column, and a hit
+  whose URL row couldn't be written isn't recorded.
+- **Anything a logged-out request can reach gets a hostile input check.**
+  Two ways in that look admin-only aren't. (a) `admin_init` fires for
+  anonymous `admin-ajax.php` and `admin-post.php` requests, so a detector
+  hooked there (`AM_Logger_File_Editor`, which now requires
+  `is_user_logged_in()`, 2.9.46) can be fed any POST by anyone. (b) Any
+  `wp_ajax_nopriv_` handler gets whatever the request sends — `url[]=x` makes
+  a field an array, and passing that to a `string`-typed parameter or a core
+  sanitizer throws a `TypeError`. That fatal is logged by
+  `AM_Logger_Fatal_Errors` at ERROR, ungrouped, with alerts: one row and one
+  email per forged request. Check `is_string()` before using a request
+  field (2.9.45). The same applies to `$wpdb->insert_id`: it isn't reset by a
+  failed insert, so check `insert()`'s return value instead.
 - **The Activity Log's status links are built from the data, not from
   `AM_Log_Levels::ORDER`.** `AM_Event_Query::get_level_counts()` returns only
   levels with rows *under the other active filters*, with counts, rendered in
@@ -752,7 +804,8 @@ If labels look wrong, re-run this audit: parse every `$this->log()`/
 (`AM_Admin::handle_clear_log()` logs `log.cleared` from there), resolve any
 action passed as a variable to its literal values, and compare the emitted
 `event_type.action` pairs against `MAP`, and the types against `TYPE_MAP`.
-Last run (2.9.37): 63 literal pairs plus 29 more from calls whose action is
+Literal pairs only, re-checked at 2.9.44: 64, all mapped (no new event types
+since). Last full run (2.9.37): 63 literal pairs plus 29 more from calls whose action is
 a variable (auto-update toggles, install/update failures, privacy, site
 status, role added/removed, maintenance, PHP errors) — all mapped. Variable
 forms are why a regex over literals alone undercounts; resolve them by hand.
@@ -767,10 +820,28 @@ are also mapped.)
 
 ## Known issues
 
-None currently tracked. The one long-standing entry was resolved in 2.2.1:
-the user filter now renders a removable chip in the filter bar (it's still
-set only from the profile modal, never a visible input, which is why the
-chip matters).
+From a full-code bug scan at 2.9.44 (findings 1–7 were fixed in
+2.9.45–2.9.51); these lower-severity ones are still open:
+- `AM_Logger_Security` logs CRITICAL "unauthorized access" for anyone
+  without `manage_options` on its pages, including users who legitimately
+  have `list_users` (`users.php`) or post to `options.php` under a plugin's
+  `option_page_capability_*` filter. It should check the page's real
+  capability.
+- `AM_Admin::ajax_delete_channel()`: a request with no `index` deletes
+  channel 1 (`absint( -1 )` is 1).
+- `AM_Stats_Geo_Updater` uses one fixed temp folder
+  (`get_temp_dir()/am-stats-geo-import`), so imports on two sites of a
+  network, or two installs sharing `/tmp`, wipe each other.
+- `am_stats_geo_account_id` is logged in plain text by `AM_Logger_Options`
+  although the Settings field treats it as a secret (it's missing from
+  `HIDDEN_VALUES`).
+- The user profile modal counts "Logged events" by `user_login`, not
+  `user_id`, so a renamed or reused login merges two people's activity.
+
+The one long-standing entry before that was resolved in 2.2.1: the user
+filter now renders a removable chip in the filter bar (it's still set only
+from the profile modal, never a visible input, which is why the chip
+matters).
 
 **Known logging limits** (not bugs; each is a core limitation, noted where the
 logger is described):
@@ -845,6 +916,11 @@ comma-separated list on one `phpcs:ignore` handles that.
 `phpcs.xml.dist`'s `minimum_supported_wp_version` feeds the deprecation
 sniffs and must track `Requires at least:` — it was still 5.3 two versions
 after the floor moved to 6.0.
+
+**Line endings:** the working tree is CRLF (`core.autocrlf=true`; the repo
+stores LF). A script that edits files by matching `"\n"` — the readme's
+`== Changelog ==\n\n` anchor, say — silently matches nothing; detect the
+file's ending first. Mixed endings left by an edit are normalized on commit.
 
 Most sites run with `WP_DEBUG` off, which hides undefined-array-key warnings;
 a `display_name` key was once read but never built in a render loop, and
