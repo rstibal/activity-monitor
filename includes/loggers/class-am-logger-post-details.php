@@ -14,7 +14,9 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  * A post being created gets its default category, template and any tags
  * assigned in the same wp_insert_post() call; that isn't an edit, so changes
  * are ignored from the moment a *new* post starts saving until it finishes
- * (wp_insert_post_data fires first, the wp_insert_post action last).
+ * (wp_insert_post_data fires first, the wp_insert_post action last). The
+ * editors' own first save of an auto-draft counts as creation too, for the
+ * rest of that request.
  */
 class AM_Logger_Post_Details extends AM_Logger_Base {
 
@@ -27,6 +29,14 @@ class AM_Logger_Post_Details extends AM_Logger_Base {
 
 	/** @var bool */
 	private $creating = false;
+
+	/**
+	 * Posts being saved out of auto-draft in this request -- see
+	 * on_insert_data().
+	 *
+	 * @var array<int,true>
+	 */
+	private $first_saves = array();
 
 	public function register_hooks() {
 		add_filter( 'wp_insert_post_data', array( $this, 'on_insert_data' ), 10, 2 );
@@ -45,6 +55,19 @@ class AM_Logger_Post_Details extends AM_Logger_Base {
 	 */
 	public function on_insert_data( $data, $postarr ) {
 		$this->creating = empty( $postarr['ID'] );
+
+		// Both editors create a new post as an auto-draft first (post-new.php
+		// inserts one before the screen even renders), so the save that
+		// actually creates it arrives as an update with an ID. That save is
+		// where core assigns the default category, and the block editor's
+		// REST save then sets terms, template and featured image after
+		// wp_update_post() returns -- so the post is remembered for the rest
+		// of the request, not just until wp_insert_post finishes. This filter
+		// runs before the row is written, so the status read here is still
+		// the old one.
+		if ( ! $this->creating && 'auto-draft' === get_post_status( (int) $postarr['ID'] ) ) {
+			$this->first_saves[ (int) $postarr['ID'] ] = true;
+		}
 		return $data;
 	}
 
@@ -156,7 +179,7 @@ class AM_Logger_Post_Details extends AM_Logger_Base {
 	}
 
 	private function record( int $post_id, array $diff ) {
-		if ( $this->creating ) {
+		if ( $this->creating || isset( $this->first_saves[ $post_id ] ) ) {
 			return;
 		}
 

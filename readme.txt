@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, event log
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.9.48
+Stable tag: 2.9.49
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -75,6 +75,9 @@ Yes. Settings → Privacy offers full addresses, anonymised addresses (the last 
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
 
 == Changelog ==
+
+= 2.9.49 =
+* Fixed: publishing or saving a brand-new post from the editor logged a spurious "details changed" entry (typically "category: none -> Uncategorized"), because the editor creates every new post as an auto-draft first. The first save of an auto-draft is now treated as creating the post.
 
 = 2.9.48 =
 * Fixed: a plugin or theme update that failed while being copied into place was not logged when it was started from "Update now" on the Plugins screen or from Dashboard > Updates -- WordPress doesn't say what kind of update those are, so they were skipped. They are now logged as update failures.
