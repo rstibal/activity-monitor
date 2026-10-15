@@ -64,7 +64,7 @@ class AM_Stats_Tracker {
 		}
 
 		$url   = self::sanitize_path( self::posted_string( 'url' ) );
-		$title = sanitize_text_field( self::posted_string( 'title' ) );
+		$title = self::fit_title( sanitize_text_field( self::posted_string( 'title' ) ) );
 		if ( '' === $url ) {
 			wp_send_json_success();
 		}
@@ -96,6 +96,11 @@ class AM_Stats_Tracker {
 
 		global $wpdb;
 		$url_id = self::get_or_create_url_id( $url, $title );
+		if ( ! $url_id ) {
+			// A hit with no URL row joins to nothing, so it would count in the
+			// totals but never show in Top Pages or Recent Hits.
+			wp_send_json_success();
+		}
 
 		$hits_table = $wpdb->prefix . AM_Stats_Schema::HITS_TABLE;
 		$wpdb->insert( $hits_table, array( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
@@ -127,11 +132,28 @@ class AM_Stats_Tracker {
 		return is_string( $value ) ? wp_unslash( $value ) : '';
 	}
 
-	/** Strips scheme/host/query, keeping just the path -- never store a full URL with query string. */
+	/**
+	 * Strips scheme/host/query, keeping just the path -- never store a full
+	 * URL with query string.
+	 *
+	 * Kept percent-encoded, as window.location.pathname sends it, and not
+	 * through sanitize_text_field(): that deletes every %XX sequence, so
+	 * /caf%C3%A9/ was stored as /caf/ and any non-ASCII paths sharing a
+	 * prefix counted as one page. An encoded path is plain printable ASCII,
+	 * so anything else is dropped, and the 255-character cut can't split a
+	 * multibyte character (which made $wpdb refuse the row) -- only a
+	 * %XX sequence, whose remains are trimmed.
+	 */
 	private static function sanitize_path( string $raw ): string {
 		$path = (string) wp_parse_url( $raw, PHP_URL_PATH );
-		$path = sanitize_text_field( $path );
-		return substr( $path, 0, 255 );
+		$path = (string) preg_replace( '/[^\x21-\x7E]/', '', $path );
+		$path = substr( $path, 0, 255 );
+		return (string) preg_replace( '/%[0-9A-Fa-f]?$/', '', $path );
+	}
+
+	/** The url table's title column is VARCHAR(255); $wpdb rejects the whole row, not just the value, when it's longer. */
+	private static function fit_title( string $title ): string {
+		return mb_substr( $title, 0, 255 );
 	}
 
 	/**
@@ -162,12 +184,21 @@ class AM_Stats_Tracker {
 			return (int) $id;
 		}
 
-		$wpdb->insert( $table, array( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$inserted = $wpdb->insert( $table, array( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 			'url_hash' => $url_hash,
 			'url'      => $url,
 			'title'    => $title,
 		) );
-		return (int) $wpdb->insert_id;
+		// The return value, not insert_id alone: a failed insert leaves
+		// insert_id holding whatever the previous insert set.
+		if ( $inserted ) {
+			return (int) $wpdb->insert_id;
+		}
+
+		// Two first hits on the same new page at once: the slower insert
+		// loses the UNIQUE url_hash race, and the winner's row is the one.
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant.
+		return (int) $wpdb->get_var( $wpdb->prepare( "SELECT id FROM `{$table}` WHERE url_hash = %s", $url_hash ) );
 	}
 
 	private static function upsert_visitor( string $visitor_hash ) {

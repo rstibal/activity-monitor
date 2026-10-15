@@ -1994,7 +1994,7 @@ class AM_Admin {
 				$title    = self::display_title( (string) $row->title );
 				return array(
 					'<a class="am-stats-truncate" href="' . esc_url( $full_url ) . '" target="_blank" rel="noopener noreferrer" title="' . esc_attr( $title ) . '">' . esc_html( $title ?: '—' ) . '</a>',
-					'<a class="am-stats-truncate" href="' . esc_url( $full_url ) . '" target="_blank" rel="noopener noreferrer" title="' . esc_attr( $row->url ) . '">' . esc_html( $row->url ) . '</a>',
+					'<a class="am-stats-truncate" href="' . esc_url( $full_url ) . '" target="_blank" rel="noopener noreferrer" title="' . esc_attr( self::stats_path_label( (string) $row->url ) ) . '">' . esc_html( self::stats_path_label( (string) $row->url ) ) . '</a>',
 					esc_html( number_format_i18n( (int) $row->visits ) ),
 					esc_html( number_format_i18n( (int) $row->unique_visitors ) ),
 				);
@@ -2120,7 +2120,7 @@ class AM_Admin {
 			$columns,
 			static function ( $row ) use ( $geo_enabled ) {
 				$full_url = self::stats_page_url( (string) $row->url );
-				$label    = self::display_title( (string) $row->title ) ?: $row->url;
+				$label    = self::display_title( (string) $row->title ) ?: self::stats_path_label( (string) $row->url );
 				$cells    = array(
 					esc_html( wp_date( AM_Date_Format::combined(), strtotime( $row->date . ' UTC' ) ) ),
 					'<a class="am-stats-truncate" href="' . esc_url( $full_url ) . '" target="_blank" rel="noopener noreferrer" title="' . esc_attr( $label ) . '">' . esc_html( $label ) . '</a>',
@@ -2163,6 +2163,17 @@ class AM_Admin {
 			$origin .= ':' . $home['port'];
 		}
 		return $origin . '/' . ltrim( $path, '/' );
+	}
+
+	/**
+	 * A stored path as readable text: am_stats_urls keeps it percent-encoded
+	 * (see AM_Stats_Tracker::sanitize_path()), which would show /café/ as
+	 * /caf%C3%A9/. Display only -- links still use the encoded form. A
+	 * decoded byte sequence that isn't valid UTF-8 is stripped rather than
+	 * left for esc_html() to blank the whole string over.
+	 */
+	private static function stats_path_label( string $path ): string {
+		return wp_check_invalid_utf8( rawurldecode( $path ), true );
 	}
 
 	private static function display_title( string $title ): string {
