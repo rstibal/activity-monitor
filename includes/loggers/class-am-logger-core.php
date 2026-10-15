@@ -22,8 +22,26 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  */
 class AM_Logger_Core extends AM_Logger_Base {
 
+	/** @var string New version from _core_updated_successfully, see on_core_updated(). */
+	private $new_version = '';
+
 	public function register_hooks() {
+		add_action( '_core_updated_successfully', array( $this, 'on_core_updated' ) );
 		add_action( 'upgrader_process_complete', array( $this, 'on_upgrader_complete' ), 10, 2 );
+	}
+
+	/**
+	 * update_core() loads the new release's version number into its own
+	 * local scope only, so the global $wp_version still holds the *old*
+	 * version for the rest of the request -- reading it in
+	 * on_upgrader_complete() logged "updated to" the version just replaced.
+	 * This action, fired by update_core() on success just before
+	 * upgrader_process_complete, is the one place handed the new number.
+	 *
+	 * @param string $version
+	 */
+	public function on_core_updated( $version ) {
+		$this->new_version = (string) $version;
 	}
 
 	public function on_upgrader_complete( $upgrader, array $data ) {
@@ -31,7 +49,13 @@ class AM_Logger_Core extends AM_Logger_Base {
 			return;
 		}
 
-		global $wp_version;
+		// Core_Upgrader::upgrade() fires upgrader_process_complete whether or
+		// not update_core() succeeded; without the success action there was
+		// no update to report.
+		if ( '' === $this->new_version ) {
+			return;
+		}
+		$version = $this->new_version;
 
 		// See AM_Logger_Plugins::on_upgrader_complete() for why this skin
 		// check is what distinguishes an unattended auto-update from any
@@ -44,7 +68,7 @@ class AM_Logger_Core extends AM_Logger_Base {
 			sprintf(
 				/* translators: %s: WordPress version number */
 				__( 'WordPress core updated to %s.', 'activity-monitor' ),
-				$wp_version
+				$version
 			),
 			array(
 				'level'       => AM_Log_Levels::NOTICE,
