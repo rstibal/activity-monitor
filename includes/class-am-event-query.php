@@ -19,8 +19,8 @@ class AM_Event_Query {
 			'event_type'=> '',
 			'action'    => '',
 			'user'      => '',   // user_login, exact match
-			'date_from' => '',   // Y-m-d, inclusive, site-local interpreted as UTC start-of-day
-			'date_to'   => '',   // Y-m-d, inclusive, site-local interpreted as UTC end-of-day
+			'date_from' => '',   // Y-m-d in the site's timezone, inclusive
+			'date_to'   => '',   // Y-m-d in the site's timezone, inclusive
 			'search'    => '',
 			'orderby'   => 'date',
 			'order'     => 'DESC',
@@ -69,13 +69,19 @@ class AM_Event_Query {
 			$where[]  = 'user_login = %s';
 			$values[] = sanitize_user( $args['user'] );
 		}
-		if ( '' !== $args['date_from'] && false !== strtotime( $args['date_from'] ) ) {
+		// The table shows times in the site's timezone, so a picked day means
+		// that day there: its local midnight-to-midnight, converted to the UTC
+		// the column stores. Read as a UTC day, a site at UTC-5 lost its last
+		// five hours of the To date and gained five of the day before From.
+		$from = self::local_day_bound( (string) $args['date_from'], '00:00:00' );
+		if ( '' !== $from ) {
 			$where[]  = 'date >= %s';
-			$values[] = gmdate( 'Y-m-d 00:00:00', strtotime( $args['date_from'] ) );
+			$values[] = $from;
 		}
-		if ( '' !== $args['date_to'] && false !== strtotime( $args['date_to'] ) ) {
+		$to = self::local_day_bound( (string) $args['date_to'], '23:59:59' );
+		if ( '' !== $to ) {
 			$where[]  = 'date <= %s';
-			$values[] = gmdate( 'Y-m-d 23:59:59', strtotime( $args['date_to'] ) );
+			$values[] = $to;
 		}
 		if ( '' !== $args['search'] ) {
 			$like     = '%' . $wpdb->esc_like( $args['search'] ) . '%';
@@ -89,6 +95,17 @@ class AM_Event_Query {
 			'sql'    => implode( ' AND ', $where ),
 			'values' => $values,
 		);
+	}
+
+	/**
+	 * A Y-m-d day in the site's timezone at $time, as the UTC 'Y-m-d H:i:s'
+	 * stored in am_events.date, or '' when $date isn't a real Y-m-d date.
+	 */
+	private static function local_day_bound( string $date, string $time ): string {
+		if ( ! preg_match( '/^(\d{4})-(\d{2})-(\d{2})$/', $date, $m ) || ! checkdate( (int) $m[2], (int) $m[3], (int) $m[1] ) ) {
+			return '';
+		}
+		return get_gmt_from_date( $date . ' ' . $time, 'Y-m-d H:i:s' );
 	}
 
 	/**

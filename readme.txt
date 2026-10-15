@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, event log
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.9.50
+Stable tag: 2.9.51
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -75,6 +75,9 @@ Yes. Settings → Privacy offers full addresses, anonymised addresses (the last 
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
 
 == Changelog ==
+
+= 2.9.51 =
+* Fixed: the Activity Log's From and To dates (and the export, which uses the same filter) were read as UTC days, while the table shows times in the site's timezone -- so on most sites they cut off or took in several hours at either end. They now cover the chosen days in the site's own timezone.
 
 = 2.9.50 =
 * Fixed: Visitor Stats stripped accented and other non-ASCII characters out of page addresses (/café/ was recorded as /caf/, so different pages could be counted as one), and a page whose title was longer than 255 characters was counted in the totals but never appeared in Top Pages or Recent Hits. Addresses are now stored intact and shown readably, and long titles are shortened to fit.
