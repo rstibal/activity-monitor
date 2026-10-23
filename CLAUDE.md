@@ -314,9 +314,9 @@ zone. It's drawn as inline SVG with `<title>` tooltips and lives inside
 spines use too; style blocks never define them. Each non-empty segment is at
 least 2 units tall so one critical among hundreds of info rows stays
 visible; when that overflows, the whole stack shrinks rather than clipping
-the top, most severe, segment. At release, the range/DST math and rendering
-had only been checked in a stub harness: the SQL hadn't run against a real
-database yet.
+the top, most severe, segment. Range/DST math and rendering were checked in a
+stub harness; Rob then confirmed it on a real test site (the `INTERVAL()`
+query included) before release.
 
 Session management (Active Sessions, per-session revoke, concurrent-session
 limit, Revoke Expired, Emergency Lockdown, `AM_Sessions` itself) was removed
