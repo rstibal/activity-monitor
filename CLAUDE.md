@@ -551,6 +551,20 @@ items)".
   the same tier as site deletion. Registers only when `is_multisite()`, same
   guard as `AM_Logger_Sites`.
 
+**`AM_Logger_Login_Locations` (2.9.58)** logs a login from a country
+(`user.login_new_country`, WARNING) or a browser+OS (`user.login_new_device`,
+NOTICE) the user hasn't used before, as separate rows after the plain login
+row (`wp_login` priority 20). Levels and "both, separately" were decided with
+Rob: country is the alerting signal, device is on record without reaching a
+WARNING channel. Known values live in `am_known_logins` usermeta (country
+codes and `browser|OS` keys, 20 most recent each, never an IP; the IP is only
+read for the local `AM_Stats_Geo` lookup). A still-empty list learns its
+first value silently, so upgrading or turning geolocation on doesn't flag
+everyone. Unknown values (geo off or unimported, local address, parser
+"Other") are skipped, not stored. It passes `user_id` explicitly, since the
+current user isn't reliably set during `wp_login`. `wp_login` only fires for
+interactive logins: application passwords and XML-RPC aren't covered.
+
 **`AM_Logger_Privacy` (2.9.37)** logs personal data export/erase requests.
 A request is a `user_request` post (`post_name` = `export_personal_data` /
 `remove_personal_data`, `post_title` = requester email) moving through
@@ -829,8 +843,8 @@ If labels look wrong, re-run this audit: parse every `$this->log()`/
 (`AM_Admin::handle_clear_log()` logs `log.cleared` from there), resolve any
 action passed as a variable to its literal values, and compare the emitted
 `event_type.action` pairs against `MAP`, and the types against `TYPE_MAP`.
-Literal pairs only, re-checked at 2.9.44: 64, all mapped (no new event types
-since). Last full run (2.9.37): 63 literal pairs plus 29 more from calls whose action is
+Literal pairs only, re-checked at 2.9.44: 64, all mapped; 2.9.58 added two
+more (`user.login_new_country`/`_device`), mapped in the same commit. Last full run (2.9.37): 63 literal pairs plus 29 more from calls whose action is
 a variable (auto-update toggles, install/update failures, privacy, site
 status, role added/removed, maintenance, PHP errors) — all mapped. Variable
 forms are why a regex over literals alone undercounts; resolve them by hand.
