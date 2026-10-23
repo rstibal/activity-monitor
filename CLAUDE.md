@@ -771,6 +771,7 @@ WordPress works:**
   `AM_Admin::sanitize_type_filter()`.
 - **The user profile modal keys on `user_id`, not the stored login** — logins
   can be renamed and reused, so a login lookup could show the wrong person.
+  So does the log's user filter (2.9.55), which the modal links to.
 - **`am_ip_storage` is applied at write time, in `AM_Event_Writer::get_ip()`,
   never at display time.** The point of "anonymised"/"none" is that the
   address never reaches the database — filtering on the way out would leave
@@ -823,23 +824,26 @@ are also mapped.)
 
 ## Known issues
 
-From a full-code bug scan at 2.9.44 (findings 1–7 were fixed in
-2.9.45–2.9.51); these lower-severity ones are still open:
-- `AM_Logger_Security` logs CRITICAL "unauthorized access" for anyone
-  without `manage_options` on its pages, including users who legitimately
-  have `list_users` (`users.php`) or post to `options.php` under a plugin's
-  `option_page_capability_*` filter. It should check the page's real
-  capability.
-- `AM_Admin::ajax_delete_channel()`: a request with no `index` deletes
-  channel 1 (`absint( -1 )` is 1).
-- `AM_Stats_Geo_Updater` uses one fixed temp folder
-  (`get_temp_dir()/am-stats-geo-import`), so imports on two sites of a
-  network, or two installs sharing `/tmp`, wipe each other.
-- `am_stats_geo_account_id` is logged in plain text by `AM_Logger_Options`
-  although the Settings field treats it as a secret (it's missing from
-  `HIDDEN_VALUES`).
-- The user profile modal counts "Logged events" by `user_login`, not
-  `user_id`, so a renamed or reused login merges two people's activity.
+None open. The full-code bug scan at 2.9.44 is fully worked off: findings
+1–7 in 2.9.45–2.9.51, the five lower-severity ones in 2.9.52–2.9.56:
+- 2.9.52: `am_stats_geo_account_id` joined `AM_Logger_Options::HIDDEN_VALUES`.
+- 2.9.53: `AM_Logger_Security::RESTRICTED_PAGES` maps each page to the
+  capabilities core itself checks there (`list_users`, `create_users` /
+  multisite `promote_users`, `activate_plugins`, `manage_options`), and
+  `options.php` applies `option_page_capability_{option_page}` the way core
+  does. It used to require `manage_options` everywhere, raising CRITICAL
+  alerts for users who were allowed in.
+- 2.9.54: `ajax_delete_channel()` rejects a missing or non-digit `index`
+  (`absint()` turned a missing one into 1 and deleted the second channel).
+- 2.9.55: the log's user filter is by `user_id` (`AM_Event_Query` arg
+  `user_id`; the `am_user` URL param now carries the ID). The profile
+  modal's count and its "View this user's activity" link used to match on
+  `user_login`, merging renamed/reused logins.
+- 2.9.56: `AM_Stats_Geo_Updater::working_dir()` is per install and site
+  (`am-stats-geo-import-<md5 of ABSPATH|prefix>`); one fixed folder in the
+  shared temp dir let concurrent imports wipe each other. The old fixed
+  folder isn't cleaned up on upgrade on purpose: another install still on
+  an older version may be using it.
 
 The one long-standing entry before that was resolved in 2.2.1: the user
 filter now renders a removable chip in the filter bar (it's still set only
