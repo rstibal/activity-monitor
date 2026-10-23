@@ -363,7 +363,7 @@ class AM_Stats_Geo_Updater {
 	}
 
 	private static function stage_download( array $progress ): array {
-		$dir = trailingslashit( get_temp_dir() ) . 'am-stats-geo-import';
+		$dir = self::working_dir();
 		wp_mkdir_p( $dir );
 		$zip_path = $dir . '/geolite2-country.zip';
 
@@ -683,9 +683,22 @@ class AM_Stats_Geo_Updater {
 		return array( 'start' => $start, 'end' => $end );
 	}
 
+	/**
+	 * This install and site's own scratch folder. get_temp_dir() is shared
+	 * by every site on a network and often by every install on the server,
+	 * and the folder is wiped at the start and end of each import, so one
+	 * fixed name let two imports delete each other's files mid-run. ABSPATH
+	 * separates installs, the table prefix separates sites (and installs
+	 * sharing a database).
+	 */
+	private static function working_dir(): string {
+		global $wpdb;
+		return trailingslashit( get_temp_dir() ) . 'am-stats-geo-import-' . substr( md5( ABSPATH . '|' . $wpdb->prefix ), 0, 12 );
+	}
+
 	private static function cleanup_working_dir( string $dir = '' ) {
 		if ( '' === $dir ) {
-			$dir = trailingslashit( get_temp_dir() ) . 'am-stats-geo-import';
+			$dir = self::working_dir();
 		}
 		if ( ! is_dir( $dir ) ) {
 			return;
