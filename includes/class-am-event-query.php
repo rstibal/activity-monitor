@@ -18,7 +18,7 @@ class AM_Event_Query {
 			'initiator' => '',
 			'event_type'=> '',
 			'action'    => '',
-			'user'      => '',   // user_login, exact match
+			'user_id'   => 0,    // 0 = any user
 			'date_from' => '',   // Y-m-d in the site's timezone, inclusive
 			'date_to'   => '',   // Y-m-d in the site's timezone, inclusive
 			'search'    => '',
@@ -65,9 +65,11 @@ class AM_Event_Query {
 			$where[]  = 'action = %s';
 			$values[] = sanitize_key( $args['action'] );
 		}
-		if ( '' !== $args['user'] ) {
-			$where[]  = 'user_login = %s';
-			$values[] = sanitize_user( $args['user'] );
+		// By ID, not login: logins can be renamed and reused, so a login
+		// match could merge two people's activity (fixed 2.9.55).
+		if ( $args['user_id'] ) {
+			$where[]  = 'user_id = %d';
+			$values[] = absint( $args['user_id'] );
 		}
 		// The table shows times in the site's timezone, so a picked day means
 		// that day there: its local midnight-to-midnight, converted to the UTC

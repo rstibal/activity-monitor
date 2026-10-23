@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, event log
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.9.54
+Stable tag: 2.9.55
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -75,6 +75,9 @@ Yes. Settings → Privacy offers full addresses, anonymised addresses (the last 
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
 
 == Changelog ==
+
+= 2.9.55 =
+* Fixed: a user's profile in the Activity Log counted their events -- and "View this user's activity" listed them -- by username, so after a username was changed or reused, two people's activity was counted together. Both now go by the user's ID.
 
 = 2.9.54 =
 * Fixed: a request to delete a notification channel that did not say which channel deleted the second one in the list. It is now rejected.

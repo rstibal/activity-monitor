@@ -646,7 +646,7 @@ class AM_Admin {
 			'initiator'  => sanitize_key( $get['am_initiator'] ?? '' ),
 			'event_type' => $export_type,
 			'action'     => $export_action,
-			'user'       => sanitize_user( $get['am_user'] ?? '' ),
+			'user_id'    => absint( $get['am_user'] ?? 0 ),
 			'date_from'  => sanitize_text_field( $get['am_from'] ?? '' ),
 			'date_to'    => sanitize_text_field( $get['am_to'] ?? '' ),
 			'search'     => sanitize_text_field( $get['am_search'] ?? '' ),
@@ -818,7 +818,7 @@ class AM_Admin {
 		// This plugin's own view of the user. get_events() is ordered by
 		// date DESC, so a single-row page gives both the total and the
 		// most recent entry without a second query.
-		$activity   = AM_Event_Query::get_events( array( 'user' => $user->user_login, 'per_page' => 1 ) );
+		$activity   = AM_Event_Query::get_events( array( 'user_id' => $user->ID, 'per_page' => 1 ) );
 		$last_seen  = $activity['items'][0]->date ?? '';
 		$registered = strtotime( $user->user_registered . ' UTC' );
 
@@ -865,7 +865,7 @@ class AM_Admin {
 				<tr>
 					<td colspan="2" style="text-align:right;">
 						<a href="<?php echo esc_url( add_query_arg(
-							array( 'page' => self::PAGE_LOG, 'am_user' => rawurlencode( $user->user_login ) ),
+							array( 'page' => self::PAGE_LOG, 'am_user' => $user->ID ),
 							admin_url( 'admin.php' )
 						) ); ?>" class="button button-small">
 							<?php esc_html_e( 'View this user’s activity', 'activity-monitor' ); ?>
@@ -1367,7 +1367,7 @@ class AM_Admin {
 		}
 
 		$action     = '' !== $type_action ? $type_action : sanitize_key( $raw['am_action'] ?? '' );
-		$user       = sanitize_user( $raw['am_user'] ?? '' );
+		$user_id    = absint( $raw['am_user'] ?? 0 );
 		$date_from  = sanitize_text_field( $raw['am_from'] ?? '' );
 		$date_to    = sanitize_text_field( $raw['am_to'] ?? '' );
 		$search     = sanitize_text_field( $raw['am_search'] ?? '' );
@@ -1394,7 +1394,7 @@ class AM_Admin {
 		// admin.js's pushState) and reopened the modal on any reload.
 		$current_url = add_query_arg( urlencode_deep( array_diff_key( $raw, array( 'am_event_id' => true ) ) ), admin_url( 'admin.php' ) );
 
-		$data      = AM_Event_Query::get_events( compact( 'per_page', 'page', 'level', 'initiator', 'event_type', 'action', 'user', 'date_from', 'date_to', 'search' ) );
+		$data      = AM_Event_Query::get_events( compact( 'per_page', 'page', 'level', 'initiator', 'event_type', 'action', 'user_id', 'date_from', 'date_to', 'search' ) );
 		$items     = $data['items'];
 		$total     = $data['total'];
 		$num_pages = (int) ceil( $total / $per_page );
@@ -1444,7 +1444,7 @@ class AM_Admin {
 		// on "No activity found." -- offering a filter that cannot match
 		// anything is worse than not offering it.
 		$level_counts = AM_Event_Query::get_level_counts(
-			compact( 'initiator', 'event_type', 'action', 'user', 'date_from', 'date_to', 'search' )
+			compact( 'initiator', 'event_type', 'action', 'user_id', 'date_from', 'date_to', 'search' )
 		);
 		$level_total  = array_sum( $level_counts );
 
@@ -1465,7 +1465,7 @@ class AM_Admin {
 		$level_link_args = array_filter( array(
 			'am_initiator' => $initiator,
 			'am_type'      => $type_filter,
-			'am_user'      => $user,
+			'am_user'      => $user_id,
 			'am_from'      => $date_from,
 			'am_to'        => $date_to,
 			'am_search'    => $search,
@@ -1545,7 +1545,7 @@ class AM_Admin {
 				      // form -- carried so changing a dropdown doesn't drop it. ?>
 				<input type="hidden" name="am_level" value="<?php echo esc_attr( $level ); ?>">
 			<?php endif; ?>
-			<?php if ( '' !== $user ) : ?>
+			<?php if ( $user_id ) : ?>
 				<?php // The visible User box was removed, but the filter itself still
 				      // works and is set from elsewhere -- the "View this user's
 				      // activity" button in the user profile modal links with
@@ -1553,7 +1553,7 @@ class AM_Admin {
 				      // would submit this form without it and silently drop it. The
 				      // chip rendered below is what makes it visible; this input
 				      // only keeps it alive across submissions. ?>
-				<input type="hidden" name="am_user" value="<?php echo esc_attr( $user ); ?>">
+				<input type="hidden" name="am_user" value="<?php echo esc_attr( $user_id ); ?>">
 			<?php endif; ?>
 
 			<div class="tablenav top">
@@ -1607,7 +1607,7 @@ class AM_Admin {
 					submit_button( __( 'Filter', 'activity-monitor' ), '', '', false, array( 'id' => 'am-filter-submit' ) );
 					?>
 
-					<?php if ( $level || $initiator || $type_filter || $action || $user || $date_from || $date_to || $search ) : ?>
+					<?php if ( $level || $initiator || $type_filter || $action || $user_id || $date_from || $date_to || $search ) : ?>
 						<a href="<?php echo esc_url( $base_url ); ?>" id="am-log-reset" class="button"><?php esc_html_e( 'Reset', 'activity-monitor' ); ?></a>
 					<?php endif; ?>
 				</div>
@@ -1626,11 +1626,12 @@ class AM_Admin {
 			// from this bar -- so without this chip the log silently shows a
 			// single user's rows with nothing on screen saying so. Only
 			// rendered when the filter is actually on.
-			if ( '' !== $user ) :
-				$filtered_user  = get_user_by( 'login', $user );
+			if ( $user_id ) :
+				$filtered_user  = get_userdata( $user_id );
 				$filtered_label = $filtered_user
 					? sprintf( '%s (%s)', $filtered_user->display_name, $filtered_user->user_login )
-					: $user;
+					/* translators: %d: ID of a user deleted since */
+					: sprintf( __( 'deleted user #%d', 'activity-monitor' ), $user_id );
 				// Built explicitly from the other filters rather than via
 				// remove_query_arg() on the current URI, matching how every
 				// other URL on this screen is composed.
@@ -1709,7 +1710,7 @@ class AM_Admin {
 						'am_initiator'  => $initiator,
 						'am_type'       => $type_filter,
 						'am_export_action' => $action,
-						'am_user'       => $user,
+						'am_user'       => $user_id,
 						'am_from'       => $date_from,
 						'am_to'         => $date_to,
 						'am_search'     => $search,
