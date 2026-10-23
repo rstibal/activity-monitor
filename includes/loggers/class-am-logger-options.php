@@ -68,10 +68,10 @@ class AM_Logger_Options extends AM_Logger_Base {
 	);
 
 	/**
-	 * Options whose values are credentials or contain them (webhook URLs, a
-	 * license key): the change is logged, the values are not.
+	 * Options whose values are credentials or contain them (webhook URLs, the
+	 * MaxMind account ID and license key): the change is logged, the values are not.
 	 */
-	const HIDDEN_VALUES = array( 'am_notification_channels', 'am_stats_geo_license_key' );
+	const HIDDEN_VALUES = array( 'am_notification_channels', 'am_stats_geo_account_id', 'am_stats_geo_license_key' );
 
 	/**
 	 * Network (multisite) options, which live in sitemeta and never reach
