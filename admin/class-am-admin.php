@@ -1098,7 +1098,13 @@ class AM_Admin {
 			wp_die( '-1' );
 		}
 
-		$index    = absint( $_POST['index'] ?? -1 );
+		// Digits only: absint() turns a missing index (or "-1") into 1 and
+		// would delete a channel nobody picked.
+		$index = isset( $_POST['index'] ) && is_string( $_POST['index'] ) && ctype_digit( $_POST['index'] ) ? (int) $_POST['index'] : null;
+		if ( null === $index ) {
+			wp_send_json_error( array( 'message' => __( 'No channel was specified.', 'activity-monitor' ) ) );
+		}
+
 		$channels = get_option( 'am_notification_channels', array() );
 
 		if ( isset( $channels[ $index ] ) ) {
