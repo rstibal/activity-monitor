@@ -91,6 +91,9 @@ delete_option( 'am_maintenance_mode_last_state' );
 delete_metadata( 'user', 0, 'am_log_per_page', '', true );
 delete_metadata( 'user', 0, 'am_theme', '', true );
 delete_metadata( 'user', 0, 'am_style', '', true );
+// Countries and devices each user has logged in from (2.9.58), see
+// AM_Logger_Login_Locations.
+delete_metadata( 'user', 0, 'am_known_logins', '', true );
 
 // Session management was removed in 2.4.0; these are its two leftover
 // settings. Note what is deliberately NOT here: the session_tokens user

@@ -41,6 +41,7 @@ class AM_Logger_Manager {
 		'AM_Logger_Update_Failures',
 		'AM_Logger_Post_Details',
 		'AM_Logger_Privacy',
+		'AM_Logger_Login_Locations',
 	);
 
 	public static function init() {

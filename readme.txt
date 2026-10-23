@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, event log
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.9.57
+Stable tag: 2.9.58
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -19,7 +19,7 @@ Activity Monitor is a WordPress audit log plugin that records what happens on yo
 * User activity: logins, logouts, failed logins, registrations, profile updates, role changes, password resets
 * Content: posts, pages, and custom post types (with before/after change details), media uploads and edits, comments, categories and tags, navigation menus, widgets
 * Site management: plugin activation/deactivation/updates/deletion, theme switches and updates, Customizer saves, WordPress core updates
-* Security: unauthorized access attempts to restricted admin pages, multisite site creation and deletion
+* Security: unauthorized access attempts to restricted admin pages, logins from a country or device the user has never used before, multisite site creation and deletion
 * Site health: PHP fatal errors, warnings, notices and deprecation notices, theme/plugin file editor use, maintenance mode, and failed outgoing email
 
 = Noise control, not noise =
@@ -75,6 +75,9 @@ Yes. Settings → Privacy offers full addresses, anonymised addresses (the last 
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
 
 == Changelog ==
+
+= 2.9.58 =
+* New: a login from a country the user has never logged in from before is logged at Warning (so Warning alerts pick it up), and one from a new browser and operating system at Notice. Each user's first login after updating is only learned, not flagged. Countries need Visitor Stats geolocation turned on; no IP address is stored for this.
 
 = 2.9.57 =
 * New: a timeline above the Activity Log shows events per day (per week for ranges over 90 days), stacked by severity. It follows every filter, so it always matches the table below it, and defaults to the last 30 days. Hover a bar for that day's breakdown.

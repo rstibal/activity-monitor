@@ -110,6 +110,8 @@ class AM_Event_Labels {
 		'user.deleted'                            => 'User Deleted',
 		'user.login'                              => 'User Logged In',
 		'user.login_failed'                      => 'Failed Login Attempt',
+		'user.login_new_country'                => 'Login from New Country',
+		'user.login_new_device'                 => 'Login from New Device',
 		'user.logout'                             => 'User Logged Out',
 		'user.password_reset'                    => 'Password Reset',
 		'user.password_retrieve_requested'      => 'Password Reset Requested',
