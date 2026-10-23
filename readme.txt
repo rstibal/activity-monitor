@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, event log
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.9.52
+Stable tag: 2.9.53
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -75,6 +75,9 @@ Yes. Settings → Privacy offers full addresses, anonymised addresses (the last 
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
 
 == Changelog ==
+
+= 2.9.53 =
+* Fixed: users who are allowed on Users, Add New User or Plugins without being administrators (for example an editor given the list_users capability), and plugin settings forms that let non-administrators save, were logged as a CRITICAL "unauthorized access attempt" -- with an alert -- every time. Each page is now checked against the capability WordPress itself requires for it.
 
 = 2.9.52 =
 * Fixed: changing the MaxMind account ID in Settings wrote the old and new IDs into the Activity Log in plain text, although the field treats the ID as a secret. The change is still logged, but the values are now hidden, as they already were for the license key.
