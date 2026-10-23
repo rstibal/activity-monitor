@@ -295,7 +295,28 @@ UI. **Volume is a settings problem, not a query problem** —
 **`get_events()` and `get_level_counts()` share `build_where()`**, which takes
 a `$skip` list; the counts query passes `array( 'level' )`, since a tally per
 level has to run across everything the other filters allow. Keep new filters
-in `build_where()` so both stay in step.
+in `build_where()` so both stay in step. `get_timeline_counts()` (2.9.57) is
+the third caller, with no skip.
+
+**The Activity Log timeline (`AM_Timeline`, 2.9.57)** is a routine-glance
+strip, not an investigation tool: events per local day (per week past 90
+days), stacked by level, last 30 days by default, else the From/To range.
+Decided with Rob, don't re-litigate: it counts **rows, not `repeat_count`**,
+so it matches the table and the status links; no click-to-filter, no
+show/hide toggle, no range control of its own. Bucket edges are local
+midnights computed in PHP (`DateTimeImmutable` in `wp_timezone()`, so DST
+can't shift them) and passed to SQL's `INTERVAL()` over
+`TIMESTAMPDIFF( SECOND, '1970-01-01', date )` — no MySQL timezone tables,
+and not `UNIX_TIMESTAMP()`, which reads the UTC column in the connection's
+zone. It's drawn as inline SVG with `<title>` tooltips and lives inside
+`#am-log-app`, so AJAX refreshes redraw it with no JS. Colours come from the
+`--am-sev-<level>` tokens on `body.wp-admin` (light/dark), which the row
+spines use too; style blocks never define them. Each non-empty segment is at
+least 2 units tall so one critical among hundreds of info rows stays
+visible; when that overflows, the whole stack shrinks rather than clipping
+the top, most severe, segment. At release, the range/DST math and rendering
+had only been checked in a stub harness: the SQL hadn't run against a real
+database yet.
 
 Session management (Active Sessions, per-session revoke, concurrent-session
 limit, Revoke Expired, Emergency Lockdown, `AM_Sessions` itself) was removed
