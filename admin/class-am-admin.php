@@ -1538,6 +1538,14 @@ class AM_Admin {
 		</ul>
 		<?php endif; ?>
 
+		<?php
+		// Inside #am-log-app, so every AJAX refresh redraws it with the
+		// table. Same filter args as get_events(); see AM_Timeline.
+		if ( AM_Event_Query::total_count() > 0 ) {
+			AM_Timeline::render( compact( 'level', 'initiator', 'event_type', 'action', 'user_id', 'date_from', 'date_to', 'search' ) );
+		}
+		?>
+
 		<form method="get" action="" id="am-filter-form">
 			<input type="hidden" name="page" value="<?php echo esc_attr( self::PAGE_LOG ); ?>">
 			<?php if ( '' !== $level ) : ?>

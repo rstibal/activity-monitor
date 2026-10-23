@@ -207,6 +207,65 @@ class AM_Event_Query {
 		return $ordered;
 	}
 
+	/**
+	 * Row counts per bucket and level, for the Activity Log's timeline.
+	 *
+	 * $bounds are the bucket edges as Unix timestamps, ascending: bucket $i
+	 * holds rows dated from $bounds[$i] up to (not including) $bounds[$i+1].
+	 * The caller computes them as local midnights converted to UTC, which a
+	 * DATE() in SQL couldn't do without MySQL's timezone tables -- and a
+	 * fixed offset would be wrong across a DST change. INTERVAL() then sorts
+	 * each row into its bucket against those exact edges. TIMESTAMPDIFF
+	 * rather than UNIX_TIMESTAMP(): the column holds UTC, and
+	 * UNIX_TIMESTAMP() would read it in the connection's timezone.
+	 *
+	 * Takes the same $args as get_events() and honours all of them, so the
+	 * bars always describe the rows the table below them is filtered to.
+	 * Counts rows, not repeat_count, to agree with the status links.
+	 *
+	 * @param int[] $bounds At least two edges.
+	 * @return array<int, array<string, int>> bucket index => level => count,
+	 *         only buckets and levels with rows.
+	 */
+	public static function get_timeline_counts( array $args, array $bounds ): array {
+		global $wpdb;
+		$table = $wpdb->prefix . AM_Schema::EVENTS_TABLE;
+
+		$bounds = array_map( 'intval', array_values( $bounds ) );
+		if ( count( $bounds ) < 2 ) {
+			return array();
+		}
+
+		$args  = wp_parse_args( $args, self::query_defaults() );
+		$built = self::build_where( $args );
+
+		$inner      = array_slice( $bounds, 1, -1 );
+		$bucket_sql = $inner
+			? 'INTERVAL( TIMESTAMPDIFF( SECOND, \'1970-01-01 00:00:00\', date ), ' . implode( ', ', array_fill( 0, count( $inner ), '%d' ) ) . ' )'
+			: '0';
+
+		$where_sql = $built['sql'];
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant; $where_sql and $bucket_sql hold only placeholders, every value is in $values.
+		$sql = "SELECT {$bucket_sql} AS bucket, level, COUNT(*) AS total FROM `{$table}` WHERE {$where_sql} AND date >= %s AND date < %s GROUP BY bucket, level";
+
+		$values = array_merge(
+			$inner,
+			$built['values'],
+			array( gmdate( 'Y-m-d H:i:s', $bounds[0] ), gmdate( 'Y-m-d H:i:s', end( $bounds ) ) )
+		);
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- see above.
+		$rows = $wpdb->get_results( $wpdb->prepare( $sql, $values ), ARRAY_A );
+
+		$counts = array();
+		foreach ( (array) $rows as $row ) {
+			if ( AM_Log_Levels::is_valid( (string) $row['level'] ) ) {
+				$counts[ (int) $row['bucket'] ][ (string) $row['level'] ] = (int) $row['total'];
+			}
+		}
+		return $counts;
+	}
+
 	public static function get_context( int $event_id ): array {
 		global $wpdb;
 		$table = $wpdb->prefix . AM_Schema::CONTEXT_TABLE;

@@ -90,6 +90,31 @@ body.wp-admin.am-theme-dark {
 	--am-color-scheme: dark;
 }
 
+/* Severity ramp as tokens (2.9.57): the row spines and the Activity Log
+   timeline (AM_Timeline) share one definition. Deliberately outside the
+   style blocks below and never redefined by them -- severity is meaning,
+   not branding. */
+body.wp-admin {
+	--am-sev-debug:     #8B99A8;
+	--am-sev-info:      #2F6FA8;
+	--am-sev-notice:    #0F6E5E;
+	--am-sev-warning:   #B8842B;
+	--am-sev-error:     #C1622B;
+	--am-sev-critical:  #B23A3A;
+	--am-sev-alert:     #8E2A6B;
+	--am-sev-emergency: #4A1030;
+}
+body.wp-admin.am-theme-dark {
+	--am-sev-debug:     #8FA0B0;
+	--am-sev-info:      #6AA9E0;
+	--am-sev-notice:    #33BFA1;
+	--am-sev-warning:   #E0AA4E;
+	--am-sev-error:     #E28A55;
+	--am-sev-critical:  #E0726E;
+	--am-sev-alert:     #D06BB0;
+	--am-sev-emergency: #F2597A;
+}
+
 /* ── Styles ────────────────────────────────────────────────────────────── */
 /* "Ledger Console" is the block above (no am-style class needed to get it).
    Every other style is a complete token set in a light and a dark block,
@@ -636,22 +661,35 @@ body.wp-core-ui .am-wrap .tablenav select { font-size: 12px; }
    magenta, wine. The ramp itself is the signature: severity reads as a
    position on a scale, not eight arbitrary colors, so it's legible even to
    someone who's never memorized what each level name means. */
-.am-row-am-debug     td:first-child { border-left: 3px solid #8B99A8; }
-.am-row-am-info       td:first-child { border-left: 3px solid #2F6FA8; }
-.am-row-am-notice    td:first-child { border-left: 3px solid #0F6E5E; }
-.am-row-am-warning   td:first-child { border-left: 3px solid #B8842B; }
-.am-row-am-error     td:first-child { border-left: 3px solid #C1622B; }
-.am-row-am-critical  td:first-child { border-left: 3px solid #B23A3A; }
-.am-row-am-alert     td:first-child { border-left: 3px solid #8E2A6B; }
-.am-row-am-emergency td:first-child { border-left: 3px solid #4A1030; }
-.am-wrap[data-am-theme="dark"] .am-row-am-debug     td:first-child { border-left-color: #8FA0B0; }
-.am-wrap[data-am-theme="dark"] .am-row-am-info       td:first-child { border-left-color: #6AA9E0; }
-.am-wrap[data-am-theme="dark"] .am-row-am-notice    td:first-child { border-left-color: #33BFA1; }
-.am-wrap[data-am-theme="dark"] .am-row-am-warning   td:first-child { border-left-color: #E0AA4E; }
-.am-wrap[data-am-theme="dark"] .am-row-am-error     td:first-child { border-left-color: #E28A55; }
-.am-wrap[data-am-theme="dark"] .am-row-am-critical  td:first-child { border-left-color: #E0726E; }
-.am-wrap[data-am-theme="dark"] .am-row-am-alert     td:first-child { border-left-color: #D06BB0; }
-.am-wrap[data-am-theme="dark"] .am-row-am-emergency td:first-child { border-left-color: #F2597A; }
+.am-row-am-debug     td:first-child { border-left: 3px solid var( --am-sev-debug ); }
+.am-row-am-info       td:first-child { border-left: 3px solid var( --am-sev-info ); }
+.am-row-am-notice    td:first-child { border-left: 3px solid var( --am-sev-notice ); }
+.am-row-am-warning   td:first-child { border-left: 3px solid var( --am-sev-warning ); }
+.am-row-am-error     td:first-child { border-left: 3px solid var( --am-sev-error ); }
+.am-row-am-critical  td:first-child { border-left: 3px solid var( --am-sev-critical ); }
+.am-row-am-alert     td:first-child { border-left: 3px solid var( --am-sev-alert ); }
+.am-row-am-emergency td:first-child { border-left: 3px solid var( --am-sev-emergency ); }
+
+/* ── Activity Log timeline (AM_Timeline, 2.9.57) ───────────────────────── */
+.am-wrap .am-timeline { clear: both; margin: 8px 0 14px; padding: 10px 12px 6px; } /* card look from .am-card */
+.am-timeline-caption { font-size: 12px; color: var( --am-muted ); margin-bottom: 6px; }
+.am-timeline-caption strong { color: var( --am-ink ); font-family: "IBM Plex Sans", sans-serif; font-weight: 600; }
+.am-timeline-empty { margin: 4px 0 6px; font-size: 12px; color: var( --am-faint ); }
+.am-timeline-chart { display: block; width: 100%; height: 80px; shape-rendering: crispEdges; }
+.am-timeline-chart g:hover rect { opacity: .75; }
+.am-timeline-axis { position: relative; height: 16px; margin-top: 4px; font-family: "IBM Plex Mono", monospace; font-size: 10px; color: var( --am-faint ); }
+.am-timeline-axis span { position: absolute; top: 0; transform: translateX( -50% ); white-space: nowrap; }
+.am-timeline-axis span:first-child { transform: none; left: 0 !important; }
+.am-timeline-axis span:last-child { transform: none; left: auto !important; right: 0; }
+.am-tl-zero { fill: var( --am-border ); }
+.am-tl-debug { fill: var( --am-sev-debug ); }
+.am-tl-info { fill: var( --am-sev-info ); }
+.am-tl-notice { fill: var( --am-sev-notice ); }
+.am-tl-warning { fill: var( --am-sev-warning ); }
+.am-tl-error { fill: var( --am-sev-error ); }
+.am-tl-critical { fill: var( --am-sev-critical ); }
+.am-tl-alert { fill: var( --am-sev-alert ); }
+.am-tl-emergency { fill: var( --am-sev-emergency ); }
 
 .am-row-highlighted td { background: #fff8c5 !important; }
 .am-wrap[data-am-theme="dark"] .am-row-highlighted td { background: #4A3F0F !important; }

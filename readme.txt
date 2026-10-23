@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, event log
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.9.56
+Stable tag: 2.9.57
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -24,7 +24,7 @@ Activity Monitor is a WordPress audit log plugin that records what happens on yo
 
 = Noise control, not noise =
 
-Repeated events (a burst of failed logins, rapid comment status churn) are automatically grouped into a single log entry with a repeat count, instead of flooding your log with duplicates. Every event is tagged with a severity level and an initiator (was this a logged-in user, an anonymous visitor, WP-Cron, WP-CLI, an unattended auto-update, a REST API call, or WordPress itself?) so you can filter down to exactly what you're looking for.
+Repeated events (a burst of failed logins, rapid comment status churn) are automatically grouped into a single log entry with a repeat count, instead of flooding your log with duplicates. Every event is tagged with a severity level and an initiator (was this a logged-in user, an anonymous visitor, WP-Cron, WP-CLI, an unattended auto-update, a REST API call, or WordPress itself?) so you can filter down to exactly what you're looking for. A timeline above the log shows events per day, colored by severity, for whatever the filters currently select.
 
 = Exports =
 
@@ -75,6 +75,9 @@ Yes. Settings → Privacy offers full addresses, anonymised addresses (the last 
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
 
 == Changelog ==
+
+= 2.9.57 =
+* New: a timeline above the Activity Log shows events per day (per week for ranges over 90 days), stacked by severity. It follows every filter, so it always matches the table below it, and defaults to the last 30 days. Hover a bar for that day's breakdown.
 
 = 2.9.56 =
 * Fixed: the country-data (GeoLite2) import used one fixed temporary folder, so two sites on a network, or two WordPress installs on the same server, importing around the same time deleted each other's files and the import failed. Each site now has its own folder.
