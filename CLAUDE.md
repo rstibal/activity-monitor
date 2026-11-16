@@ -563,7 +563,10 @@ first value silently, so upgrading or turning geolocation on doesn't flag
 everyone. Unknown values (geo off or unimported, local address, parser
 "Other") are skipped, not stored. It passes `user_id` explicitly, since the
 current user isn't reliably set during `wp_login`. `wp_login` only fires for
-interactive logins: application passwords and XML-RPC aren't covered.
+interactive logins: application passwords and XML-RPC aren't covered. The
+learn/new/skip rules were checked in a stub harness, then Rob confirmed them on
+a real test site (silent first login, new device, new country via VPN, correct
+username) after the v2.9.58 release.
 
 **`AM_Logger_Privacy` (2.9.37)** logs personal data export/erase requests.
 A request is a `user_request` post (`post_name` = `export_personal_data` /
