@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, event log
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.9.72
+Stable tag: 2.9.73
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -75,6 +75,9 @@ Yes. Settings → Privacy offers full addresses, anonymised addresses (the last 
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
 
 == Changelog ==
+
+= 2.9.73 =
+* Improved: the text shown by the admin screens' script (window titles, "Loading", error messages, the remove-channel confirmation, the Light/Dark label) can now be translated like the rest of the plugin. It was fixed English. Error messages in those windows are also inserted as plain text rather than HTML.
 
 = 2.9.72 =
 * Improved: Visitor Stats now says, for any range longer than a day, that unique visitors are counted per day. Visitors are identified by a value that changes daily, so someone returning on another day was always counted again; the screen just did not say so.

@@ -2,6 +2,16 @@
 (function ($) {
 	'use strict';
 
+	/* Every string this file shows, translated server-side: see
+	   AM_Admin::enqueue_assets(). */
+	var L = amData.i18n;
+
+	/* A one-line message in the modal body. .text(), not .html(): some of
+	   these come back from the server. */
+	function amModalMessage(text) {
+		$('#am-modal-body').empty().append($('<p>').text(text));
+	}
+
 	/* The shared modal is a real dialog to assistive tech and the keyboard
 	   (role/aria-modal are on the markup, see render_screen_close()): focus
 	   moves into it on open, Tab stays inside it (handler further down), and
@@ -13,9 +23,9 @@
 	function openModal(title) {
 		var $overlay = $('#am-modal-overlay');
 		if (!$overlay.is(':visible')) amModalReturnFocus = document.activeElement;
-		$('#am-modal-title').text(title || 'Details');
+		$('#am-modal-title').text(title || L.details);
 		$overlay.show();
-		$('#am-modal-body').html('<p class="am-loading">Loading…</p>');
+		$('#am-modal-body').empty().append($('<p class="am-loading">').text(L.loading));
 		$overlay.find('.am-modal').trigger('focus');
 	}
 
@@ -33,10 +43,10 @@
 	   have been removed entirely. Shared by the log table's row click
 	   and the am_event_id deep-link below. */
 	function loadEventDetail(id) {
-		openModal('Event Details');
+		openModal(L.eventDetails);
 		$.post(amData.ajaxUrl, { action: 'am_get_v2_event_detail', entry_id: id, nonce: amData.nonce })
-		.done(function (r) { $('#am-modal-body').html(r.success ? r.data.html : '<p>Error.</p>'); })
-		.fail(function () { $('#am-modal-body').html('<p>Request failed.</p>'); });
+		.done(function (r) { if (r.success) { $('#am-modal-body').html(r.data.html); } else { amModalMessage(L.error); } })
+		.fail(function () { amModalMessage(L.requestFailed); });
 	}
 
 	/* preventDefault() belongs here even though the button now declares
@@ -88,16 +98,16 @@
 		e.preventDefault();
 		var ip = $(this).data('ip');
 		if (!ip) return;
-		openModal('IP Lookup: ' + ip);
+		openModal(L.ipLookup.replace('%s', ip));
 		$.post(amData.ajaxUrl, { action: 'am_ip_lookup', ip: ip, nonce: amData.nonce })
 		.done(function (r) {
 			if (r.success) {
 				$('#am-modal-body').html(r.data.html);
 			} else {
-				$('#am-modal-body').html('<p>' + (r.data && r.data.message ? r.data.message : 'Error.') + '</p>');
+				amModalMessage(r.data && r.data.message ? r.data.message : L.error);
 			}
 		})
-		.fail(function () { $('#am-modal-body').html('<p>Request failed.</p>'); });
+		.fail(function () { amModalMessage(L.requestFailed); });
 	});
 
 	/* WordPress user profile modal. Triggered by clicking a username in
@@ -110,16 +120,16 @@
 		e.preventDefault();
 		var userId = $(this).data('user-id');
 		if (!userId) return;
-		openModal('User Details');
+		openModal(L.userDetails);
 		$.post(amData.ajaxUrl, { action: 'am_user_profile', user_id: userId, nonce: amData.nonce })
 		.done(function (r) {
 			if (r.success) {
 				$('#am-modal-body').html(r.data.html);
 			} else {
-				$('#am-modal-body').html('<p>' + (r.data && r.data.message ? r.data.message : 'Error.') + '</p>');
+				amModalMessage(r.data && r.data.message ? r.data.message : L.error);
 			}
 		})
-		.fail(function () { $('#am-modal-body').html('<p>Request failed.</p>'); });
+		.fail(function () { amModalMessage(L.requestFailed); });
 	});
 
 	$('#am-modal-close').on('click', closeModal);
@@ -157,17 +167,17 @@
 	   whole table body with the fresh server-rendered rows, so the
 	   table never drifts from what's actually stored. */
 	function openChannelModal(type, index) {
-		openModal('Loading…');
+		openModal(L.loading);
 		$.post(amData.ajaxUrl, { action: 'am_channel_form', type: type, index: (index === undefined ? '' : index), nonce: amData.nonce })
 		.done(function (r) {
 			if (r.success) {
 				$('#am-modal-title').text(r.data.title);
 				$('#am-modal-body').html(r.data.html);
 			} else {
-				$('#am-modal-body').html('<p>Error.</p>');
+				amModalMessage(L.error);
 			}
 		})
-		.fail(function () { $('#am-modal-body').html('<p>Request failed.</p>'); });
+		.fail(function () { amModalMessage(L.requestFailed); });
 	}
 
 	$(document).on('click', '.am-add-channel-btn', function () {
@@ -212,15 +222,15 @@
 				closeModal();
 				refreshChannelsTable(r.data.html, false);
 			} else {
-				$err.text((r.data && r.data.message) ? r.data.message : 'Could not save. Check the values and try again.').show();
+				$err.text((r.data && r.data.message) ? r.data.message : L.saveFailed).show();
 			}
 		})
-		.fail(function () { $err.text('Request failed.').show(); })
+		.fail(function () { $err.text(L.requestFailed).show(); })
 		.always(function () { $btn.prop('disabled', false); });
 	});
 
 	$(document).on('click', '#am-channel-delete-btn', function () {
-		if (!window.confirm('Remove this notification channel?')) return;
+		if (!window.confirm(L.confirmRemoveChannel)) return;
 		var index = $(this).data('index');
 		var $btn  = $(this).prop('disabled', true);
 
@@ -396,7 +406,7 @@
 		$wrap.attr('data-am-theme', next);
 		$('body').toggleClass('am-theme-dark', next === 'dark').toggleClass('am-theme-light', next === 'light');
 		$(this).attr('aria-pressed', next === 'dark' ? 'true' : 'false');
-		$(this).find('.am-tt-label').text(next === 'dark' ? 'Dark' : 'Light');
+		$(this).find('.am-tt-label').text(next === 'dark' ? L.dark : L.light);
 		$.post(amData.ajaxUrl, { action: 'am_save_theme', theme: next, nonce: amData.nonce });
 	});
 

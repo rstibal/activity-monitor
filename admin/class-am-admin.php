@@ -211,6 +211,23 @@ class AM_Admin {
 		wp_localize_script( 'am-admin', 'amData', array(
 			'ajaxUrl' => admin_url( 'admin-ajax.php' ),
 			'nonce'   => wp_create_nonce( 'am_ajax' ),
+			// Every string admin.js shows. They were hardcoded English in
+			// the script through 2.9.72, the one untranslatable part of
+			// the plugin.
+			'i18n'    => array(
+				'details'              => __( 'Details', 'activity-monitor' ),
+				'loading'              => __( 'Loading…', 'activity-monitor' ),
+				'eventDetails'         => __( 'Event Details', 'activity-monitor' ),
+				'userDetails'          => __( 'User Details', 'activity-monitor' ),
+				/* translators: %s: IP address */
+				'ipLookup'             => __( 'IP Lookup: %s', 'activity-monitor' ),
+				'error'                => __( 'Error.', 'activity-monitor' ),
+				'requestFailed'        => __( 'Request failed.', 'activity-monitor' ),
+				'saveFailed'           => __( 'Could not save. Check the values and try again.', 'activity-monitor' ),
+				'confirmRemoveChannel' => __( 'Remove this notification channel?', 'activity-monitor' ),
+				'dark'                 => __( 'Dark', 'activity-monitor' ),
+				'light'                => __( 'Light', 'activity-monitor' ),
+			),
 		) );
 	}
 
