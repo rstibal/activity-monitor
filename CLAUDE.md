@@ -672,7 +672,8 @@ update.
   `get_file_data()` — `get_plugin_data()` needs wp-admin includes) as
   "Name 1.2.3". **`object_name` stays the plugin file path**: it's the stable
   identifier, the grouping key, and what a search for the slug matches.
-- None of this has been run on a site yet; it's from reading core.
+- Written from reading core; Rob then confirmed it on a test site, along
+  with the rest of the 2.9.59–2.9.73 batch, before the v2.9.73 release.
 
 **Draft autosaves (2.9.60)** — both editors autosave a draft its author is
 editing straight into the post via `wp_update_post()`, so each one reached
