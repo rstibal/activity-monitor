@@ -694,6 +694,7 @@ body.wp-core-ui .am-wrap .tablenav select { font-size: 12px; }
 .am-timeline-axis span:first-child { transform: none; left: 0 !important; }
 .am-timeline-axis span:last-child { transform: none; left: auto !important; right: 0; }
 .am-tl-zero { fill: var( --am-border ); }
+.am-tl-visits { fill: var( --am-accent ); } /* Visitor Stats' single series */
 .am-tl-debug { fill: var( --am-sev-debug ); }
 .am-tl-info { fill: var( --am-sev-info ); }
 .am-tl-notice { fill: var( --am-sev-notice ); }

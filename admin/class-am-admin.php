@@ -2195,6 +2195,8 @@ class AM_Admin {
 			<?php endif; ?>
 		</form>
 
+		<?php AM_Timeline::render_visits( $days ); ?>
+
 		<?php $this->render_recent_hits_section( $days, $pages['hits'], $current_url ); ?>
 
 		<h2><?php esc_html_e( 'Top Pages', 'activity-monitor' ); ?></h2>

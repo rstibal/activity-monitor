@@ -2,7 +2,9 @@
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 /**
- * AM_Timeline — the Activity Log's events-per-day strip (2.9.57).
+ * AM_Timeline — the Activity Log's events-per-day strip (2.9.57). Since
+ * 2.9.81 it also draws Visitor Stats' visits strip, render_visits(), which
+ * has its own doc; the rest of this one describes the log's.
  *
  * A glance, not an investigation tool: one bar per day (per week past
  * MAX_DAILY days), stacked by level in AM_Log_Levels::ORDER so the most
@@ -96,6 +98,105 @@ class AM_Timeline {
 					<?php endforeach; ?>
 				</div>
 			<?php endif; ?>
+		</div>
+		<?php
+	}
+
+	/**
+	 * The same strip for Visitor Stats (2.9.81): visits per bucket over the
+	 * screen's selected range, one series, in the accent colour. Per hour for
+	 * "Today", per day up to MAX_DAILY days, per week beyond. The range is
+	 * AM_Stats_Query::since()'s: whole local days ending today. Rendered
+	 * inside #am-stats-content, so a range change redraws it. Echoes nothing
+	 * when the range has no visits; the tables below already say so.
+	 */
+	public static function render_visits( int $days ) {
+		$today = new DateTimeImmutable( 'today', wp_timezone() );
+		$end   = $today->modify( '+1 day' )->getTimestamp();
+		$edges = array();
+
+		if ( $days <= 1 ) {
+			$unit = 'hour';
+			// Real elapsed hours, so a 23- or 25-hour DST day still ends on
+			// the next midnight.
+			for ( $ts = $today->getTimestamp(); $ts < $end; $ts += HOUR_IN_SECONDS ) {
+				$edges[] = $ts;
+			}
+		} else {
+			$unit  = $days > self::MAX_DAILY ? 'week' : 'day';
+			$step  = 'week' === $unit ? '+7 days' : '+1 day';
+			$start = $today->modify( '-' . ( $days - 1 ) . ' days' );
+			$day   = $start;
+			$ts    = $day->getTimestamp();
+			while ( $ts < $end ) {
+				$edges[] = $ts;
+				$day     = $day->modify( $step );
+				$ts      = $day->getTimestamp();
+			}
+		}
+		$edges[] = $end;
+
+		$counts = AM_Stats_Query::get_visit_counts( $edges );
+		$slots  = count( $edges ) - 1;
+		$peak   = $counts ? max( $counts ) : 0;
+		if ( $peak <= 0 ) {
+			return;
+		}
+
+		$time_format = (string) get_option( 'time_format', 'g:i a' );
+		if ( 'hour' === $unit ) {
+			$caption = __( 'Visits per hour', 'activity-monitor' );
+			/* translators: %s: highest number of visits in one hour */
+			$per_text = __( 'busiest hour %s', 'activity-monitor' );
+		} elseif ( 'week' === $unit ) {
+			$caption = __( 'Visits per week', 'activity-monitor' );
+			/* translators: %s: highest number of visits in one week */
+			$per_text = __( 'busiest week %s', 'activity-monitor' );
+		} else {
+			$caption = __( 'Visits per day', 'activity-monitor' );
+			/* translators: %s: highest number of visits in one day */
+			$per_text = __( 'busiest day %s', 'activity-monitor' );
+		}
+		?>
+		<div class="am-card am-timeline">
+			<div class="am-timeline-caption">
+				<strong><?php echo esc_html( $caption ); ?></strong>
+				<span>&middot; <?php echo esc_html( sprintf( $per_text, number_format_i18n( $peak ) ) ); ?></span>
+			</div>
+			<svg class="am-timeline-chart" viewBox="0 0 <?php echo esc_attr( $slots * self::SLOT ); ?> <?php echo esc_attr( self::HEIGHT ); ?>"
+			     preserveAspectRatio="none" role="img" aria-label="<?php echo esc_attr( $caption ); ?>">
+				<?php
+				for ( $i = 0; $i < $slots; $i++ ) {
+					$visits = (int) ( $counts[ $i ] ?? 0 );
+					if ( 'hour' === $unit ) {
+						$when = wp_date( $time_format, $edges[ $i ] );
+					} elseif ( 'week' === $unit ) {
+						/* translators: %s: first day of a week */
+						$when = sprintf( __( 'Week of %s', 'activity-monitor' ), wp_date( 'M j', $edges[ $i ] ) );
+					} else {
+						$when = wp_date( 'D, M j', $edges[ $i ] );
+					}
+					/* translators: %s: formatted number of visits */
+					$title = $when . ': ' . sprintf( _n( '%s visit', '%s visits', $visits, 'activity-monitor' ), number_format_i18n( $visits ) );
+
+					$x     = $i * self::SLOT + 1;
+					$width = self::SLOT - 2;
+					echo '<g><title>' . esc_html( $title ) . '</title>';
+					if ( 0 === $visits ) {
+						echo '<rect class="am-tl-zero" x="' . esc_attr( $x ) . '" y="' . esc_attr( self::HEIGHT - 1 ) . '" width="' . esc_attr( $width ) . '" height="1"></rect>';
+					} else {
+						$h = max( self::MIN_SEGMENT, $visits / $peak * self::HEIGHT );
+						echo '<rect class="am-tl-visits" x="' . esc_attr( $x ) . '" y="' . esc_attr( round( self::HEIGHT - $h, 2 ) ) . '" width="' . esc_attr( $width ) . '" height="' . esc_attr( round( $h, 2 ) ) . '"></rect>';
+					}
+					echo '</g>';
+				}
+				?>
+			</svg>
+			<div class="am-timeline-axis">
+				<?php foreach ( self::label_slots( $slots ) as $i ) : ?>
+					<span style="left:<?php echo esc_attr( round( ( $i + 0.5 ) / $slots * 100, 2 ) ); ?>%"><?php echo esc_html( wp_date( 'hour' === $unit ? $time_format : 'M j', $edges[ $i ] ) ); ?></span>
+				<?php endforeach; ?>
+			</div>
 		</div>
 		<?php
 	}

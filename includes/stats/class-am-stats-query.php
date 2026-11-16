@@ -165,6 +165,51 @@ class AM_Stats_Query {
 	}
 
 	/**
+	 * Visits per bucket, for the Visitor Stats strip (AM_Timeline::render_visits()).
+	 *
+	 * $bounds are the bucket edges as Unix timestamps, ascending; bucket $i
+	 * holds hits from $bounds[$i] up to (not including) $bounds[$i+1]. Same
+	 * INTERVAL()-over-TIMESTAMPDIFF() bucketing as
+	 * AM_Event_Query::get_timeline_counts(), for the reasons given there:
+	 * the caller's edges are local midnights (or hours), which SQL can't
+	 * compute without MySQL's timezone tables.
+	 *
+	 * @param int[] $bounds At least two edges.
+	 * @return array<int,int> bucket index => visits, only buckets with any.
+	 */
+	public static function get_visit_counts( array $bounds ): array {
+		global $wpdb;
+		$hits_table = $wpdb->prefix . AM_Stats_Schema::HITS_TABLE;
+
+		$bounds = array_map( 'intval', array_values( $bounds ) );
+		if ( count( $bounds ) < 2 ) {
+			return array();
+		}
+
+		$inner      = array_slice( $bounds, 1, -1 );
+		$bucket_sql = $inner
+			? 'INTERVAL( TIMESTAMPDIFF( SECOND, \'1970-01-01 00:00:00\', date ), ' . implode( ', ', array_fill( 0, count( $inner ), '%d' ) ) . ' )'
+			: '0';
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant; $bucket_sql holds only placeholders, every value is in $values.
+		$sql = "SELECT {$bucket_sql} AS bucket, COUNT(*) AS visits FROM `{$hits_table}` WHERE date >= %s AND date < %s GROUP BY bucket";
+
+		$values = array_merge(
+			$inner,
+			array( gmdate( 'Y-m-d H:i:s', $bounds[0] ), gmdate( 'Y-m-d H:i:s', end( $bounds ) ) )
+		);
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- see above.
+		$rows = $wpdb->get_results( $wpdb->prepare( $sql, $values ), ARRAY_A );
+
+		$counts = array();
+		foreach ( (array) $rows as $row ) {
+			$counts[ (int) $row['bucket'] ] = (int) $row['visits'];
+		}
+		return $counts;
+	}
+
+	/**
 	 * Start of the range as the UTC the date column stores: the site's local
 	 * midnight $days - 1 days ago, so "Today" is today and "Last 7 days" is
 	 * today plus the six before it. Through 2.9.61 it was a rolling

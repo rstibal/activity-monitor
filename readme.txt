@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, event log
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.9.80
+Stable tag: 2.9.81
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -75,6 +75,9 @@ Yes. Settings → Privacy offers full addresses, anonymised addresses (the last 
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
 
 == Changelog ==
+
+= 2.9.81 =
+* New: Visitor Stats shows a strip of visits over the selected range, above Recent Hits: per hour for Today, per day up to 90 days, per week for 12 months. Hover a bar for its count.
 
 = 2.9.80 =
 * New: a Reverse proxy setting (Settings > Privacy) for sites behind a load balancer or proxy other than Cloudflare, where every entry showed the proxy's address instead of the visitor's. Choose the header the proxy sets (X-Forwarded-For or X-Real-IP) and enter the proxy's own addresses; the header is believed only on requests arriving from those addresses, so it cannot be faked by a visitor. The setting shows what the current request looks like to help fill it in. It applies to the log, alerts, new-country login detection and Visitor Stats. Nothing changes until both parts are filled in.
