@@ -1157,6 +1157,20 @@ class AM_Admin {
 			'webhook_url' => wp_unslash( $_POST['webhook_url'] ?? '' ),
 		);
 
+		$channels = get_option( 'am_notification_channels', array() );
+		$channels = is_array( $channels ) ? $channels : array();
+		$index    = isset( $_POST['index'] ) && '' !== $_POST['index'] ? absint( $_POST['index'] ) : null;
+
+		// The edit form never carries a saved webhook back (see
+		// render_channel_modal_form()), so a blank one on an existing Slack
+		// channel means "unchanged".
+		if (
+			'slack' === $raw['type'] && is_string( $raw['webhook_url'] ) && '' === trim( $raw['webhook_url'] )
+			&& null !== $index && 'slack' === ( $channels[ $index ]['type'] ?? '' )
+		) {
+			$raw['webhook_url'] = (string) ( $channels[ $index ]['webhook_url'] ?? '' );
+		}
+
 		$clean = self::sanitize_one_channel( $raw );
 		if ( null === $clean ) {
 			$message = 'slack' === $raw['type']
@@ -1173,9 +1187,6 @@ class AM_Admin {
 		if ( 'email' === $clean['type'] && '' === $clean['recipients'] ) {
 			wp_send_json_error( array( 'message' => __( 'Enter at least one valid email address.', 'activity-monitor' ) ) );
 		}
-
-		$channels = get_option( 'am_notification_channels', array() );
-		$index    = isset( $_POST['index'] ) && '' !== $_POST['index'] ? absint( $_POST['index'] ) : null;
 
 		if ( null !== $index && isset( $channels[ $index ] ) ) {
 			$channels[ $index ] = $clean;
@@ -3058,9 +3069,15 @@ class AM_Admin {
 					<div class="am-field-row am-field-full">
 						<label>
 							<?php esc_html_e( 'Webhook URL', 'activity-monitor' ); ?>
-							<input type="url" name="webhook_url"
-							       value="<?php echo esc_attr( $ch['webhook_url'] ?? '' ); ?>"
-							       placeholder="https://hooks.slack.com/services/…"
+							<?php
+							// A saved webhook is a credential and is never sent back
+							// to the page, the same as the MaxMind fields: the box
+							// starts empty and a blank save keeps what is stored
+							// (see ajax_save_channel()).
+							$has_webhook = '' !== (string) ( $ch['webhook_url'] ?? '' );
+							?>
+							<input type="url" name="webhook_url" value="" autocomplete="off"
+							       placeholder="<?php echo $has_webhook ? esc_attr__( 'Saved — leave blank to keep it', 'activity-monitor' ) : 'https://hooks.slack.com/services/…'; ?>"
 							       class="large-text">
 							<p class="description">
 								<?php
