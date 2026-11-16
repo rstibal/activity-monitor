@@ -80,6 +80,11 @@ class AM_Logger_Posts extends AM_Logger_Base {
 			return;
 		}
 
+		if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) {
+			$this->log_autosave( $post_after );
+			return;
+		}
+
 		$this->log(
 			'post',
 			'updated',
@@ -97,6 +102,44 @@ class AM_Logger_Posts extends AM_Logger_Base {
 				'object_name' => $post_after->post_title,
 				'context'     => array( 'diff' => $diff ),
 				'group'       => false, // Content edits are individually meaningful; don't collapse them.
+			)
+		);
+	}
+
+	/**
+	 * An editor autosaving a draft. Both editors save a draft its author is
+	 * working on straight into the post (a published post gets an autosave
+	 * revision instead, which skip_post() drops), so every autosave reached
+	 * on_post_updated() as an ordinary edit: an ungrouped row a minute, each
+	 * holding two full copies of the content.
+	 *
+	 * Logged once an hour per post and user, with no content, and labelled
+	 * for what it is. Its own throttle rather than occasion grouping, which
+	 * does nothing when am_occasion_window_seconds is 0. The deliberate save
+	 * that follows is still a normal "updated" row with its diff.
+	 */
+	private function log_autosave( WP_Post $post ) {
+		$key = 'am_autosave_' . $post->ID . '_' . get_current_user_id();
+		if ( false !== get_transient( $key ) ) {
+			return;
+		}
+		set_transient( $key, 1, HOUR_IN_SECONDS );
+
+		$this->log(
+			'post',
+			'autosaved',
+			sprintf(
+				/* translators: 1: post title, 2: post type */
+				__( 'Draft "%1$s" (%2$s) autosaved while being edited. Further autosaves of it are not logged for an hour.', 'activity-monitor' ),
+				$post->post_title,
+				$post->post_type
+			),
+			array(
+				'level'       => AM_Log_Levels::INFO,
+				'object_type' => $post->post_type,
+				'object_id'   => $post->ID,
+				'object_name' => $post->post_title,
+				'group'       => false,
 			)
 		);
 	}

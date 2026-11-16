@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, event log
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.9.59
+Stable tag: 2.9.60
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -75,6 +75,9 @@ Yes. Settings → Privacy offers full addresses, anonymised addresses (the last 
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
 
 == Changelog ==
+
+= 2.9.60 =
+* Fixed: while a draft was being written, every editor autosave (about one a minute) was logged as a separate "Post Updated" entry, each storing two full copies of the content. Autosaves of a draft are now one "Post Draft Autosaved" entry per hour, per post and user, with no content stored. Saving the draft yourself is logged as before, with its changes.
 
 = 2.9.59 =
 * Fixed: a plugin or theme updated on its own -- by a background auto-update, from the "update now" link on its details page, or through WP-CLI -- was never logged; only updates run from the Plugins or Updates screens were. Also fixed: an update that failed partway was logged as "updated" next to the entry saying it failed.

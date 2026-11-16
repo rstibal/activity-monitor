@@ -49,6 +49,7 @@ class AM_Event_Labels {
 		'plugin.deleted'                        => 'Plugin Deleted',
 		'plugin.installed'                      => 'Plugin Installed',
 		'plugin.updated'                        => 'Plugin Updated',
+		'post.autosaved'                         => 'Post Draft Autosaved',
 		'post.deleted'                           => 'Post Deleted',
 		'post.published'                        => 'Post Published',
 		'post.restored'                          => 'Post Restored from Trash',
