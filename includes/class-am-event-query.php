@@ -87,7 +87,11 @@ class AM_Event_Query {
 		}
 		if ( '' !== $args['search'] ) {
 			$like     = '%' . $wpdb->esc_like( $args['search'] ) . '%';
-			$where[]  = '( message LIKE %s OR user_login LIKE %s OR object_name LIKE %s )';
+			// ip_address too (2.9.63): "what did this address do" is one of
+			// the first things asked of an audit log, and pasting one in
+			// found nothing.
+			$where[]  = '( message LIKE %s OR user_login LIKE %s OR object_name LIKE %s OR ip_address LIKE %s )';
+			$values[] = $like;
 			$values[] = $like;
 			$values[] = $like;
 			$values[] = $like;

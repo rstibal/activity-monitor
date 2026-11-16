@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, event log
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.9.62
+Stable tag: 2.9.63
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -75,6 +75,9 @@ Yes. Settings → Privacy offers full addresses, anonymised addresses (the last 
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
 
 == Changelog ==
+
+= 2.9.63 =
+* Improved: the Activity Log search (and an export of its results) now matches IP addresses as well as the message, username and object name, so pasting an address in shows what it did.
 
 = 2.9.62 =
 * Fixed: Visitor Stats ranges were a rolling number of hours back from now, so "Today" included yesterday afternoon. Ranges are now whole days in the site's timezone: "Today" is today, "Last 7 days" is today and the six days before it.
