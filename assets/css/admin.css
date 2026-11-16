@@ -774,8 +774,12 @@ body.wp-core-ui .am-wrap .tablenav select { font-size: 12px; }
 
 .am-diff-table { width: 100%; border-collapse: collapse; }
 .am-diff-table td { padding: 4px 6px; font-size: 12px; vertical-align: top; border-bottom: 1px solid var( --am-border ); }
-.am-diff-before { color: var( --am-danger ); text-decoration: line-through; }
-.am-diff-after { color: var( --am-accent ); }
+.am-diff-table td { overflow-wrap: anywhere; }
+/* The colour and the strike mark only the part that changed (<del>/<ins>);
+   the unchanged text shown around it in a long value stays muted. */
+.am-diff-before del { color: var( --am-danger ); text-decoration: line-through; }
+.am-diff-after ins { color: var( --am-accent ); text-decoration: none; font-weight: 600; }
+.am-diff-context { color: var( --am-muted ); }
 
 /* ── Settings ──────────────────────────────────────────────────────────── */
 /* Every field is still core furniture -- render_settings_sections() (a

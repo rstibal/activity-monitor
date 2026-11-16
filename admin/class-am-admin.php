@@ -758,11 +758,12 @@ class AM_Admin {
 				<td>
 					<table class="am-diff-table">
 						<?php foreach ( $context['diff'] as $field => $change ) : ?>
+						<?php $cells = self::diff_cells( is_array( $change ) ? ( $change['before'] ?? '' ) : '', is_array( $change ) ? ( $change['after'] ?? '' ) : '' ); ?>
 						<tr>
 							<td><strong><?php echo esc_html( $field ); ?></strong></td>
-							<td class="am-diff-before"><?php echo esc_html( wp_trim_words( (string) ( $change['before'] ?? '' ), 20 ) ); ?></td>
+							<td class="am-diff-before"><?php echo $cells[0]; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped per-part in diff_cells(). ?></td>
 							<td>&rarr;</td>
-							<td class="am-diff-after"><?php echo esc_html( wp_trim_words( (string) ( $change['after'] ?? '' ), 20 ) ); ?></td>
+							<td class="am-diff-after"><?php echo $cells[1]; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped per-part in diff_cells(). ?></td>
 						</tr>
 						<?php endforeach; ?>
 					</table>
@@ -772,6 +773,97 @@ class AM_Admin {
 		</table>
 		<?php
 		wp_send_json_success( array( 'html' => ob_get_clean() ) );
+	}
+
+	/** Values at or under this many characters are shown whole in a Changes row. */
+	const DIFF_WHOLE = 120;
+
+	/** Unchanged characters shown either side of the changed part of a longer value. */
+	const DIFF_CONTEXT = 60;
+
+	/** The changed part itself is cut after this many characters. */
+	const DIFF_CHANGED_MAX = 400;
+
+	/**
+	 * The before and after cells of one Changes row, as escaped HTML.
+	 *
+	 * Short values are shown whole. A longer one (post content, mostly) shows
+	 * only the part that differs, with a little unchanged text around it:
+	 * what the two values share at the start and at the end is skipped. Up to
+	 * 2.9.60 each side was its first 20 words with tags stripped, so an edit
+	 * further in -- or one that only added markup, a <script> included --
+	 * showed two identical cells.
+	 *
+	 * @param mixed $before
+	 * @param mixed $after
+	 * @return string[] Two cells.
+	 */
+	private static function diff_cells( $before, $after ): array {
+		$before = is_scalar( $before ) ? (string) $before : (string) wp_json_encode( $before );
+		$after  = is_scalar( $after ) ? (string) $after : (string) wp_json_encode( $after );
+
+		if ( mb_strlen( $before ) <= self::DIFF_WHOLE && mb_strlen( $after ) <= self::DIFF_WHOLE ) {
+			return array(
+				self::diff_cell( '', $before, '', 'del' ),
+				self::diff_cell( '', $after, '', 'ins' ),
+			);
+		}
+
+		// Shared bytes at the start: XOR leaves a NUL wherever the two agree.
+		// Backed off to a character boundary, so a cut never lands inside a
+		// multibyte character (esc_html() blanks a string that isn't UTF-8).
+		$prefix = strspn( $before ^ $after, "\0" );
+		while ( $prefix > 0 && ( self::is_utf8_tail( $before, $prefix ) || self::is_utf8_tail( $after, $prefix ) ) ) {
+			$prefix--;
+		}
+
+		// Shared bytes at the end, out of what the prefix left over.
+		$rest   = min( strlen( $before ), strlen( $after ) ) - $prefix;
+		$suffix = $rest > 0 ? strspn( strrev( substr( $before, -$rest ) ) ^ strrev( substr( $after, -$rest ) ), "\0" ) : 0;
+		while ( $suffix > 0 && self::is_utf8_tail( $before, strlen( $before ) - $suffix ) ) {
+			$suffix--;
+		}
+
+		$cells = array();
+		foreach ( array( 'del' => $before, 'ins' => $after ) as $tag => $value ) {
+			$cells[] = self::diff_cell(
+				substr( $value, 0, $prefix ),
+				substr( $value, $prefix, strlen( $value ) - $prefix - $suffix ),
+				$suffix > 0 ? substr( $value, -$suffix ) : '',
+				$tag
+			);
+		}
+		return $cells;
+	}
+
+	/** Whether the byte at $offset continues a multibyte UTF-8 character. */
+	private static function is_utf8_tail( string $value, int $offset ): bool {
+		return isset( $value[ $offset ] ) && 0x80 === ( ord( $value[ $offset ] ) & 0xC0 );
+	}
+
+	/** One side of a Changes row: trimmed unchanged text around the changed part in a <del> or <ins>. */
+	private static function diff_cell( string $head, string $changed, string $tail, string $tag ): string {
+		if ( mb_strlen( $head ) > self::DIFF_CONTEXT ) {
+			$head = '…' . mb_substr( $head, -self::DIFF_CONTEXT );
+		}
+		if ( mb_strlen( $tail ) > self::DIFF_CONTEXT ) {
+			$tail = mb_substr( $tail, 0, self::DIFF_CONTEXT ) . '…';
+		}
+		if ( mb_strlen( $changed ) > self::DIFF_CHANGED_MAX ) {
+			$changed = mb_substr( $changed, 0, self::DIFF_CHANGED_MAX ) . '…';
+		}
+
+		$html = '';
+		if ( '' !== $head ) {
+			$html .= '<span class="am-diff-context">' . esc_html( $head ) . '</span>';
+		}
+		if ( '' !== $changed ) {
+			$html .= '<' . $tag . '>' . esc_html( $changed ) . '</' . $tag . '>';
+		}
+		if ( '' !== $tail ) {
+			$html .= '<span class="am-diff-context">' . esc_html( $tail ) . '</span>';
+		}
+		return $html;
 	}
 
 	/**
