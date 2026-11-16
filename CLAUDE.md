@@ -453,6 +453,47 @@ shows its `repeat_count` in the Message cell (2.9.64). A saved Slack webhook
 is never echoed into the edit form; a blank one on save means "unchanged"
 (2.9.70), same convention as the MaxMind fields.
 
+**Export (2.9.74–2.9.75)** — `AM_Export::stream()` writes in batches of 500,
+walking down by id (`get_events()` args `before_id`, `count => false`,
+`orderby => id`), not `no_limit` and not OFFSET: the old version held the
+whole result in memory, and rows logged mid-export have higher ids so they
+can't shift a batch. Order is therefore by id, newest first. Columns gained
+`id`, `user_id`, `object_id`; `message` is the `full_message` context value
+where the column cut it; CSV and JSON add a `context` column (one
+`AM_Event_Query::get_contexts()` query per batch), HTML and TXT don't. The
+export logs itself as `log.exported` (WARNING) after the last batch, so the
+file never contains its own row. Checked in a stub harness, not on a site.
+
+**The Type dropdown's list is cached (2.9.76)** in the `am_type_actions`
+transient. `SELECT DISTINCT event_type, action` has no index to answer from
+and ran on every render. It's exact, not "eventually": `AM_Event_Writer`
+calls `AM_Event_Query::note_type_action()` after each insert, which drops the
+cache when the pair is new; `AM_Schema::clear_all()` and `prune()` drop it
+too. Anything else that inserts into or deletes from `am_events` must do the
+same. An index was considered and passed over: `(event_type, action)` at
+utf8mb4 is over the 767-byte key limit on older row formats.
+
+**Notification channels grew three things (2.9.77–2.9.79)**, all stored on
+the channel record and all optional, so a channel saved earlier behaves as
+before:
+- **Send Test** (`ajax_test_channel()` → `AM_Notifications::send_test()`)
+  goes through the real `send_email()`/`send_slack()`, which now return
+  `''` or the failure reason. It tests the *saved* channel by index.
+- **`types`**: event types the channel alerts on; empty = all. Choices are
+  `AM_Notifications::type_choices()` (`TYPE_MAP` less `session`, plus `log`).
+  All ticked is stored as empty, so a type added later isn't left out.
+- **`rate`**: alerts per `RATE_WINDOW` (10 min); 0 or absent = no limit, new
+  channels default to 20. Over the limit the channel gets one "paused until"
+  message and a `system.alerts_paused` row (`skip_notify`), then nothing
+  until the window ends. Counted in transient `am_alert_rate_<md5 of type +
+  target>`, cleared in `uninstall.php`. This is the rate-limit rule applied
+  to alerts: the events are all still logged.
+
+**Visitor Stats has a visits strip (2.9.81)**, `AM_Timeline::render_visits()`
+over `AM_Stats_Query::get_visit_counts()`: per hour for Today, per day to 90
+days, per week beyond, same `INTERVAL()` bucketing as the log's timeline.
+Hourly edges step by real seconds so a DST day still ends at midnight.
+
 **`uninstall.php` returns early when `am_delete_data_on_uninstall` is off**
 (default on, so an untouched site behaves as it always did). When off, the
 file does *nothing* — including not deleting that option, or the choice
@@ -867,6 +908,18 @@ WordPress works:**
 - **The user profile modal keys on `user_id`, not the stored login** — logins
   can be renamed and reused, so a login lookup could show the wrong person.
   So does the log's user filter (2.9.55), which the modal links to.
+- **The visitor's address comes from `AM_Client_IP::resolve()` (2.9.80),
+  never `AM_DB_Legacy_IP::resolve()` directly.** It returns the legacy
+  result unless *both* `am_proxy_header` (`x-forwarded-for` / `x-real-ip`)
+  and `am_trusted_proxies` (IPs/CIDRs) are set *and* `REMOTE_ADDR` is one of
+  those proxies; then it takes the header, using the rightmost
+  X-Forwarded-For entry that isn't itself a trusted proxy. A forwarding
+  header is whatever the client typed, so never trust one without the
+  proxy check, and don't add a "just trust the header" shortcut. Cloudflare
+  detection is unchanged and wins when it applies. `AM_DB_Legacy_IP` itself
+  is still untouched. Both options are in `WATCHED_OPTIONS` at WARNING.
+  Sixteen cases (spoofing, chains, ports, IPv6, malformed) pass in a stub
+  harness; not yet tried behind a real proxy.
 - **`am_ip_storage` is applied at write time, in `AM_Event_Writer::get_ip()`,
   never at display time.** The point of "anonymised"/"none" is that the
   address never reaches the database — filtering on the way out would leave
@@ -904,8 +957,9 @@ If labels look wrong, re-run this audit: parse every `$this->log()`/
 action passed as a variable to its literal values, and compare the emitted
 `event_type.action` pairs against `MAP`, and the types against `TYPE_MAP`.
 Literal pairs only, re-checked at 2.9.44: 64, all mapped; 2.9.58 added two
-more (`user.login_new_country`/`_device`) and 2.9.60 one (`post.autosaved`),
-each mapped in the same commit. Last full run (2.9.37): 63 literal pairs plus 29 more from calls whose action is
+more (`user.login_new_country`/`_device`), 2.9.60 one (`post.autosaved`),
+2.9.74 `log.exported` and 2.9.79 `system.alerts_paused`, each mapped in the
+same commit. Last full run (2.9.37): 63 literal pairs plus 29 more from calls whose action is
 a variable (auto-update toggles, install/update failures, privacy, site
 status, role added/removed, maintenance, PHP errors) — all mapped. Variable
 forms are why a regex over literals alone undercounts; resolve them by hand.
