@@ -53,6 +53,10 @@ class AM_Notifications {
 				continue;
 			}
 
+			if ( ! self::within_rate( $channel ) ) {
+				continue;
+			}
+
 			$type = $channel['type'] ?? 'email';
 			if ( 'slack' === $type ) {
 				$user_login = (string) ( $args['user_login'] ?? '' );
@@ -62,6 +66,105 @@ class AM_Notifications {
 				self::send_email( $channel, $level, $event_type, $action, $message, $args );
 			}
 		}
+	}
+
+	/** Length of the window a channel's alert limit is counted over. */
+	const RATE_WINDOW = 600;
+
+	/** Alert limits offered per channel: alerts per RATE_WINDOW, 0 = no limit. */
+	const RATE_CHOICES = array( 0, 5, 10, 20, 50 );
+
+	/** Preselected for a new channel. Channels saved before 2.9.79 have no limit. */
+	const RATE_DEFAULT = 20;
+
+	/**
+	 * Whether $channel may send one more alert now, counting it if so
+	 * (2.9.79).
+	 *
+	 * A channel's 'rate' caps its alerts per RATE_WINDOW. Every alert is a
+	 * blocking email or HTTP call made inside the request that logged the
+	 * event, so with grouping off -- or simply many different events at
+	 * once -- a burst could send hundreds, slowing the site and burying the
+	 * inbox. Rate-limited, not blinded: the alert that goes over the limit
+	 * is replaced by one notice saying alerts are paused and until when,
+	 * the pause is logged (system.alerts_paused), and every event is still
+	 * in the log. Sending resumes by itself when the window ends.
+	 *
+	 * Counted in a transient keyed on where the channel sends to, so
+	 * reordering or editing the list doesn't reset or mix up counts. Two
+	 * requests racing can let an extra alert or two through; that's fine
+	 * for a flood guard.
+	 */
+	private static function within_rate( array $channel ): bool {
+		$rate = (int) ( $channel['rate'] ?? 0 );
+		if ( $rate <= 0 ) {
+			return true;
+		}
+
+		$target = 'slack' === ( $channel['type'] ?? 'email' ) ? ( $channel['webhook_url'] ?? '' ) : ( $channel['recipients'] ?? '' );
+		$key    = 'am_alert_rate_' . md5( ( $channel['type'] ?? 'email' ) . '|' . $target );
+		$now    = time();
+		$state  = get_transient( $key );
+		if ( ! is_array( $state ) || ! isset( $state['start'], $state['count'] ) || $now >= (int) $state['start'] + self::RATE_WINDOW ) {
+			$state = array( 'start' => $now, 'count' => 0 );
+		}
+
+		$count          = (int) $state['count'];
+		$state['count'] = $count + 1;
+		set_transient( $key, $state, max( 1, (int) $state['start'] + self::RATE_WINDOW - $now ) );
+
+		if ( $count < $rate ) {
+			return true;
+		}
+		if ( $count === $rate ) {
+			self::announce_pause( $channel, $rate, (int) $state['start'] + self::RATE_WINDOW );
+		}
+		return false;
+	}
+
+	/** Tells the channel, and the log, that its alerts are paused until $until. Once per window. */
+	private static function announce_pause( array $channel, int $rate, int $until ) {
+		$resumes = wp_date( AM_Date_Format::combined(), $until );
+		$minutes = (int) ( self::RATE_WINDOW / MINUTE_IN_SECONDS );
+		$message = sprintf(
+			/* translators: 1: number of alerts, 2: number of minutes, 3: date and time alerts resume */
+			__( 'Alerts on this channel are paused: it reached its limit of %1$d in %2$d minutes. Events are still being recorded in the Activity Log, and alerts resume at %3$s.', 'activity-monitor' ),
+			$rate,
+			$minutes,
+			$resumes
+		);
+
+		if ( 'slack' === ( $channel['type'] ?? 'email' ) ) {
+			self::send_slack( $channel, $message, '', '', 0 );
+		} else {
+			self::send_email( $channel, AM_Log_Levels::WARNING, 'system', 'alerts_paused', $message, array( 'ip_address' => '' ) );
+		}
+
+		$name = '' !== (string) ( $channel['name'] ?? '' )
+			? (string) $channel['name']
+			: ( 'slack' === ( $channel['type'] ?? 'email' ) ? __( 'Slack', 'activity-monitor' ) : __( 'Email', 'activity-monitor' ) );
+
+		// skip_notify: this row must not itself try to alert the channel
+		// that has just been paused (or any other).
+		AM_Event_Writer::log(
+			'system',
+			'alerts_paused',
+			sprintf(
+				/* translators: 1: channel name, 2: number of alerts, 3: number of minutes, 4: date and time alerts resume */
+				__( 'Alerts to the "%1$s" channel paused until %4$s: it reached its limit of %2$d in %3$d minutes.', 'activity-monitor' ),
+				$name,
+				$rate,
+				$minutes,
+				$resumes
+			),
+			array(
+				'level'       => AM_Log_Levels::WARNING,
+				'object_type' => 'notification',
+				'object_name' => $name,
+				'group'       => false,
+				'skip_notify' => true,
+			)
+		);
 	}
 
 	/**

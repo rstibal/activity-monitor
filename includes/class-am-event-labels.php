@@ -84,6 +84,7 @@ class AM_Event_Labels {
 		'site.reactivated'                       => 'Site Reactivated',
 		'site.made_public'                       => 'Site Made Public',
 		'site.made_private'                      => 'Site Made Private',
+		'system.alerts_paused'                   => 'Alerts Paused',
 		'system.export'                          => 'Content Exported',
 		'system.fatal_error'                     => 'PHP Fatal Error',
 		'system.file_edit_attempted'             => 'File Editor Used',

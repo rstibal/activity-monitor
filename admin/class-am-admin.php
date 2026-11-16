@@ -547,6 +547,12 @@ class AM_Admin {
 			$types = array();
 		}
 
+		// Alerts allowed per AM_Notifications::RATE_WINDOW; 0 = no limit.
+		$rate = absint( $ch['rate'] ?? 0 );
+		if ( ! in_array( $rate, AM_Notifications::RATE_CHOICES, true ) ) {
+			$rate = 0;
+		}
+
 		if ( 'slack' === $type ) {
 			$webhook_url = esc_url_raw( trim( $ch['webhook_url'] ?? '' ) );
 			// Slack incoming webhooks are always posted to
@@ -566,6 +572,7 @@ class AM_Admin {
 				'name'        => $name,
 				'level'       => $level,
 				'types'       => $types,
+				'rate'        => $rate,
 				'webhook_url' => $webhook_url,
 			);
 		}
@@ -577,6 +584,7 @@ class AM_Admin {
 			'name'       => $name,
 			'level'      => $level,
 			'types'      => $types,
+			'rate'       => $rate,
 			'recipients' => implode( ', ', array_filter( $emails, 'is_email' ) ),
 		);
 	}
@@ -1189,6 +1197,7 @@ class AM_Admin {
 			'type'        => sanitize_key( wp_unslash( $_POST['type'] ?? '' ) ),
 			'name'        => wp_unslash( $_POST['name'] ?? '' ),
 			'level'       => wp_unslash( $_POST['level'] ?? '' ),
+			'rate'        => absint( $_POST['rate'] ?? 0 ),
 			'types'       => isset( $_POST['types'] ) && is_array( $_POST['types'] ) ? wp_unslash( $_POST['types'] ) : array(), // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- each entry is whitelisted in sanitize_one_channel().
 			'recipients'  => wp_unslash( $_POST['recipients'] ?? '' ),
 			'webhook_url' => wp_unslash( $_POST['webhook_url'] ?? '' ),
@@ -3148,6 +3157,33 @@ class AM_Admin {
 								</option>
 							<?php endforeach; ?>
 						</select>
+					</label>
+				</div>
+
+				<?php
+				// A new channel starts with a limit; one saved before the
+				// limit existed (no 'rate' key) keeps sending without one.
+				$rate    = null === $index ? AM_Notifications::RATE_DEFAULT : (int) ( $ch['rate'] ?? 0 );
+				$minutes = (int) ( AM_Notifications::RATE_WINDOW / MINUTE_IN_SECONDS );
+				?>
+				<div class="am-field-row am-field-full">
+					<label>
+						<?php esc_html_e( 'Alert Limit', 'activity-monitor' ); ?>
+						<select name="rate">
+							<?php foreach ( AM_Notifications::RATE_CHOICES as $choice ) : ?>
+								<option value="<?php echo esc_attr( $choice ); ?>" <?php selected( $rate, $choice ); ?>>
+									<?php
+									if ( 0 === $choice ) {
+										esc_html_e( 'No limit', 'activity-monitor' );
+									} else {
+										/* translators: 1: number of alerts, 2: number of minutes */
+										printf( esc_html__( 'At most %1$d alerts every %2$d minutes', 'activity-monitor' ), (int) $choice, (int) $minutes );
+									}
+									?>
+								</option>
+							<?php endforeach; ?>
+						</select>
+						<p class="description"><?php esc_html_e( 'Past the limit, this channel gets one message saying alerts are paused and when they resume. Nothing is lost: every event is still recorded in the log.', 'activity-monitor' ); ?></p>
 					</label>
 				</div>
 
