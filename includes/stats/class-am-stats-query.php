@@ -5,7 +5,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  * AM_Stats_Query — read-side query layer for the stats admin screen.
  * Plain $wpdb queries against the three am_stats_* tables, matching the
  * style of AM_Event_Query (no ORM). Every method takes a $days window
- * (calendar days back from now, UTC) rather than arbitrary date filters --
+ * (whole days in the site's timezone, ending today) rather than arbitrary date filters --
  * the stats screen only ever needs a handful of fixed ranges.
  */
 class AM_Stats_Query {
@@ -164,7 +164,17 @@ class AM_Stats_Query {
 		return array( 'items' => $items, 'total' => $total );
 	}
 
+	/**
+	 * Start of the range as the UTC the date column stores: the site's local
+	 * midnight $days - 1 days ago, so "Today" is today and "Last 7 days" is
+	 * today plus the six before it. Through 2.9.61 it was a rolling
+	 * $days x 24 hours back from now, so "Today" reached into yesterday.
+	 */
 	private static function since( int $days ): string {
-		return gmdate( 'Y-m-d H:i:s', time() - ( $days * DAY_IN_SECONDS ) );
+		$start = new DateTimeImmutable( 'today', wp_timezone() );
+		if ( $days > 1 ) {
+			$start = $start->modify( '-' . ( $days - 1 ) . ' days' );
+		}
+		return gmdate( 'Y-m-d H:i:s', $start->getTimestamp() );
 	}
 }

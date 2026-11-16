@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, event log
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.9.61
+Stable tag: 2.9.62
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -75,6 +75,9 @@ Yes. Settings → Privacy offers full addresses, anonymised addresses (the last 
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
 
 == Changelog ==
+
+= 2.9.62 =
+* Fixed: Visitor Stats ranges were a rolling number of hours back from now, so "Today" included yesterday afternoon. Ranges are now whole days in the site's timezone: "Today" is today, "Last 7 days" is today and the six days before it.
 
 = 2.9.61 =
 * Fixed: the Changes section of an event's details showed only the first 20 words of the old and new value, with HTML stripped. An edit further into a post, or one that only added markup (a script tag, for instance), showed two identical values. Short values are now shown whole, and a long one shows the part that actually changed, with a little of the unchanged text around it.
