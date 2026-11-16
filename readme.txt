@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, event log
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.9.75
+Stable tag: 2.9.76
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -75,6 +75,9 @@ Yes. Settings → Privacy offers full addresses, anonymised addresses (the last 
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
 
 == Changelog ==
+
+= 2.9.76 =
+* Improved: the Activity Log loads faster on a large log. The list behind the Type filter was rebuilt by reading the whole log on every page view, filter and page turn; it is now remembered and only rebuilt when a new kind of event is logged or the log is cleared or trimmed.
 
 = 2.9.75 =
 * Improved: exports are written a few hundred entries at a time instead of loading the whole log into memory first, which made a large log fail to export. Every format now includes each entry's ID, user ID and object ID, and gives the full message where the log had shortened it. CSV and JSON also include a context column with the before and after values shown under Changes. Note for anything reading these files: the columns have changed (id is now first), and entries are ordered newest first by ID.

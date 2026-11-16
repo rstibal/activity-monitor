@@ -160,6 +160,11 @@ class AM_Event_Writer {
 		$wpdb->insert( $events_table, $row );
 		$event_id = $wpdb->insert_id;
 
+		if ( $event_id ) {
+			// Keeps the Activity Log's cached Type list complete.
+			AM_Event_Query::note_type_action( $row['event_type'], $row['action'] );
+		}
+
 		if ( $event_id && ! empty( $args['context'] ) ) {
 			self::write_context( $event_id, $args['context'] );
 		}

@@ -343,14 +343,50 @@ class AM_Event_Query {
 	 * @return array<array{event_type:string, action:string}>
 	 */
 	public static function get_event_type_actions(): array {
+		$cached = get_transient( self::TYPE_ACTIONS_TRANSIENT );
+		if ( is_array( $cached ) ) {
+			return $cached;
+		}
+
 		global $wpdb;
 		$table = $wpdb->prefix . AM_Schema::EVENTS_TABLE;
-		return $wpdb->get_results(
+		$pairs = (array) $wpdb->get_results(
 			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant.
 			"SELECT DISTINCT event_type, action FROM `{$table}`
 			 ORDER BY event_type ASC, action ASC",
 			ARRAY_A
 		);
+		set_transient( self::TYPE_ACTIONS_TRANSIENT, $pairs, DAY_IN_SECONDS );
+		return $pairs;
+	}
+
+	/**
+	 * Cache of get_event_type_actions(). That query reads the whole table
+	 * (there is no index it can answer from), and it ran on every render of
+	 * the log, AJAX refreshes included. The list only changes when a pair is
+	 * logged for the first time or its last row is deleted, so it is kept
+	 * until one of those happens: AM_Event_Writer reports each new row to
+	 * note_type_action(), and clearing or pruning the log calls
+	 * forget_type_actions(). The day's expiry is only a backstop.
+	 */
+	const TYPE_ACTIONS_TRANSIENT = 'am_type_actions';
+
+	/** Drops the cached list if $event_type + $action isn't in it yet. */
+	public static function note_type_action( string $event_type, string $action ) {
+		$cached = get_transient( self::TYPE_ACTIONS_TRANSIENT );
+		if ( ! is_array( $cached ) ) {
+			return; // Nothing cached; the next read rebuilds it.
+		}
+		foreach ( $cached as $pair ) {
+			if ( is_array( $pair ) && ( $pair['event_type'] ?? null ) === $event_type && ( $pair['action'] ?? null ) === $action ) {
+				return;
+			}
+		}
+		delete_transient( self::TYPE_ACTIONS_TRANSIENT );
+	}
+
+	public static function forget_type_actions() {
+		delete_transient( self::TYPE_ACTIONS_TRANSIENT );
 	}
 
 	/** Row count in am_events — used to distinguish "no events yet" from "no v2.0 loggers active yet". */

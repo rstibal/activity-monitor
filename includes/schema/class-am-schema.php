@@ -218,6 +218,7 @@ class AM_Schema {
 			$wpdb->query( "DROP TABLE IF EXISTS `{$wpdb->prefix}{$table}`" );
 		}
 		self::drop_legacy_table();
+		delete_transient( 'am_type_actions' );
 		delete_option( self::DB_VERSION_OPTION );
 		delete_option( 'am_v1_migrated' );
 	}
@@ -236,6 +237,7 @@ class AM_Schema {
 			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a plugin constant.
 			$wpdb->query( "TRUNCATE TABLE `{$wpdb->prefix}{$table}`" );
 		}
+		delete_transient( 'am_type_actions' ); // AM_Event_Query::TYPE_ACTIONS_TRANSIENT; that class isn't loaded on uninstall.
 	}
 
 	/**
@@ -272,5 +274,8 @@ class AM_Schema {
 			$retention_days
 		) );
 		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+
+		// A type whose last rows just aged out should leave the Type filter.
+		delete_transient( 'am_type_actions' );
 	}
 }

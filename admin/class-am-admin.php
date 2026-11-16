@@ -1627,7 +1627,8 @@ class AM_Admin {
 		);
 		?>
 
-		<?php if ( 0 === AM_Event_Query::total_count() ) : ?>
+		<?php $log_is_empty = 0 === AM_Event_Query::total_count(); ?>
+		<?php if ( $log_is_empty ) : ?>
 			<div class="notice notice-info inline">
 				<p>
 					<?php esc_html_e( 'No activity recorded yet. Try editing a post, logging in, or changing a setting, then check back here.', 'activity-monitor' ); ?>
@@ -1671,7 +1672,7 @@ class AM_Admin {
 		<?php
 		// Inside #am-log-app, so every AJAX refresh redraws it with the
 		// table. Same filter args as get_events(); see AM_Timeline.
-		if ( AM_Event_Query::total_count() > 0 ) {
+		if ( ! $log_is_empty ) {
 			AM_Timeline::render( compact( 'level', 'initiator', 'event_type', 'action', 'user_id', 'date_from', 'date_to', 'search' ) );
 		}
 		?>
