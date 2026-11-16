@@ -711,7 +711,7 @@ class AM_Admin {
 		?>
 		<table class="am-detail-table">
 			<tr><th><?php esc_html_e( 'ID', 'activity-monitor' ); ?></th><td><?php echo esc_html( $row->id ); ?></td></tr>
-			<tr><th><?php esc_html_e( 'Date / Time', 'activity-monitor' ); ?></th><td><?php echo esc_html( $row->date ); ?> UTC</td></tr>
+			<tr><th><?php esc_html_e( 'Date / Time', 'activity-monitor' ); ?></th><td><?php echo esc_html( wp_date( AM_Date_Format::combined(), strtotime( $row->date . ' UTC' ) ) ); ?> <span class="am-diff-context">(<?php echo esc_html( $row->date ); ?> UTC)</span></td></tr>
 			<tr>
 				<th><?php esc_html_e( 'Level', 'activity-monitor' ); ?></th>
 				<td><span class="am-badge am-<?php echo esc_attr( $row->level ); ?>"><?php echo esc_html( AM_Log_Levels::label( $row->level ) ); ?></span></td>

@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, event log
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.9.64
+Stable tag: 2.9.65
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -75,6 +75,9 @@ Yes. Settings → Privacy offers full addresses, anonymised addresses (the last 
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
 
 == Changelog ==
+
+= 2.9.65 =
+* Improved: an event's details now show its time in the site's timezone and chosen format, the same as the table, with the UTC time beside it. It used to show UTC only.
 
 = 2.9.64 =
 * Improved: an entry that stands for several repeats now shows its count (for example x12) at the start of its message in the Activity Log. The count used to appear only after opening Details.
