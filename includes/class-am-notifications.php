@@ -104,8 +104,11 @@ class AM_Notifications {
 		$body .= sprintf( __( 'Level:        %s', 'activity-monitor' ), $safe_label ) . "\n";
 		/* translators: %s: event type and action, e.g. "post.updated" */
 		$body .= sprintf( __( 'Event:        %s', 'activity-monitor' ), $safe_type ) . "\n";
-		/* translators: %s: date and time in UTC */
-		$body .= sprintf( __( 'Time:         %s (UTC)', 'activity-monitor' ), gmdate( 'Y-m-d H:i:s' ) ) . "\n";
+		// Site time first, in the format the log itself uses, so the email
+		// and the row it points at read the same; UTC kept alongside.
+		$now   = time();
+		/* translators: 1: date and time in the site's timezone, 2: the same moment in UTC */
+		$body .= sprintf( __( 'Time:         %1$s (%2$s UTC)', 'activity-monitor' ), wp_date( AM_Date_Format::combined(), $now ), gmdate( 'Y-m-d H:i:s', $now ) ) . "\n";
 		/* translators: %s: WordPress username */
 		$body .= sprintf( __( 'User:         %s', 'activity-monitor' ), $safe_user ) . "\n";
 		/* translators: %s: IP address */
@@ -117,8 +120,16 @@ class AM_Notifications {
 		/* translators: %s: the event's human-readable log message */
 		$body .= "\n" . sprintf( __( "Message:\n%s", 'activity-monitor' ), $safe_message ) . "\n\n";
 		$body .= str_repeat( '─', 50 ) . "\n";
+		// Straight to this event, the same deep link the Slack alert carries
+		// (admin.js opens its Details on arrival), then the log as a whole.
+		$log_url  = admin_url( 'admin.php?page=' . AM_Admin::PAGE_LOG );
+		$event_id = (int) ( $args['event_id'] ?? 0 );
+		if ( $event_id > 0 ) {
+			/* translators: %s: URL that opens this event in the activity log */
+			$body .= sprintf( __( 'View this event: %s', 'activity-monitor' ), add_query_arg( 'am_event_id', $event_id, $log_url ) ) . "\n";
+		}
 		/* translators: %s: URL to the full activity log */
-		$body .= sprintf( __( 'View full log: %s', 'activity-monitor' ), admin_url( 'admin.php?page=activity-monitor' ) ) . "\n";
+		$body .= sprintf( __( 'View full log: %s', 'activity-monitor' ), $log_url ) . "\n";
 
 		$sent = wp_mail( $recipients, $subject, $body );
 
