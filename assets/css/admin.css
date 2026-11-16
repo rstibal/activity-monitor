@@ -646,6 +646,12 @@ body.wp-core-ui .am-wrap .tablenav select { font-size: 12px; }
 .am-ip-cell { max-width: 16ch; overflow: hidden; text-overflow: ellipsis; }
 .am-ip-lookup { color: var( --am-accent ); }
 
+/* How many times a grouped row was recorded, ahead of its message. */
+.am-repeat {
+	font-family: "IBM Plex Mono", monospace; font-weight: 600;
+	color: var( --am-ink ); background: var( --am-surface-2 );
+	border: 1px solid var( --am-border ); border-radius: 3px; padding: 0 4px;
+}
 .am-log-message-clamp {
 	display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
 	overflow: hidden; white-space: normal;

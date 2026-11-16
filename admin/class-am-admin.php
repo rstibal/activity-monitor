@@ -167,7 +167,16 @@ class AM_Admin {
 				<?php endif; ?>
 			</td>
 			<td class="am-ip-cell" title="<?php echo esc_attr( $row->ip_address ); ?>"><?php echo self::ip_cell_html( (string) $row->ip_address ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped per-part in ip_cell_html(). ?></td>
-			<td class="am-log-message-cell" title="<?php echo esc_attr( $row->message ); ?>"><span class="am-log-message-clamp"><?php echo esc_html( $row->message ); ?></span></td>
+			<td class="am-log-message-cell" title="<?php echo esc_attr( $row->message ); ?>"><span class="am-log-message-clamp"><?php
+				// A grouped row's count, in the row itself: without it 4,000
+				// failed logins and one read the same until Details is opened.
+				if ( (int) $row->repeat_count > 1 ) {
+					/* translators: %s: number of times this event was recorded */
+					$repeat_title = sprintf( __( 'Recorded %s times; the date is the most recent.', 'activity-monitor' ), number_format_i18n( (int) $row->repeat_count ) );
+					echo '<span class="am-repeat" title="' . esc_attr( $repeat_title ) . '">&times;' . esc_html( number_format_i18n( (int) $row->repeat_count ) ) . '</span> ';
+				}
+				echo esc_html( $row->message );
+				?></span></td>
 			<td>
 				<?php
 				// type="button" is required, not cosmetic: this row sits
