@@ -2,10 +2,28 @@
 (function ($) {
 	'use strict';
 
+	/* The shared modal is a real dialog to assistive tech and the keyboard
+	   (role/aria-modal are on the markup, see render_screen_close()): focus
+	   moves into it on open, Tab stays inside it (handler further down), and
+	   on close focus goes back to whatever opened it. A modal opened from
+	   inside the modal (a username in Event Details) keeps the original
+	   opener as the place to return to. */
+	var amModalReturnFocus = null;
+
 	function openModal(title) {
+		var $overlay = $('#am-modal-overlay');
+		if (!$overlay.is(':visible')) amModalReturnFocus = document.activeElement;
 		$('#am-modal-title').text(title || 'Details');
-		$('#am-modal-overlay').show();
+		$overlay.show();
 		$('#am-modal-body').html('<p class="am-loading">Loading…</p>');
+		$overlay.find('.am-modal').trigger('focus');
+	}
+
+	function closeModal() {
+		$('#am-modal-overlay').hide();
+		// The opener may be gone: a table refresh replaces its rows.
+		if (amModalReturnFocus && document.body.contains(amModalReturnFocus)) amModalReturnFocus.focus();
+		amModalReturnFocus = null;
 	}
 
 	/* Reads am_events via the am_get_v2_event_detail AJAX action. Name kept
@@ -104,9 +122,30 @@
 		.fail(function () { $('#am-modal-body').html('<p>Request failed.</p>'); });
 	});
 
-	$('#am-modal-close').on('click', function () { $('#am-modal-overlay').hide(); });
-	$('#am-modal-overlay').on('click', function (e) { if (e.target === this) $(this).hide(); });
-	$(document).on('keydown', function (e) { if (e.key === 'Escape') $('#am-modal-overlay').hide(); });
+	$('#am-modal-close').on('click', closeModal);
+	$('#am-modal-overlay').on('click', function (e) { if (e.target === this) closeModal(); });
+	$(document).on('keydown', function (e) {
+		if (e.key === 'Escape' && $('#am-modal-overlay').is(':visible')) closeModal();
+	});
+
+	/* Keeps Tab inside the open modal: off the last control wraps to the
+	   first, and Shift+Tab off the first (or off the dialog itself, where
+	   focus sits right after opening) wraps to the last. */
+	$('#am-modal-overlay').on('keydown', function (e) {
+		if (e.key !== 'Tab') return;
+		var dialog = $(this).find('.am-modal')[0];
+		var $stops = $(this).find('a[href], button:not([disabled]), input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled])').filter(':visible');
+		if (!$stops.length) { e.preventDefault(); return; }
+		var first = $stops[0];
+		var last  = $stops[$stops.length - 1];
+		if (e.shiftKey && (document.activeElement === first || document.activeElement === dialog)) {
+			e.preventDefault();
+			last.focus();
+		} else if (!e.shiftKey && document.activeElement === last) {
+			e.preventDefault();
+			first.focus();
+		}
+	});
 
 	/* Notification channel management (Settings > Alerts & Reports).
 	   Add/Edit both open the shared modal, fetching its form HTML from
@@ -170,7 +209,7 @@
 		$.post(amData.ajaxUrl, $form.serialize() + '&action=am_save_channel&nonce=' + amData.nonce)
 		.done(function (r) {
 			if (r.success) {
-				$('#am-modal-overlay').hide();
+				closeModal();
 				refreshChannelsTable(r.data.html, false);
 			} else {
 				$err.text((r.data && r.data.message) ? r.data.message : 'Could not save. Check the values and try again.').show();
@@ -188,7 +227,7 @@
 		$.post(amData.ajaxUrl, { action: 'am_delete_channel', index: index, nonce: amData.nonce })
 		.done(function (r) {
 			if (r.success) {
-				$('#am-modal-overlay').hide();
+				closeModal();
 				refreshChannelsTable(r.data.html, r.data.empty);
 			}
 		})

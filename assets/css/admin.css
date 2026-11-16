@@ -769,6 +769,8 @@ body.wp-core-ui .am-wrap .tablenav select { font-size: 12px; }
    the dark surface. Set explicitly here instead of relying on inheritance
    from a scope this markup isn't inside. */
 .am-modal { background: var( --am-surface ); color: var( --am-ink ); border-radius: 6px; box-shadow: 0 8px 40px rgba(0,0,0,.35); width: 660px; max-width: 95vw; max-height: 85vh; display: flex; flex-direction: column; }
+/* Focus lands on the dialog itself when it opens; it isn't a control, so no ring. */
+.am-modal:focus { outline: none; }
 .am-modal-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var( --am-border ); }
 /* Core's own h2 rule sets an explicit color, which beats the inherited
    var(--am-ink) from .am-modal above -- inheritance has no specificity, so

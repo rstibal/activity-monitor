@@ -1385,10 +1385,11 @@ class AM_Admin {
 
 		<!-- Shared modal overlay: one per screen, reused by every modal. -->
 		<div id="am-modal-overlay" class="am-modal-overlay" style="display:none;">
-			<div class="am-modal">
+			<?php // tabindex="-1": admin.js moves focus onto the dialog when it opens. ?>
+			<div class="am-modal" role="dialog" aria-modal="true" aria-labelledby="am-modal-title" tabindex="-1">
 				<div class="am-modal-header">
 					<h2 id="am-modal-title"><?php esc_html_e( 'Details', 'activity-monitor' ); ?></h2>
-					<button type="button" class="am-modal-close" id="am-modal-close">&times;</button>
+					<button type="button" class="am-modal-close" id="am-modal-close" aria-label="<?php esc_attr_e( 'Close', 'activity-monitor' ); ?>"><span aria-hidden="true">&times;</span></button>
 				</div>
 				<div class="am-modal-body" id="am-modal-body">
 					<p class="am-loading"><?php esc_html_e( 'Loading…', 'activity-monitor' ); ?></p>
