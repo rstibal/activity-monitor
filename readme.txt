@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, event log
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.9.65
+Stable tag: 2.9.66
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -75,6 +75,9 @@ Yes. Settings → Privacy offers full addresses, anonymised addresses (the last 
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
 
 == Changelog ==
+
+= 2.9.66 =
+* Fixed: on the Activity Log and Visitor Stats, clicking a filter, a page number or Back did nothing at all if the screen had been left open for a day or the request failed. Those clicks now load the page normally instead. The table also dims while it is updating, and a slow answer can no longer overwrite a newer one.
 
 = 2.9.65 =
 * Improved: an event's details now show its time in the site's timezone and chosen format, the same as the table, with the UTC time beside it. It used to show UTC only.

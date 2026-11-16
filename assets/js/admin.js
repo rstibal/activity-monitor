@@ -216,24 +216,49 @@
 		window.history.pushState({ amQs: qs }, '', window.location.pathname + '?' + qs);
 	}
 
-	function amRefreshLog(qs, pushUrl) {
-		$.post(amData.ajaxUrl, { action: 'am_log_table', qs: qs, nonce: amData.nonce })
-		.done(function (r) {
-			if (r.success) {
-				$('#am-log-app').html(r.data.html);
-				if (pushUrl) amPushState(qs);
+	/* One refresh of either container. Three things it does beyond the swap:
+	   - am-busy dims the container and blocks clicks until the answer is in
+	     (see admin.css), so a click visibly did something.
+	   - Anything short of a rendered result falls back to loading the same
+	     URL as an ordinary page. That covers a tab left open past its nonce's
+	     lifetime, a session that has ended (the page load lands on the login
+	     screen), and a failed request -- all of which used to leave the click
+	     doing nothing at all, silently.
+	   - A reply that a later click has already overtaken is dropped, so a
+	     slow first answer can't overwrite the second. */
+	var amRefreshSeq = {};
+
+	function amRefresh(action, selector, qs, pushUrl) {
+		var $box = $(selector).addClass('am-busy').attr('aria-busy', 'true');
+		var seq  = amRefreshSeq[action] = (amRefreshSeq[action] || 0) + 1;
+
+		function fallBack() {
+			if (seq !== amRefreshSeq[action]) return;
+			// From a link or form: go where it pointed. From back/forward:
+			// the address bar already holds the target, so reload it.
+			if (pushUrl) {
+				window.location.assign(window.location.pathname + '?' + qs);
+			} else {
+				window.location.reload();
 			}
-		});
+		}
+
+		$.post(amData.ajaxUrl, { action: action, qs: qs, nonce: amData.nonce })
+		.done(function (r) {
+			if (seq !== amRefreshSeq[action]) return;
+			if (!r || !r.success || !r.data) { fallBack(); return; }
+			$box.html(r.data.html).removeClass('am-busy').removeAttr('aria-busy');
+			if (pushUrl) amPushState(qs);
+		})
+		.fail(fallBack);
+	}
+
+	function amRefreshLog(qs, pushUrl) {
+		amRefresh('am_log_table', '#am-log-app', qs, pushUrl);
 	}
 
 	function amRefreshStats(qs, pushUrl) {
-		$.post(amData.ajaxUrl, { action: 'am_stats_content', qs: qs, nonce: amData.nonce })
-		.done(function (r) {
-			if (r.success) {
-				$('#am-stats-content').html(r.data.html);
-				if (pushUrl) amPushState(qs);
-			}
-		});
+		amRefresh('am_stats_content', '#am-stats-content', qs, pushUrl);
 	}
 
 	/* Level filter links, pagination links (top and bottom tablenav), the

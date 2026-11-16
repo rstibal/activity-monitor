@@ -646,6 +646,12 @@ body.wp-core-ui .am-wrap .tablenav select { font-size: 12px; }
 .am-ip-cell { max-width: 16ch; overflow: hidden; text-overflow: ellipsis; }
 .am-ip-lookup { color: var( --am-accent ); }
 
+/* While an AJAX refresh is in flight (admin.js amRefresh()). The short delay
+   keeps a fast answer from flickering. */
+#am-log-app.am-busy, #am-stats-content.am-busy {
+	opacity: .55; pointer-events: none; transition: opacity .15s linear .12s;
+}
+
 /* How many times a grouped row was recorded, ahead of its message. */
 .am-repeat {
 	font-family: "IBM Plex Mono", monospace; font-weight: 600;
