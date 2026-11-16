@@ -46,6 +46,13 @@ class AM_Notifications {
 				continue;
 			}
 
+			// An empty list (and any channel saved before 2.9.78) means
+			// every type.
+			$types = isset( $channel['types'] ) && is_array( $channel['types'] ) ? $channel['types'] : array();
+			if ( $types && ! in_array( $event_type, $types, true ) ) {
+				continue;
+			}
+
 			$type = $channel['type'] ?? 'email';
 			if ( 'slack' === $type ) {
 				$user_login = (string) ( $args['user_login'] ?? '' );
@@ -55,6 +62,24 @@ class AM_Notifications {
 				self::send_email( $channel, $level, $event_type, $action, $message, $args );
 			}
 		}
+	}
+
+	/**
+	 * Event types a channel can be limited to, slug => label (2.9.78).
+	 *
+	 * AM_Event_Labels::TYPE_MAP, less 'session' (nothing logs it any more),
+	 * plus 'log' -- the log being cleared or exported -- which that map
+	 * leaves out on purpose (see CLAUDE.md on why) but which is exactly the
+	 * kind of event someone wants an alert for.
+	 *
+	 * @return array<string,string>
+	 */
+	public static function type_choices(): array {
+		$choices = AM_Event_Labels::TYPE_MAP;
+		unset( $choices['session'] );
+		$choices['log'] = __( 'Activity Log', 'activity-monitor' );
+		asort( $choices );
+		return $choices;
 	}
 
 	/**

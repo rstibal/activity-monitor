@@ -532,6 +532,21 @@ class AM_Admin {
 
 		$name = sanitize_text_field( $ch['name'] ?? '' );
 
+		// Which event types this channel hears about; empty means all of
+		// them. Every box ticked is stored as empty too, so a type added in
+		// a later version isn't silently left out of an "everything" channel.
+		$choices = array_keys( AM_Notifications::type_choices() );
+		$types   = array();
+		foreach ( (array) ( $ch['types'] ?? array() ) as $picked ) {
+			if ( is_string( $picked ) && in_array( sanitize_key( $picked ), $choices, true ) ) {
+				$types[] = sanitize_key( $picked );
+			}
+		}
+		$types = array_values( array_unique( $types ) );
+		if ( count( $types ) === count( $choices ) ) {
+			$types = array();
+		}
+
 		if ( 'slack' === $type ) {
 			$webhook_url = esc_url_raw( trim( $ch['webhook_url'] ?? '' ) );
 			// Slack incoming webhooks are always posted to
@@ -550,6 +565,7 @@ class AM_Admin {
 				'type'        => 'slack',
 				'name'        => $name,
 				'level'       => $level,
+				'types'       => $types,
 				'webhook_url' => $webhook_url,
 			);
 		}
@@ -560,6 +576,7 @@ class AM_Admin {
 			'type'       => 'email',
 			'name'       => $name,
 			'level'      => $level,
+			'types'      => $types,
 			'recipients' => implode( ', ', array_filter( $emails, 'is_email' ) ),
 		);
 	}
@@ -1172,6 +1189,7 @@ class AM_Admin {
 			'type'        => sanitize_key( wp_unslash( $_POST['type'] ?? '' ) ),
 			'name'        => wp_unslash( $_POST['name'] ?? '' ),
 			'level'       => wp_unslash( $_POST['level'] ?? '' ),
+			'types'       => isset( $_POST['types'] ) && is_array( $_POST['types'] ) ? wp_unslash( $_POST['types'] ) : array(), // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- each entry is whitelisted in sanitize_one_channel().
 			'recipients'  => wp_unslash( $_POST['recipients'] ?? '' ),
 			'webhook_url' => wp_unslash( $_POST['webhook_url'] ?? '' ),
 		);
@@ -2998,6 +3016,7 @@ class AM_Admin {
 							<th scope="col"><?php esc_html_e( 'Type', 'activity-monitor' ); ?></th>
 							<th scope="col"><?php esc_html_e( 'Name', 'activity-monitor' ); ?></th>
 							<th scope="col"><?php esc_html_e( 'Minimum Level', 'activity-monitor' ); ?></th>
+							<th scope="col"><?php esc_html_e( 'Event Types', 'activity-monitor' ); ?></th>
 							<th scope="col"><?php esc_html_e( 'Target', 'activity-monitor' ); ?></th>
 							<th scope="col"><?php esc_html_e( 'Actions', 'activity-monitor' ); ?></th>
 						</tr>
@@ -3052,6 +3071,14 @@ class AM_Admin {
 		if ( ! AM_Log_Levels::is_valid( $level ) ) {
 			$level = AM_Log_Levels::CRITICAL;
 		}
+		$type_choices = AM_Notifications::type_choices();
+		$type_labels  = array();
+		foreach ( (array) ( $ch['types'] ?? array() ) as $picked ) {
+			if ( is_string( $picked ) && isset( $type_choices[ $picked ] ) ) {
+				$type_labels[] = $type_choices[ $picked ];
+			}
+		}
+		$types_label = $type_labels ? implode( ', ', $type_labels ) : __( 'All', 'activity-monitor' );
 		$icon   = 'slack' === $type ? 'dashicons-format-chat' : 'dashicons-email-alt';
 		$target = 'slack' === $type
 			? __( 'Webhook configured', 'activity-monitor' )
@@ -3064,6 +3091,7 @@ class AM_Admin {
 			</td>
 			<td><?php echo esc_html( $name ?: '—' ); ?></td>
 			<td><span class="am-badge am-<?php echo esc_attr( $level ); ?>"><?php echo esc_html( AM_Log_Levels::label( $level ) ); ?></span></td>
+			<td><?php echo esc_html( $types_label ); ?></td>
 			<td class="am-message-cell" title="<?php echo esc_attr( $target ); ?>"><?php echo esc_html( $target ); ?></td>
 			<td>
 				<button type="button" class="button button-small am-edit-channel-btn" data-index="<?php echo esc_attr( $index ); ?>">
@@ -3122,6 +3150,20 @@ class AM_Admin {
 						</select>
 					</label>
 				</div>
+
+				<?php $picked_types = isset( $ch['types'] ) && is_array( $ch['types'] ) ? $ch['types'] : array(); ?>
+				<fieldset class="am-field-full am-channel-types">
+					<legend><?php esc_html_e( 'Event Types', 'activity-monitor' ); ?></legend>
+					<div class="am-type-grid">
+						<?php foreach ( AM_Notifications::type_choices() as $type_slug => $type_label ) : ?>
+							<label>
+								<input type="checkbox" name="types[]" value="<?php echo esc_attr( $type_slug ); ?>" <?php checked( in_array( $type_slug, $picked_types, true ) ); ?>>
+								<?php echo esc_html( $type_label ); ?>
+							</label>
+						<?php endforeach; ?>
+					</div>
+					<p class="description"><?php esc_html_e( 'Tick the types this channel should alert on. Leave them all unticked for every type.', 'activity-monitor' ); ?></p>
+				</fieldset>
 
 				<?php if ( 'slack' === $type ) : ?>
 					<div class="am-field-row am-field-full">

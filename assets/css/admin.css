@@ -823,6 +823,14 @@ body.wp-core-ui .am-wrap .tablenav select { font-size: 12px; }
 .am-channel-fields { padding: 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .am-field-row { display: flex; flex-direction: column; }
 .am-field-full { grid-column: 1 / -1; }
+/* The channel form's Event Types checkboxes. A fieldset, not an .am-field-row:
+   that row's label rule stacks a label over its control, wrong for a tick box. */
+.am-channel-types { border: 0; margin: 0; padding: 0; min-width: 0; }
+.am-channel-types legend { font-size: 12px; font-weight: 600; color: var( --am-ink ); padding: 0; margin-bottom: 4px; }
+.am-type-grid { display: grid; grid-template-columns: repeat( 3, 1fr ); gap: 4px 12px; }
+.am-type-grid label { font-size: 12px; color: var( --am-ink ); display: flex; align-items: center; gap: 6px; }
+.am-type-grid input[type="checkbox"] { margin: 0; }
+.am-channel-types .description { font-size: 11px !important; color: var( --am-muted ); margin: 6px 0 0 !important; }
 .am-field-row label { font-size: 12px; font-weight: 600; color: var( --am-ink ); display: flex; flex-direction: column; gap: 4px; }
 .am-field-row .description { font-size: 11px !important; color: var( --am-muted ); margin: 2px 0 0 !important; }
 
