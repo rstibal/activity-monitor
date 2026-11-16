@@ -462,7 +462,8 @@ can't shift a batch. Order is therefore by id, newest first. Columns gained
 where the column cut it; CSV and JSON add a `context` column (one
 `AM_Event_Query::get_contexts()` query per batch), HTML and TXT don't. The
 export logs itself as `log.exported` (WARNING) after the last batch, so the
-file never contains its own row. Checked in a stub harness, not on a site.
+file never contains its own row. Checked in a stub harness; Rob then
+confirmed it on a site after the v2.9.81 release.
 
 **The Type dropdown's list is cached (2.9.76)** in the `am_type_actions`
 transient. `SELECT DISTINCT event_type, action` has no index to answer from
