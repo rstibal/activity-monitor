@@ -244,6 +244,28 @@
 		.always(function () { $btn.prop('disabled', false); });
 	});
 
+	/* Send Test, in a saved channel's edit form: sends one alert through the
+	   channel as stored (see AM_Admin::ajax_test_channel()) and shows the
+	   outcome under the form. */
+	$(document).on('click', '#am-channel-test-btn', function () {
+		var $btn    = $(this).prop('disabled', true);
+		var $err    = $('#am-channel-modal-error').hide();
+		var $status = $('#am-channel-modal-status').text(L.sendingTest).show();
+
+		$.post(amData.ajaxUrl, { action: 'am_test_channel', index: $btn.data('index'), nonce: amData.nonce })
+		.done(function (r) {
+			var message = (r.data && r.data.message) ? r.data.message : L.error;
+			if (r.success) {
+				$status.text(message);
+			} else {
+				$status.hide();
+				$err.text(message).show();
+			}
+		})
+		.fail(function () { $status.hide(); $err.text(L.requestFailed).show(); })
+		.always(function () { $btn.prop('disabled', false); });
+	});
+
 	/* Activity Log and Visitor Stats: AJAX pagination/filtering, no page
 	   reload. Both screens follow the same qs-round-trip shape --
 	   render_log_content()/render_stats_content() build every link and

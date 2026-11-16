@@ -67,6 +67,7 @@ class AM_Admin {
 		add_action( 'wp_ajax_am_channel_form',                array( $instance, 'ajax_channel_form' ) );
 		add_action( 'wp_ajax_am_save_channel',                array( $instance, 'ajax_save_channel' ) );
 		add_action( 'wp_ajax_am_delete_channel',              array( $instance, 'ajax_delete_channel' ) );
+		add_action( 'wp_ajax_am_test_channel',                array( $instance, 'ajax_test_channel' ) );
 		add_action( 'wp_ajax_am_log_table',                   array( $instance, 'ajax_log_table' ) );
 		add_action( 'wp_ajax_am_stats_content',               array( $instance, 'ajax_stats_content' ) );
 		add_action( 'wp_ajax_am_save_theme',                  array( $instance, 'ajax_save_theme' ) );
@@ -225,6 +226,7 @@ class AM_Admin {
 				'requestFailed'        => __( 'Request failed.', 'activity-monitor' ),
 				'saveFailed'           => __( 'Could not save. Check the values and try again.', 'activity-monitor' ),
 				'confirmRemoveChannel' => __( 'Remove this notification channel?', 'activity-monitor' ),
+				'sendingTest'          => __( 'Sending…', 'activity-monitor' ),
 				'dark'                 => __( 'Dark', 'activity-monitor' ),
 				'light'                => __( 'Light', 'activity-monitor' ),
 			),
@@ -1249,6 +1251,37 @@ class AM_Admin {
 		wp_send_json_success( array(
 			'html'  => ob_get_clean(),
 			'empty' => empty( $channels ),
+		) );
+	}
+
+	/**
+	 * Sends a test alert through one saved channel (the channel form's Send
+	 * Test button) and reports what happened. Always the stored channel,
+	 * looked up by index: the form's unsaved edits aren't tested, and the
+	 * webhook never has to travel back from the page.
+	 */
+	public function ajax_test_channel() {
+		check_ajax_referer( 'am_ajax', 'nonce' );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( '-1' );
+		}
+
+		$index    = isset( $_POST['index'] ) && is_string( $_POST['index'] ) && ctype_digit( $_POST['index'] ) ? (int) $_POST['index'] : null;
+		$channels = get_option( 'am_notification_channels', array() );
+		if ( null === $index || ! is_array( $channels ) || ! isset( $channels[ $index ] ) || ! is_array( $channels[ $index ] ) ) {
+			wp_send_json_error( array( 'message' => __( 'That channel no longer exists. Reload the page and try again.', 'activity-monitor' ) ) );
+		}
+
+		$error = AM_Notifications::send_test( $channels[ $index ] );
+		if ( '' !== $error ) {
+			/* translators: %s: the reason the test alert could not be sent */
+			wp_send_json_error( array( 'message' => sprintf( __( 'The test alert failed: %s', 'activity-monitor' ), $error ) ) );
+		}
+
+		wp_send_json_success( array(
+			'message' => 'slack' === ( $channels[ $index ]['type'] ?? 'email' )
+				? __( 'Test alert sent. Slack accepted it, so it should be in the channel now.', 'activity-monitor' )
+				: __( 'Test alert sent. WordPress handed it to the mail system; check the inbox (and spam folder) to confirm it arrived.', 'activity-monitor' ),
 		) );
 	}
 
@@ -3129,12 +3162,18 @@ class AM_Admin {
 				<?php endif; ?>
 			</div>
 
-			<p id="am-channel-modal-error" class="am-modal-error" style="display:none;"></p>
+			<p id="am-channel-modal-error" class="am-modal-error" style="display:none;" role="alert"></p>
+			<p id="am-channel-modal-status" class="am-modal-status" style="display:none;" role="status"></p>
 
 			<div class="am-modal-actions">
 				<?php if ( null !== $index ) : ?>
 					<button type="button" class="button am-btn-danger" id="am-channel-delete-btn" data-index="<?php echo esc_attr( $index ); ?>">
 						<?php esc_html_e( 'Delete Channel', 'activity-monitor' ); ?>
+					</button>
+					<?php // Tests the channel as saved, not what is typed in the form. ?>
+					<button type="button" class="button am-channel-test-btn" id="am-channel-test-btn" data-index="<?php echo esc_attr( $index ); ?>"
+					        title="<?php esc_attr_e( 'Sends a test alert using this channel’s saved settings. Save first if you have changed them.', 'activity-monitor' ); ?>">
+						<?php esc_html_e( 'Send Test', 'activity-monitor' ); ?>
 					</button>
 				<?php endif; ?>
 				<button type="submit" class="button button-primary" id="am-channel-save-btn">

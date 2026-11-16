@@ -816,6 +816,9 @@ body.wp-core-ui .am-wrap .tablenav select { font-size: 12px; }
 
 .am-radio-description { margin: 0 0 10px 24px; color: var( --am-muted ); }
 .am-modal-error { color: var( --am-danger ); margin: 12px 0 0; }
+.am-modal-status { color: var( --am-accent ); margin: 12px 0 0; }
+/* Delete sits left, Send Test and Save right. */
+.am-modal-actions .am-channel-test-btn { margin-left: auto; margin-right: 8px; }
 
 .am-channel-fields { padding: 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .am-field-row { display: flex; flex-direction: column; }

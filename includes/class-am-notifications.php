@@ -71,11 +71,12 @@ class AM_Notifications {
 		return '' !== $display_name ? "{$display_name} ({$user_login})" : $user_login;
 	}
 
-	private static function send_email( array $channel, string $level, string $event_type, string $action, string $message, array $args ) {
+	/** @return string '' when the email was handed to the mail transport, otherwise why not. */
+	private static function send_email( array $channel, string $level, string $event_type, string $action, string $message, array $args ): string {
 		$raw_recipients = $channel['recipients'] ?? '';
 		$recipients     = array_filter( array_map( 'trim', explode( ',', $raw_recipients ) ) );
 		if ( empty( $recipients ) ) {
-			return;
+			return __( 'This channel has no recipients.', 'activity-monitor' );
 		}
 
 		$site    = get_bloginfo( 'name' );
@@ -143,7 +144,32 @@ class AM_Notifications {
 		if ( ! $sent ) {
 			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- best-effort fallback; wp_mail_failed is the primary record.
 			error_log( 'Activity Monitor: notification email to ' . $raw_recipients . ' failed to send.' );
+			return __( 'WordPress could not send the email. The reason is in the Activity Log, under Email Delivery Failed.', 'activity-monitor' );
 		}
+		return '';
+	}
+
+	/**
+	 * Sends one test alert through $channel, for the channel form's Send
+	 * Test button, and says how it went: '' on success, otherwise the
+	 * reason. Goes through the same send_email()/send_slack() a real alert
+	 * does, so a pass here means the real path works -- for email, as far as
+	 * "handed to the mail transport", which is all wp_mail() can ever say.
+	 */
+	public static function send_test( array $channel ): string {
+		$user    = wp_get_current_user();
+		$message = __( 'This is a test alert from Activity Monitor. If you can read it, this channel works.', 'activity-monitor' );
+
+		if ( 'slack' === ( $channel['type'] ?? 'email' ) ) {
+			return self::send_slack( $channel, $message, (string) $user->user_login, '', 0 );
+		}
+
+		$level = isset( $channel['level'] ) && AM_Log_Levels::is_valid( (string) $channel['level'] ) ? (string) $channel['level'] : AM_Log_Levels::CRITICAL;
+		return self::send_email( $channel, $level, 'system', 'test', $message, array(
+			'user_login'        => (string) $user->user_login,
+			'user_display_name' => (string) $user->display_name,
+			'ip_address'        => '',
+		) );
 	}
 
 	/**
@@ -187,10 +213,11 @@ class AM_Notifications {
 	 * "rstibal (rstibal)", and Rob wants this line uniform regardless of
 	 * whether a given user bothered to set a distinct display name.
 	 */
-	private static function send_slack( array $channel, string $message, string $user_login, string $ip, int $event_id ) {
+	/** @return string '' when Slack accepted the message, otherwise why not. */
+	private static function send_slack( array $channel, string $message, string $user_login, string $ip, int $event_id ): string {
 		$webhook_url = trim( $channel['webhook_url'] ?? '' );
 		if ( '' === $webhook_url ) {
-			return;
+			return __( 'This channel has no webhook URL.', 'activity-monitor' );
 		}
 
 		$domain = wp_strip_all_tags( (string) wp_parse_url( home_url(), PHP_URL_HOST ) );
@@ -199,7 +226,8 @@ class AM_Notifications {
 		$base   = rtrim( wp_strip_all_tags( (string) $message ), '.' );
 
 		$log_url = add_query_arg(
-			array( 'page' => AM_Admin::PAGE_LOG, 'am_event_id' => $event_id ),
+			// No event to open for a test alert (event 0): link to the log.
+			$event_id > 0 ? array( 'page' => AM_Admin::PAGE_LOG, 'am_event_id' => $event_id ) : array( 'page' => AM_Admin::PAGE_LOG ),
 			admin_url( 'admin.php' )
 		);
 		$domain_link = "<{$log_url}|{$domain}>";
@@ -230,13 +258,16 @@ class AM_Notifications {
 
 		if ( is_wp_error( $response ) ) {
 			self::log_slack_failure( $webhook_url, $response->get_error_message() );
-			return;
+			return $response->get_error_message();
 		}
 
 		$code = wp_remote_retrieve_response_code( $response );
 		if ( 200 !== (int) $code ) {
-			self::log_slack_failure( $webhook_url, 'HTTP ' . $code . ': ' . wp_remote_retrieve_body( $response ) );
+			$reason = 'HTTP ' . $code . ': ' . wp_strip_all_tags( (string) wp_remote_retrieve_body( $response ) );
+			self::log_slack_failure( $webhook_url, $reason );
+			return $reason;
 		}
+		return '';
 	}
 
 	/**
