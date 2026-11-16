@@ -29,7 +29,60 @@ class AM_Logger_Plugins extends AM_Logger_Base {
 	/** @var array<string,bool> Plugin file => whether its copy into place succeeded, this request. */
 	private $results = array();
 
+	/** @var array<string,string> Plugin file => the version it had before this request's update. */
+	private $old_versions = array();
+
+	/**
+	 * A plugin's name and version, read from its main file's header.
+	 *
+	 * Messages name the plugin this way ("Akismet Anti-spam 5.3") rather than
+	 * by its file ("akismet/akismet.php"), which stays as the row's
+	 * object_name: it is what identifies the plugin across renames and what
+	 * occasion grouping keys on. get_file_data() rather than
+	 * get_plugin_data(), which only exists once wp-admin's includes are
+	 * loaded. Falls back to the file path when the header can't be read.
+	 *
+	 * @return array{name:string, version:string}
+	 */
+	private static function header( string $plugin ): array {
+		$out  = array( 'name' => $plugin, 'version' => '' );
+		$file = WP_PLUGIN_DIR . '/' . $plugin;
+		if ( 0 !== validate_file( $plugin ) || ! is_file( $file ) || ! is_readable( $file ) ) {
+			return $out;
+		}
+
+		$data = get_file_data( $file, array( 'name' => 'Plugin Name', 'version' => 'Version' ), 'plugin' );
+		$name = trim( wp_strip_all_tags( (string) $data['name'] ) );
+		if ( '' !== $name ) {
+			$out['name'] = $name;
+		}
+		$out['version'] = trim( wp_strip_all_tags( (string) $data['version'] ) );
+		return $out;
+	}
+
+	/** "Name 1.2.3", or just the name when no version is known. */
+	private static function describe( string $plugin ): string {
+		$header = self::header( $plugin );
+		return '' !== $header['version'] ? $header['name'] . ' ' . $header['version'] : $header['name'];
+	}
+
+	/**
+	 * Notes the version about to be replaced, while the old files are still
+	 * there. A filter: $response goes back unchanged.
+	 *
+	 * @param mixed $response
+	 * @param mixed $hook_extra
+	 * @return mixed
+	 */
+	public function on_pre_install( $response, $hook_extra ) {
+		if ( is_array( $hook_extra ) && ! empty( $hook_extra['plugin'] ) && is_string( $hook_extra['plugin'] ) ) {
+			$this->old_versions[ $hook_extra['plugin'] ] = self::header( $hook_extra['plugin'] )['version'];
+		}
+		return $response;
+	}
+
 	public function register_hooks() {
+		add_filter( 'upgrader_pre_install', array( $this, 'on_pre_install' ), 10, 2 );
 		add_filter( 'upgrader_install_package_result', array( $this, 'on_install_package_result' ), 999, 2 );
 		add_action( 'activated_plugin', array( $this, 'on_plugin_activated' ) );
 		add_action( 'deactivated_plugin', array( $this, 'on_plugin_deactivated' ) );
@@ -60,9 +113,9 @@ class AM_Logger_Plugins extends AM_Logger_Base {
 			'plugin',
 			'activated',
 			sprintf(
-				/* translators: %s: plugin file path */
+				/* translators: %s: plugin name and version */
 				__( 'Plugin "%s" activated.', 'activity-monitor' ),
-				$plugin
+				self::describe( $plugin )
 			),
 			array(
 				'level'       => AM_Log_Levels::NOTICE,
@@ -77,9 +130,9 @@ class AM_Logger_Plugins extends AM_Logger_Base {
 			'plugin',
 			'deactivated',
 			sprintf(
-				/* translators: %s: plugin file path */
+				/* translators: %s: plugin name and version */
 				__( 'Plugin "%s" deactivated.', 'activity-monitor' ),
-				$plugin
+				self::describe( $plugin )
 			),
 			array(
 				'level'       => AM_Log_Levels::WARNING,
@@ -94,9 +147,9 @@ class AM_Logger_Plugins extends AM_Logger_Base {
 			'plugin',
 			'deleted',
 			sprintf(
-				/* translators: %s: plugin file path */
+				/* translators: %s: plugin name and version */
 				__( 'Plugin "%s" deleted.', 'activity-monitor' ),
-				$plugin
+				self::describe( $plugin )
 			),
 			array(
 				'level'       => AM_Log_Levels::WARNING,
@@ -134,9 +187,9 @@ class AM_Logger_Plugins extends AM_Logger_Base {
 				'plugin',
 				'installed',
 				sprintf(
-					/* translators: %s: plugin file path */
+					/* translators: %s: plugin name and version */
 					__( 'Plugin "%s" installed.', 'activity-monitor' ),
-					$plugin
+					self::describe( $plugin )
 				),
 				array(
 					'level'       => AM_Log_Levels::NOTICE,
@@ -174,18 +227,35 @@ class AM_Logger_Plugins extends AM_Logger_Base {
 			if ( ! is_string( $plugin ) || false === ( $this->results[ $plugin ] ?? true ) ) {
 				continue;
 			}
+			$header  = self::header( $plugin );
+			$old     = $this->old_versions[ $plugin ] ?? '';
+			$context = array();
+			if ( '' !== $old && '' !== $header['version'] && $old !== $header['version'] ) {
+				$message = sprintf(
+					/* translators: 1: plugin name, 2: old version, 3: new version */
+					__( 'Plugin "%1$s" updated from %2$s to %3$s.', 'activity-monitor' ),
+					$header['name'],
+					$old,
+					$header['version']
+				);
+				$context = array( 'diff' => array( 'version' => array( 'before' => $old, 'after' => $header['version'] ) ) );
+			} else {
+				$message = sprintf(
+					/* translators: %s: plugin name and version */
+					__( 'Plugin "%s" updated.', 'activity-monitor' ),
+					self::describe( $plugin )
+				);
+			}
+
 			$this->log(
 				'plugin',
 				'updated',
-				sprintf(
-					/* translators: %s: plugin file path */
-					__( 'Plugin "%s" updated.', 'activity-monitor' ),
-					$plugin
-				),
+				$message,
 				array(
 					'level'       => AM_Log_Levels::NOTICE,
 					'object_type' => 'plugin',
 					'object_name' => $plugin,
+					'context'     => $context,
 					'initiator'   => $is_auto_update ? AM_Initiator_Detector::AUTO_UPDATE : null,
 				)
 			);

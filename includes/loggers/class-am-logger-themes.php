@@ -42,7 +42,27 @@ class AM_Logger_Themes extends AM_Logger_Base {
 		return $result;
 	}
 
+	/** @var array<string,string> Theme slug => the version it had before this request's update. */
+	private $old_versions = array();
+
+	/**
+	 * Notes the version about to be replaced, while the old files are still
+	 * there. A filter: $response goes back unchanged.
+	 *
+	 * @param mixed $response
+	 * @param mixed $hook_extra
+	 * @return mixed
+	 */
+	public function on_pre_install( $response, $hook_extra ) {
+		if ( is_array( $hook_extra ) && ! empty( $hook_extra['theme'] ) && is_string( $hook_extra['theme'] ) ) {
+			$wp_theme = wp_get_theme( $hook_extra['theme'] );
+			$this->old_versions[ $hook_extra['theme'] ] = $wp_theme->exists() ? (string) $wp_theme->get( 'Version' ) : '';
+		}
+		return $response;
+	}
+
 	public function register_hooks() {
+		add_filter( 'upgrader_pre_install', array( $this, 'on_pre_install' ), 10, 2 );
 		add_filter( 'upgrader_install_package_result', array( $this, 'on_install_package_result' ), 999, 2 );
 		add_action( 'switch_theme', array( $this, 'on_theme_switch' ), 10, 3 );
 		add_action( 'customize_save_after', array( $this, 'on_customizer_save' ) );
@@ -169,18 +189,39 @@ class AM_Logger_Themes extends AM_Logger_Base {
 			if ( ! is_string( $theme ) || false === ( $this->results[ $theme ] ?? true ) ) {
 				continue;
 			}
+			// Core clears its theme cache before this action runs, so this
+			// reads the new files.
+			$wp_theme = wp_get_theme( $theme );
+			$name     = $wp_theme->exists() ? (string) $wp_theme->get( 'Name' ) : $theme;
+			$new      = $wp_theme->exists() ? (string) $wp_theme->get( 'Version' ) : '';
+			$old      = $this->old_versions[ $theme ] ?? '';
+			$context  = array();
+			if ( '' !== $old && '' !== $new && $old !== $new ) {
+				$message = sprintf(
+					/* translators: 1: theme name, 2: old version, 3: new version */
+					__( 'Theme "%1$s" updated from %2$s to %3$s.', 'activity-monitor' ),
+					$name,
+					$old,
+					$new
+				);
+				$context = array( 'diff' => array( 'version' => array( 'before' => $old, 'after' => $new ) ) );
+			} else {
+				$message = sprintf(
+					/* translators: %s: theme name and version */
+					__( 'Theme "%s" updated.', 'activity-monitor' ),
+					'' !== $new ? $name . ' ' . $new : $name
+				);
+			}
+
 			$this->log(
 				'theme',
 				'updated',
-				sprintf(
-					/* translators: %s: theme name */
-					__( 'Theme "%s" updated.', 'activity-monitor' ),
-					$theme
-				),
+				$message,
 				array(
 					'level'       => AM_Log_Levels::NOTICE,
 					'object_type' => 'theme',
 					'object_name' => $theme,
+					'context'     => $context,
 					'initiator'   => $is_auto_update ? AM_Initiator_Detector::AUTO_UPDATE : null,
 				)
 			);
