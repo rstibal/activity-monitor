@@ -60,7 +60,7 @@ class AM_Notifications {
 			$type = $channel['type'] ?? 'email';
 			if ( 'slack' === $type ) {
 				$user_login = (string) ( $args['user_login'] ?? '' );
-				$ip         = $args['ip_address'] ?? AM_DB_Legacy_IP::resolve();
+				$ip         = $args['ip_address'] ?? AM_Client_IP::resolve();
 				self::send_slack( $channel, $message, $user_login, (string) $ip, (int) ( $args['event_id'] ?? 0 ) );
 			} else {
 				self::send_email( $channel, $level, $event_type, $action, $message, $args );
@@ -210,7 +210,7 @@ class AM_Notifications {
 		$site    = get_bloginfo( 'name' );
 		$label   = AM_Log_Levels::label( $level );
 		$user    = self::format_user_label( $args['user_display_name'] ?? '', $args['user_login'] ?? '' ) ?: 'unknown';
-		$ip      = $args['ip_address'] ?? AM_DB_Legacy_IP::resolve();
+		$ip      = $args['ip_address'] ?? AM_Client_IP::resolve();
 		/* translators: 1: site name, 2: log level label, 3: event type, 4: event action */
 		$subject = sprintf( __( '[%1$s] Activity Monitor Alert – %2$s: %3$s.%4$s', 'activity-monitor' ), $site, $label, $event_type, $action );
 

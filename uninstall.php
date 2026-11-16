@@ -75,6 +75,8 @@ delete_option( 'am_occasion_window_seconds' );
 delete_option( 'am_datetime_format' );
 delete_option( 'am_ip_storage' );
 delete_option( 'am_ip_lookup_enabled' );
+delete_option( 'am_proxy_header' );
+delete_option( 'am_trusted_proxies' );
 delete_option( 'am_default_style' );
 // Throttle markers written by AM_Logger_Cron, AM_Logger_Posts (draft
 // autosaves) and AM_Notifications (per-channel alert counts); they expire on

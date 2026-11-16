@@ -52,6 +52,9 @@ class AM_Logger_Options extends AM_Logger_Base {
 		// storage / channels is how someone quietly blunts the audit trail.
 		'am_retention_days'           => AM_Log_Levels::WARNING,
 		'am_ip_storage'               => AM_Log_Levels::WARNING,
+		// Decide whose address every later entry carries.
+		'am_proxy_header'             => AM_Log_Levels::WARNING,
+		'am_trusted_proxies'          => AM_Log_Levels::WARNING,
 		'am_notification_channels'    => AM_Log_Levels::WARNING,
 		'am_occasion_window_seconds'  => AM_Log_Levels::NOTICE,
 		'am_log_cron_changes'         => AM_Log_Levels::NOTICE,

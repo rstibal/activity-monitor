@@ -45,7 +45,7 @@ class AM_Logger_Login_Locations extends AM_Logger_Base {
 		$known = get_user_meta( $user->ID, self::KNOWN_META, true );
 		$known = is_array( $known ) ? $known : array();
 
-		$country = AM_Stats_Geo::country_for( AM_DB_Legacy_IP::resolve() );
+		$country = AM_Stats_Geo::country_for( AM_Client_IP::resolve() );
 
 		$user_agent = isset( $_SERVER['HTTP_USER_AGENT'] ) && is_string( $_SERVER['HTTP_USER_AGENT'] )
 			? sanitize_text_field( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ) )

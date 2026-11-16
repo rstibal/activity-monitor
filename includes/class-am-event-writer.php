@@ -315,7 +315,9 @@ class AM_Event_Writer {
 			return '';
 		}
 
-		$ip = AM_DB_Legacy_IP::resolve();
+		// AM_Client_IP layers the trusted-proxy setting over
+		// AM_DB_Legacy_IP::resolve(); with it unset the two are identical.
+		$ip = AM_Client_IP::resolve();
 
 		return 'anonymized' === $mode ? (string) wp_privacy_anonymize_ip( $ip ) : $ip;
 	}

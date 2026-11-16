@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, event log
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.9.79
+Stable tag: 2.9.80
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -75,6 +75,9 @@ Yes. Settings → Privacy offers full addresses, anonymised addresses (the last 
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
 
 == Changelog ==
+
+= 2.9.80 =
+* New: a Reverse proxy setting (Settings > Privacy) for sites behind a load balancer or proxy other than Cloudflare, where every entry showed the proxy's address instead of the visitor's. Choose the header the proxy sets (X-Forwarded-For or X-Real-IP) and enter the proxy's own addresses; the header is believed only on requests arriving from those addresses, so it cannot be faked by a visitor. The setting shows what the current request looks like to help fill it in. It applies to the log, alerts, new-country login detection and Visitor Stats. Nothing changes until both parts are filled in.
 
 = 2.9.79 =
 * New: each notification channel can have an alert limit (5, 10, 20 or 50 alerts every 10 minutes). Past the limit the channel gets one message saying alerts are paused and when they resume, the pause is logged, and every event is still recorded. This stops a burst of events sending hundreds of emails or Slack messages and slowing the site while it does. New channels start at 20; existing channels keep sending without a limit until you set one.

@@ -91,7 +91,7 @@ class AM_Stats_Tracker {
 		// lookup below -- both already respect am_ip_storage the same way,
 		// so there's one IP-privacy decision per hit, not two.
 		$ip_storage   = (string) get_option( 'am_ip_storage', 'full' );
-		$ip           = 'none' === $ip_storage ? '' : AM_DB_Legacy_IP::resolve();
+		$ip           = 'none' === $ip_storage ? '' : AM_Client_IP::resolve();
 		$visitor_hash = self::visitor_hash( $ip, $user_agent );
 
 		$country_code = '';

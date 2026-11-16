@@ -309,6 +309,17 @@ class AM_Admin {
 			'default'           => 'full',
 		) );
 
+		register_setting( self::SETTINGS_GROUP, AM_Client_IP::HEADER_OPTION, array(
+			'sanitize_callback' => array( $this, 'sanitize_proxy_header' ),
+			'default'           => '',
+		) );
+
+		register_setting( self::SETTINGS_GROUP, AM_Client_IP::PROXIES_OPTION, array(
+			'type'              => 'array',
+			'sanitize_callback' => array( 'AM_Client_IP', 'sanitize_proxies' ),
+			'default'           => array(),
+		) );
+
 		register_setting( self::SETTINGS_GROUP, 'am_ip_lookup_enabled', array(
 			'type'              => 'boolean',
 			'sanitize_callback' => array( $this, 'sanitize_checkbox' ),
@@ -388,6 +399,7 @@ class AM_Admin {
 			self::PAGE_SETTINGS
 		);
 		add_settings_field( 'am_field_ip_storage', __( 'IP addresses', 'activity-monitor' ), array( $this, 'field_ip_storage' ), self::PAGE_SETTINGS, 'am_privacy' );
+		add_settings_field( 'am_field_proxy', __( 'Reverse proxy', 'activity-monitor' ), array( $this, 'field_proxy' ), self::PAGE_SETTINGS, 'am_privacy' );
 		add_settings_field( 'am_field_ip_lookup', __( 'IP address lookups', 'activity-monitor' ), array( $this, 'field_ip_lookup' ), self::PAGE_SETTINGS, 'am_privacy' );
 
 		add_settings_section(
@@ -447,6 +459,12 @@ class AM_Admin {
 	public function sanitize_ip_storage( $input ): string {
 		$mode = sanitize_key( $input );
 		return in_array( $mode, array( 'full', 'anonymized', 'none' ), true ) ? $mode : 'full';
+	}
+
+	/** '' (none) or one of AM_Client_IP::HEADERS' keys. */
+	public function sanitize_proxy_header( $input ): string {
+		$header = is_string( $input ) ? strtolower( trim( $input ) ) : '';
+		return isset( AM_Client_IP::HEADERS[ $header ] ) ? $header : '';
 	}
 
 	/** Unchecked boxes post nothing, which reaches this as null. */
@@ -2787,6 +2805,77 @@ class AM_Admin {
 			<?php endforeach; ?>
 			<p class="description">
 				<?php esc_html_e( 'Applies to entries recorded from now on — this changes what reaches the database, so entries already in the log are unaffected.', 'activity-monitor' ); ?>
+			</p>
+		</fieldset>
+		<?php
+	}
+
+	/**
+	 * Which forwarding header to believe, and from which proxies -- see
+	 * AM_Client_IP. Shows what this very request looks like to the server,
+	 * since "what is my proxy's address and which header does it send" is
+	 * otherwise something to go and ask the host.
+	 */
+	public function field_proxy() {
+		$current = (string) get_option( AM_Client_IP::HEADER_OPTION, '' );
+		$labels  = array(
+			''                => __( 'None — the site is not behind a proxy, or only behind Cloudflare', 'activity-monitor' ),
+			'x-forwarded-for' => 'X-Forwarded-For',
+			'x-real-ip'       => 'X-Real-IP',
+		);
+		// phpcs:disable WordPress.Security.ValidatedSanitizedInput.InputNotValidated -- each is checked with isset()/is_string() in the same expression.
+		$remote = isset( $_SERVER['REMOTE_ADDR'] ) && is_string( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '';
+		$seen   = array();
+		foreach ( AM_Client_IP::HEADERS as $slug => $server_key ) {
+			if ( isset( $_SERVER[ $server_key ] ) && is_string( $_SERVER[ $server_key ] ) && '' !== $_SERVER[ $server_key ] ) {
+				$seen[] = $labels[ $slug ] . ': ' . sanitize_text_field( wp_unslash( $_SERVER[ $server_key ] ) );
+			}
+		}
+		// phpcs:enable WordPress.Security.ValidatedSanitizedInput.InputNotValidated
+		?>
+		<fieldset>
+			<legend class="screen-reader-text"><span><?php esc_html_e( 'Reverse proxy', 'activity-monitor' ); ?></span></legend>
+			<p class="description">
+				<?php esc_html_e( 'Only needed if every entry in the log shows the same IP address — your load balancer’s or proxy’s — instead of each visitor’s. Cloudflare is recognised automatically and needs nothing here.', 'activity-monitor' ); ?>
+			</p>
+			<p>
+				<label for="am_proxy_header"><?php esc_html_e( 'The proxy passes the visitor’s address in', 'activity-monitor' ); ?></label><br>
+				<select id="am_proxy_header" name="<?php echo esc_attr( AM_Client_IP::HEADER_OPTION ); ?>">
+					<?php foreach ( $labels as $value => $label ) : ?>
+						<option value="<?php echo esc_attr( $value ); ?>" <?php selected( $value, $current ); ?>><?php echo esc_html( $label ); ?></option>
+					<?php endforeach; ?>
+				</select>
+			</p>
+			<p>
+				<label for="am_trusted_proxies"><?php esc_html_e( 'The proxy’s own addresses, one per line (an address, or a range such as 10.0.0.0/8)', 'activity-monitor' ); ?></label><br>
+				<textarea id="am_trusted_proxies" name="<?php echo esc_attr( AM_Client_IP::PROXIES_OPTION ); ?>" rows="3" class="regular-text" spellcheck="false"><?php echo esc_textarea( implode( "\n", AM_Client_IP::proxies() ) ); ?></textarea>
+			</p>
+			<p class="description">
+				<?php esc_html_e( 'Both are required: the header is believed only on requests that arrive from one of these addresses, because anyone can type that header into a request. Leave either empty and nothing changes.', 'activity-monitor' ); ?>
+			</p>
+			<p class="description">
+				<?php
+				printf(
+					/* translators: %s: an IP address */
+					esc_html__( 'This page’s request reached the server from %s.', 'activity-monitor' ),
+					esc_html( '' !== $remote ? $remote : '—' )
+				);
+				echo ' ';
+				if ( $seen ) {
+					/* translators: %s: header names and their values */
+					printf( esc_html__( 'It carried: %s.', 'activity-monitor' ), esc_html( implode( '; ', $seen ) ) );
+					echo ' ';
+					esc_html_e( 'If that first address is not yours, it is the proxy’s: enter it above and pick the header showing your own address.', 'activity-monitor' );
+				} else {
+					esc_html_e( 'It carried neither header, so there is nothing to set up.', 'activity-monitor' );
+				}
+				echo ' ';
+				printf(
+					/* translators: %s: an IP address */
+					esc_html__( 'With the saved settings, it is logged as %s.', 'activity-monitor' ),
+					esc_html( AM_Client_IP::resolve() )
+				);
+				?>
 			</p>
 		</fieldset>
 		<?php
