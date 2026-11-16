@@ -34,12 +34,17 @@ class AM_Stats_Tracker {
 	}
 
 	/**
-	 * Enqueued unconditionally on the front end. Whether a given hit ends
-	 * up recorded is decided server-side in handle_track(), which always
+	 * Enqueued on the front end whenever tracking is on. Whether a given hit
+	 * ends up recorded is decided server-side in handle_track(), which always
 	 * runs fresh PHP even on a cached page -- see class doc.
+	 *
+	 * With tracking off the script isn't printed at all (2.9.71): it used to
+	 * load on every page and post a hit that handle_track() then threw away.
+	 * A page cached while tracking was on keeps its beacon until the cache
+	 * turns over, which is why handle_track() still checks the setting too.
 	 */
 	public static function enqueue_beacon() {
-		if ( is_admin() ) {
+		if ( is_admin() || ! (bool) get_option( 'am_stats_enable_tracking', 1 ) ) {
 			return;
 		}
 		wp_enqueue_script( 'am-stats-beacon', AM_URL . 'assets/js/stats-beacon.js', array(), AM_VERSION, true );
