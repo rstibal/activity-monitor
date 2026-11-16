@@ -24,7 +24,9 @@ class AM_Event_Query {
 			'search'    => '',
 			'orderby'   => 'date',
 			'order'     => 'DESC',
-			'no_limit'  => false, // export mode: ignore per_page/page, return every matching row
+			'no_limit'  => false, // ignore per_page/page, return every matching row
+			'before_id' => 0,     // only rows with a lower id: the export's batch cursor
+			'count'     => true,  // false skips the COUNT(*) and returns total 0
 		);
 	}
 
@@ -85,6 +87,10 @@ class AM_Event_Query {
 			$where[]  = 'date <= %s';
 			$values[] = $to;
 		}
+		if ( $args['before_id'] ) {
+			$where[]  = 'id < %d';
+			$values[] = absint( $args['before_id'] );
+		}
 		if ( '' !== $args['search'] ) {
 			$like     = '%' . $wpdb->esc_like( $args['search'] ) . '%';
 			// ip_address too (2.9.63): "what did this address do" is one of
@@ -144,15 +150,14 @@ class AM_Event_Query {
 		}
 
 		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared -- $count_sql/$data_sql are built above from plugin constants plus a fixed set of literal WHERE fragments; every caller-supplied value travels separately in $values as a %s placeholder.
-		if ( $args['no_limit'] ) {
+		$total = 0;
+		if ( $args['count'] ) {
 			$total = empty( $values ) ? (int) $wpdb->get_var( $count_sql ) : (int) $wpdb->get_var( $wpdb->prepare( $count_sql, $values ) );
+		}
+		if ( $args['no_limit'] ) {
 			$items = empty( $values ) ? $wpdb->get_results( $data_sql ) : $wpdb->get_results( $wpdb->prepare( $data_sql, $values ) );
-		} elseif ( ! empty( $values ) ) {
-			$total = (int) $wpdb->get_var( $wpdb->prepare( $count_sql, $values ) );
-			$items = $wpdb->get_results( $wpdb->prepare( $data_sql, array_merge( $values, array( absint( $args['per_page'] ), $offset ) ) ) );
 		} else {
-			$total = (int) $wpdb->get_var( $count_sql );
-			$items = $wpdb->get_results( $wpdb->prepare( $data_sql, absint( $args['per_page'] ), $offset ) );
+			$items = $wpdb->get_results( $wpdb->prepare( $data_sql, array_merge( $values, array( absint( $args['per_page'] ), $offset ) ) ) );
 		}
 		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared
 
@@ -285,6 +290,37 @@ class AM_Event_Query {
 			$context[ $row->key ] = ( null !== $decoded || 'null' === $row->value ) ? $decoded : $row->value;
 		}
 		return $context;
+	}
+
+	/**
+	 * get_context() for many events in one query, for the export.
+	 *
+	 * @param int[] $event_ids
+	 * @return array<int, array<string, mixed>> event id => its context; events
+	 *         with none are absent.
+	 */
+	public static function get_contexts( array $event_ids ): array {
+		global $wpdb;
+		$event_ids = array_values( array_filter( array_map( 'absint', $event_ids ) ) );
+		if ( ! $event_ids ) {
+			return array();
+		}
+
+		$table        = $wpdb->prefix . AM_Schema::CONTEXT_TABLE;
+		$placeholders = implode( ', ', array_fill( 0, count( $event_ids ), '%d' ) );
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- table name is a plugin constant; $placeholders is only %d markers, one per id.
+		$rows = $wpdb->get_results( $wpdb->prepare(
+			"SELECT event_id, `key`, value FROM `{$table}` WHERE event_id IN ( {$placeholders} )",
+			$event_ids
+		) );
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
+
+		$contexts = array();
+		foreach ( (array) $rows as $row ) {
+			$decoded = json_decode( (string) $row->value, true );
+			$contexts[ (int) $row->event_id ][ $row->key ] = ( null !== $decoded || 'null' === $row->value ) ? $decoded : $row->value;
+		}
+		return $contexts;
 	}
 
 	/**

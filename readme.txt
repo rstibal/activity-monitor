@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, event log
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.9.74
+Stable tag: 2.9.75
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -75,6 +75,9 @@ Yes. Settings → Privacy offers full addresses, anonymised addresses (the last 
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
 
 == Changelog ==
+
+= 2.9.75 =
+* Improved: exports are written a few hundred entries at a time instead of loading the whole log into memory first, which made a large log fail to export. Every format now includes each entry's ID, user ID and object ID, and gives the full message where the log had shortened it. CSV and JSON also include a context column with the before and after values shown under Changes. Note for anything reading these files: the columns have changed (id is now first), and entries are ordered newest first by ID.
 
 = 2.9.74 =
 * New: exporting the activity log is itself logged, at Warning, with the format and number of entries. Downloading the whole audit trail used to leave no record, while WordPress's own Tools > Export did.
