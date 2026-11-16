@@ -425,7 +425,33 @@ all seven, the one thing the range-form handler does that a plain link click
 doesn't.
 
 All modals share one overlay, the `openModal()` JS helper, and the `am_ajax`
-nonce.
+nonce. Since 2.9.67 it's a real dialog (`role="dialog"`, `aria-modal`): close
+it only through `closeModal()`, which returns focus to the opener, never a
+bare `.hide()`. Every string `admin.js` shows comes from `amData.i18n`
+(`enqueue_assets()`, 2.9.73) — add new ones there, not as literals — and
+one-line messages go through `amModalMessage()`, which uses `.text()`.
+
+**A failed log/stats AJAX refresh falls back to a normal page load (2.9.66)**,
+in `amRefresh()`: an expired nonce, an ended session or a dropped request
+used to leave the click doing nothing. It also dims the container
+(`.am-busy`) and drops a reply that a later click has overtaken.
+
+**The Changes rows in Event Details (2.9.61)** come from
+`AM_Admin::diff_cells()`: values up to 120 characters whole, longer ones as
+the differing middle (common prefix/suffix skipped, cut on UTF-8 character
+boundaries) with 60 characters of context, tags left in and escaped. Don't
+go back to `wp_trim_words()` — it showed the first 20 words with markup
+stripped, so a later edit or an injected `<script>` rendered as no change.
+
+**Visitor Stats ranges are whole local days (2.9.62)** —
+`AM_Stats_Query::since()` is the site's local midnight `$days - 1` days ago,
+matching the log's date filter. "Unique visitors" is per day (the visitor
+hash rotates daily), which the screen now states for multi-day ranges.
+
+**The log search also matches `ip_address` (2.9.63)**, and a grouped row
+shows its `repeat_count` in the Message cell (2.9.64). A saved Slack webhook
+is never echoed into the edit form; a blank one on save means "unchanged"
+(2.9.70), same convention as the MaxMind fields.
 
 **`uninstall.php` returns early when `am_delete_data_on_uninstall` is off**
 (default on, so an untouched site behaves as it always did). When off, the
@@ -613,8 +639,8 @@ Network signup/activation isn't separately logged: activation already yields
 double-log. Core's `deleted` flag means *deactivated* (hidden, not removed);
 real removal is `wp_delete_site`, logged separately.
 
-**`AM_Logger_Update_Failures` (2.9.32)** — `upgrader_process_complete` only
-fires on success. Hooks `upgrader_install_package_result` and
+**`AM_Logger_Update_Failures` (2.9.32)** — `upgrader_process_complete` says
+nothing about the outcome (see the next paragraph). Hooks `upgrader_install_package_result` and
 `upgrader_source_selection` (both filters, priority 999, return arg 1
 unchanged; core returns a source error before the result filter, so one failure
 hits one hook) plus `automatic_updates_complete` for background runs, deduped
@@ -625,6 +651,36 @@ screen (AJAX) and Dashboard → Updates both use — passes only `plugin` /
 the type from whichever key is present (2.9.48 — before that, every manual
 update failure at the copy step was dropped). A missing action reads as an
 update.
+
+**Plugin/theme "updated" rows (2.9.59, 2.9.69)** — checked against core 6.8's
+`WP_Upgrader::run()`, `Plugin_Upgrader` and `Theme_Upgrader`:
+- `upgrader_process_complete` carries a `plugins` / `themes` *list* only from
+  `bulk_upgrade()` (Plugins screen, Dashboard → Updates). `upgrade()` —
+  background auto-updates, `update.php?action=upgrade-plugin`, WP-CLI — sends
+  one `plugin` / `theme`. Until 2.9.59 only the list was read, so none of
+  those were logged and the Auto-Update initiator never appeared on a plugin
+  or theme row. Both shapes are read now.
+- The action fires after a *failed* copy too, and a bulk run lists every item
+  attempted. Each logger records per-item outcomes from
+  `upgrader_install_package_result` (priority 999, returns arg 1 unchanged)
+  and skips a known failure; an item with no recorded outcome (an updater
+  that bypasses `run()`) is still logged.
+- Old versions come from `upgrader_pre_install` (fires while the old files
+  are still there; `hook_extra` has `plugin` / `theme` in both paths). The
+  row's message is "updated from X to Y" with a `diff.version` context.
+- Plugin messages name the plugin from its header (`AM_Logger_Plugins::header()`,
+  `get_file_data()` — `get_plugin_data()` needs wp-admin includes) as
+  "Name 1.2.3". **`object_name` stays the plugin file path**: it's the stable
+  identifier, the grouping key, and what a search for the slug matches.
+- None of this has been run on a site yet; it's from reading core.
+
+**Draft autosaves (2.9.60)** — both editors autosave a draft its author is
+editing straight into the post via `wp_update_post()`, so each one reached
+`on_post_updated()` as an ungrouped "updated" row holding two copies of the
+content. With `DOING_AUTOSAVE` set it is now `post.autosaved`: INFO, no
+context, once an hour per post and user (transient `am_autosave_<post>_<user>`,
+cleared in `uninstall.php`). Own throttle, not occasion grouping, per the
+rate-limit rule below. A deliberate save is unchanged.
 
 **`AM_Logger_Core` (2.9.47)** takes the new version from
 `_core_updated_successfully`, not the global `$wp_version`: `update_core()`
@@ -847,7 +903,8 @@ If labels look wrong, re-run this audit: parse every `$this->log()`/
 action passed as a variable to its literal values, and compare the emitted
 `event_type.action` pairs against `MAP`, and the types against `TYPE_MAP`.
 Literal pairs only, re-checked at 2.9.44: 64, all mapped; 2.9.58 added two
-more (`user.login_new_country`/`_device`), mapped in the same commit. Last full run (2.9.37): 63 literal pairs plus 29 more from calls whose action is
+more (`user.login_new_country`/`_device`) and 2.9.60 one (`post.autosaved`),
+each mapped in the same commit. Last full run (2.9.37): 63 literal pairs plus 29 more from calls whose action is
 a variable (auto-update toggles, install/update failures, privacy, site
 status, role added/removed, maintenance, PHP errors) — all mapped. Variable
 forms are why a regex over literals alone undercounts; resolve them by hand.
