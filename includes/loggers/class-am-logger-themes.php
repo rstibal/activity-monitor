@@ -24,7 +24,26 @@ class AM_Logger_Themes extends AM_Logger_Base {
 	/** @var array<string,string> Stylesheet => display name, captured before the files are gone. */
 	private $pending_deletes = array();
 
+	/** @var array<string,bool> Theme slug => whether its copy into place succeeded, this request. */
+	private $results = array();
+
+	/**
+	 * See AM_Logger_Plugins::on_install_package_result(). A filter: $result
+	 * goes back unchanged.
+	 *
+	 * @param mixed $result
+	 * @param mixed $hook_extra
+	 * @return mixed
+	 */
+	public function on_install_package_result( $result, $hook_extra ) {
+		if ( is_array( $hook_extra ) && ! empty( $hook_extra['theme'] ) && is_string( $hook_extra['theme'] ) ) {
+			$this->results[ $hook_extra['theme'] ] = $result && ! is_wp_error( $result );
+		}
+		return $result;
+	}
+
 	public function register_hooks() {
+		add_filter( 'upgrader_install_package_result', array( $this, 'on_install_package_result' ), 999, 2 );
 		add_action( 'switch_theme', array( $this, 'on_theme_switch' ), 10, 3 );
 		add_action( 'customize_save_after', array( $this, 'on_customizer_save' ) );
 		add_action( 'upgrader_process_complete', array( $this, 'on_upgrader_complete' ), 10, 2 );
@@ -131,7 +150,13 @@ class AM_Logger_Themes extends AM_Logger_Base {
 			return;
 		}
 
-		if ( empty( $data['themes'] ) ) {
+		// A 'themes' list from bulk_upgrade(), one 'theme' from upgrade() --
+		// see AM_Logger_Plugins::on_upgrader_complete().
+		if ( ! empty( $data['themes'] ) ) {
+			$themes = (array) $data['themes'];
+		} elseif ( ! empty( $data['theme'] ) ) {
+			$themes = array( $data['theme'] );
+		} else {
 			return;
 		}
 
@@ -140,7 +165,10 @@ class AM_Logger_Themes extends AM_Logger_Base {
 		// other WP_CRON-context update.
 		$is_auto_update = $upgrader->skin instanceof Automatic_Upgrader_Skin;
 
-		foreach ( (array) $data['themes'] as $theme ) {
+		foreach ( $themes as $theme ) {
+			if ( ! is_string( $theme ) || false === ( $this->results[ $theme ] ?? true ) ) {
+				continue;
+			}
 			$this->log(
 				'theme',
 				'updated',

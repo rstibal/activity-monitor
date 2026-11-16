@@ -26,11 +26,33 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  */
 class AM_Logger_Plugins extends AM_Logger_Base {
 
+	/** @var array<string,bool> Plugin file => whether its copy into place succeeded, this request. */
+	private $results = array();
+
 	public function register_hooks() {
+		add_filter( 'upgrader_install_package_result', array( $this, 'on_install_package_result' ), 999, 2 );
 		add_action( 'activated_plugin', array( $this, 'on_plugin_activated' ) );
 		add_action( 'deactivated_plugin', array( $this, 'on_plugin_deactivated' ) );
 		add_action( 'delete_plugin', array( $this, 'on_plugin_delete' ) );
 		add_action( 'upgrader_process_complete', array( $this, 'on_upgrader_complete' ), 10, 2 );
+	}
+
+	/**
+	 * Notes how each plugin's update ended. upgrader_process_complete fires
+	 * whether or not the copy into place worked, and for a bulk run it lists
+	 * every plugin attempted, so on its own it logged a failed update as
+	 * "updated" (next to AM_Logger_Update_Failures' row saying it failed).
+	 * A filter: $result goes back unchanged.
+	 *
+	 * @param mixed $result
+	 * @param mixed $hook_extra
+	 * @return mixed
+	 */
+	public function on_install_package_result( $result, $hook_extra ) {
+		if ( is_array( $hook_extra ) && ! empty( $hook_extra['plugin'] ) && is_string( $hook_extra['plugin'] ) ) {
+			$this->results[ $hook_extra['plugin'] ] = $result && ! is_wp_error( $result );
+		}
+		return $result;
 	}
 
 	public function on_plugin_activated( string $plugin ) {
@@ -125,7 +147,15 @@ class AM_Logger_Plugins extends AM_Logger_Base {
 			return;
 		}
 
-		if ( empty( $data['plugins'] ) ) {
+		// Plugin_Upgrader::bulk_upgrade() (the Plugins and Updates screens)
+		// reports a 'plugins' list; upgrade() -- background auto-updates,
+		// update.php's own "update now" link, WP-CLI -- reports one 'plugin'.
+		// Reading only the list meant none of the latter were ever logged.
+		if ( ! empty( $data['plugins'] ) ) {
+			$plugins = (array) $data['plugins'];
+		} elseif ( ! empty( $data['plugin'] ) ) {
+			$plugins = array( $data['plugin'] );
+		} else {
 			return;
 		}
 
@@ -137,7 +167,13 @@ class AM_Logger_Plugins extends AM_Logger_Base {
 		// via WP-CLI or another cron-context caller would still get.
 		$is_auto_update = $upgrader->skin instanceof Automatic_Upgrader_Skin;
 
-		foreach ( (array) $data['plugins'] as $plugin ) {
+		foreach ( $plugins as $plugin ) {
+			// Only a known failure is skipped: an updater that never went
+			// through WP_Upgrader::run() leaves no result, and is logged as
+			// before.
+			if ( ! is_string( $plugin ) || false === ( $this->results[ $plugin ] ?? true ) ) {
+				continue;
+			}
 			$this->log(
 				'plugin',
 				'updated',

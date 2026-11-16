@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, event log
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.9.58
+Stable tag: 2.9.59
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -75,6 +75,9 @@ Yes. Settings → Privacy offers full addresses, anonymised addresses (the last 
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
 
 == Changelog ==
+
+= 2.9.59 =
+* Fixed: a plugin or theme updated on its own -- by a background auto-update, from the "update now" link on its details page, or through WP-CLI -- was never logged; only updates run from the Plugins or Updates screens were. Also fixed: an update that failed partway was logged as "updated" next to the entry saying it failed.
 
 = 2.9.58 =
 * New: a login from a country the user has never logged in from before is logged at Warning (so Warning alerts pick it up), and one from a new browser and operating system at Notice. Each user's first login after updating is only learned, not flagged. Countries need Visitor Stats geolocation turned on; no IP address is stored for this.

@@ -4,8 +4,9 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 /**
  * AM_Logger_Update_Failures — plugin/theme installs and updates that failed.
  *
- * upgrader_process_complete only fires on success, so failures need their own
- * hooks:
+ * upgrader_process_complete says nothing about the outcome (it fires after a
+ * failed copy too, and not at all after an earlier failure), so failures need
+ * their own hooks:
  *  - upgrader_install_package_result: the copy into place failed.
  *  - upgrader_source_selection (late, so core's own package checks have run):
  *    the package was unpacked but wasn't a valid plugin/theme. Core returns
