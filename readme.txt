@@ -4,7 +4,7 @@ Tags: activity log, audit log, security, user activity, event log
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.9.71
+Stable tag: 2.9.72
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -75,6 +75,9 @@ Yes. Settings → Privacy offers full addresses, anonymised addresses (the last 
 1. The Activity Log screen, with filtering by level, initiator, event type, and date range.
 
 == Changelog ==
+
+= 2.9.72 =
+* Improved: Visitor Stats now says, for any range longer than a day, that unique visitors are counted per day. Visitors are identified by a value that changes daily, so someone returning on another day was always counted again; the screen just did not say so.
 
 = 2.9.71 =
 * Improved: with visitor tracking turned off, the tracking script is no longer added to the site's pages. It used to load on every page and send a request that was then discarded. After turning tracking back on, clear any page cache so pages include the script again.

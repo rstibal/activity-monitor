@@ -2090,6 +2090,13 @@ class AM_Admin {
 					<noscript><button type="submit" class="button"><?php esc_html_e( 'Apply', 'activity-monitor' ); ?></button></noscript>
 				</li>
 			</ul>
+			<?php if ( $days > 1 ) : ?>
+				<?php
+				// The visitor hash rotates every day (AM_Stats_Tracker::visitor_hash()),
+				// so over several days "unique" can only mean unique per day.
+				?>
+				<p class="description am-stats-note"><?php esc_html_e( 'Unique visitors are counted per day: someone who comes back on another day is counted again. Visitors are not followed from one day to the next.', 'activity-monitor' ); ?></p>
+			<?php endif; ?>
 		</form>
 
 		<?php $this->render_recent_hits_section( $days, $pages['hits'], $current_url ); ?>
