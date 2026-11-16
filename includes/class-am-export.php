@@ -31,6 +31,30 @@ class AM_Export {
 		$result = AM_Event_Query::get_events( array_merge( $filters, array( 'no_limit' => true ) ) );
 		$items  = $result['items'];
 
+		// The audit trail leaving the site as a file is itself an audit
+		// event, same tier as core's Tools -> Export (AM_Logger_Export).
+		// Written after the query, so the export doesn't contain its own row.
+		AM_Event_Writer::log(
+			'log',
+			'exported',
+			sprintf(
+				/* translators: 1: file format, e.g. CSV, 2: number of entries, e.g. "1,204 entries" */
+				__( 'Activity log exported as %1$s (%2$s).', 'activity-monitor' ),
+				strtoupper( $format ),
+				sprintf(
+					/* translators: %s: formatted number of entries */
+					_n( '%s entry', '%s entries', count( $items ), 'activity-monitor' ),
+					number_format_i18n( count( $items ) )
+				)
+			),
+			array(
+				'level'       => AM_Log_Levels::WARNING,
+				'object_type' => 'log',
+				'object_name' => 'activity-log',
+				'group'       => false,
+			)
+		);
+
 		$filename = 'activity-monitor-export-' . gmdate( 'Y-m-d' ) . '.' . $format;
 
 		nocache_headers();

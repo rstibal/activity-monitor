@@ -30,6 +30,7 @@ class AM_Event_Labels {
 		'cron.unschedule_attempted'              => 'Cron Unschedule Attempted',
 		'cron.unscheduled'                    => 'Cron Event Unscheduled',
 		'log.cleared'                            => 'Activity Log Cleared',
+		'log.exported'                           => 'Activity Log Exported',
 		'media.deleted'                        => 'Media Deleted',
 		'media.updated'                        => 'Media Updated',
 		'media.uploaded'                       => 'Media Uploaded',
